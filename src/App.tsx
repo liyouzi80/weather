@@ -164,7 +164,7 @@ function ProviderCard({ r }: { r: Annotated }) {
         )}
       </div>
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
-      {c.forecast && (
+      {c.forecast && isForecastCurrent(c.forecast, c.forecastIssuedAt) && (
         <div className="forecast">
           <b>番禺区气象台</b>
           {c.forecastIssuedAt ? ` · ${c.forecastIssuedAt}` : ''}：{c.forecast}
@@ -251,6 +251,32 @@ function sortedMedian(arr: number[]): number {
   const s = [...arr].sort((a, b) => a - b)
   const mid = Math.floor(s.length / 2)
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+}
+
+// 番禺区气象台短时预报时效检测：按"预报窗口结束时间"（北京时）判断是否过期。
+// forecastIssuedAt 形如「2026年05月29日 17:00」，content 含「…今天17时到20时…」。
+// 解析不出来时回退为"发布后 4 小时"。过期则不再展示该条预报。
+function isForecastCurrent(content?: string, issued?: string): boolean {
+  if (!issued) return true
+  const m = issued.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2})/)
+  if (!m) return true
+  const Y = +m[1], Mo = +m[2], D = +m[3], H = +m[4], Mi = +m[5]
+  // 发布时间为北京时间(UTC+8)，换算成 UTC 毫秒
+  const issuedUTC = Date.UTC(Y, Mo - 1, D, H - 8, Mi)
+  const now = Date.now()
+  if (now < issuedUTC - 3600_000) return true // 时钟偏差保护：发布时间"在未来"则照常显示
+
+  // 优先用内容里的窗口结束时间「到XX时」；结束小时 ≤ 发布小时视为次日
+  let limitUTC: number
+  const em = content?.match(/到\s*(\d{1,2})\s*时/)
+  if (em) {
+    const eh = +em[1]
+    const dayOffset = eh <= H ? 1 : 0
+    limitUTC = Date.UTC(Y, Mo - 1, D + dayOffset, eh - 8, 0)
+  } else {
+    limitUTC = issuedUTC + 4 * 3600_000
+  }
+  return now <= limitUTC + 30 * 60_000 // 给 30 分钟宽限
 }
 
 function formatTime(iso: string): string {
