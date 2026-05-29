@@ -78,7 +78,7 @@ export default function App() {
       </header>
 
       {stats && (
-        <div className="summary">
+        <div className="summary" key={cityIdx}>
           {weatherEmoji(stats.text) && <div className="sum-icon">{weatherEmoji(stats.text)}</div>}
           <div className="big">{stats.avg.toFixed(1)}°</div>
           <div className="meta">
@@ -88,7 +88,7 @@ export default function App() {
         </div>
       )}
 
-      {stats && stats.count >= 2 && <TempRanking results={annotated} />}
+      {stats && stats.count >= 2 && <TempRanking results={annotated} key={`rank-${cityIdx}`} />}
 
       {loading && results.length === 0 ? (
         <div className="cards">

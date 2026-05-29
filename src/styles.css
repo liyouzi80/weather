@@ -548,10 +548,56 @@ body::after {
 @media (max-width: 400px) {
   .app { padding: env(safe-area-inset-top) 12px 40px; }
   .topbar h1 { font-size: 22px; }
-  .location-bar .city { font-size: 28px; }
+  .loc-header .city { font-size: 26px; }
   .summary { padding: 18px; gap: 16px; }
   .summary .big { font-size: 44px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }
   .rank-name { min-width: 80px; font-size: 13px; }
+}
+
+/* ── Motion / 动效 ── */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.loc-header { animation: fadeIn 0.45s ease both; }
+.loc-header .city { animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.summary { animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.ranking { animation: riseIn 0.5s 0.06s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+
+/* 排行行依次入场 */
+.rank-row { animation: riseIn 0.45s both; }
+.rank-row:nth-child(2) { animation-delay: 0.04s; }
+.rank-row:nth-child(3) { animation-delay: 0.08s; }
+.rank-row:nth-child(4) { animation-delay: 0.12s; }
+.rank-row:nth-child(5) { animation-delay: 0.16s; }
+.rank-row:nth-child(6) { animation-delay: 0.20s; }
+.rank-row:nth-child(7) { animation-delay: 0.24s; }
+.rank-row:nth-child(8) { animation-delay: 0.28s; }
+
+/* 触摸反馈 */
+.card:active { transform: scale(0.985); }
+.icon-btn svg { transition: transform var(--transition-fast); }
+.icon-btn.switch:hover svg { transform: rotate(180deg); }
+.icon-btn.switch:active svg { transform: rotate(180deg) scale(0.9); }
+
+/* 数值 / 进度条平滑过渡 */
+.summary .big,
+.card .temp,
+.rank-temp { transition: color var(--transition-fast); }
+
+/* 尊重系统「减弱动态效果」 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
