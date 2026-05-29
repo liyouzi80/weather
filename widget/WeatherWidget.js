@@ -70,35 +70,32 @@ function renderMain(w, data) {
 
   left.addSpacer()
 
-  // 地名
-  const city = left.addText(data.city)
+  // 地名 + 天气（同一行，居中对称）
+  const topRow = left.addStack()
+  topRow.layoutHorizontally()
+  topRow.addSpacer()
+  const city = topRow.addText(data.city)
   city.font = Font.semiboldSystemFont(16)
   city.textColor = C.text
   city.lineLimit = 1
-  city.centerAlignText()
-
-  left.addSpacer(8)
-
-  // 温度
-  const median = data.median != null ? Math.round(data.median) : '—'
-  const big = left.addText(`${median}°`)
-  big.font = Font.boldSystemFont(34)
-  big.textColor = C.text
-  big.lineLimit = 1
-  big.centerAlignText()
-
-  left.addSpacer(8)
-
-  // 天气
+  topRow.addSpacer(14)
   if (data.text) {
-    const wx = left.addText(data.text)
+    const wx = topRow.addText(data.text)
     wx.font = Font.mediumSystemFont(15)
     wx.textColor = C.text2
     wx.lineLimit = 1
-    wx.centerAlignText()
-  } else {
-    left.addText(' ')
   }
+  topRow.addSpacer()
+
+  left.addSpacer(12)
+
+  // 温度（居中）
+  const median = data.median != null ? Math.round(data.median) : '—'
+  const big = left.addText(`${median}°`)
+  big.font = Font.boldSystemFont(44)
+  big.textColor = C.text
+  big.lineLimit = 1
+  big.centerAlignText()
 
   left.addSpacer()
 
