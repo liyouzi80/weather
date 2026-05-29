@@ -1,7 +1,7 @@
 {
-  "name": "天气多信源对比",
-  "short_name": "天气对比",
-  "description": "聚合 Open-Meteo、中央气象台、和风、彩云、广州市气象局等多个信源的实时天气对比",
+  "name": "番禺多信源实况",
+  "short_name": "番禺天气",
+  "description": "聚合 Open-Meteo、中央气象台、和风、彩云、广州市气象局多个信源的番禺实时天气，并高亮各信源差异",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0b1220",

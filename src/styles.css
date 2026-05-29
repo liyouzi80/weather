@@ -100,6 +100,18 @@ body {
 .card.err { border-left-color: #64748b; opacity: 0.75; }
 .card .err-msg { color: #f87171; font-size: 13px; }
 
+/* 差异高亮 */
+.card.is-max { background: linear-gradient(90deg, rgba(239,68,68,0.12), var(--bg-card) 60%); }
+.card.is-min { background: linear-gradient(90deg, rgba(59,130,246,0.12), var(--bg-card) 60%); }
+.tag { font-size: 10px; padding: 2px 7px; border-radius: 6px; font-weight: 600; }
+.tag-hot { background: rgba(239,68,68,0.2); color: #fca5a5; }
+.tag-cold { background: rgba(59,130,246,0.2); color: #93c5fd; }
+.delta { font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: 6px; }
+.delta-hot { color: #fca5a5; background: rgba(239,68,68,0.12); }
+.delta-cold { color: #93c5fd; background: rgba(59,130,246,0.12); }
+.text-diff { color: #fbbf24 !important; }
+.warn-text { color: #fbbf24; }
+
 .badge {
   font-size: 10px; padding: 1px 6px; border-radius: 6px;
   background: var(--bg-card-2); color: var(--text-dim);

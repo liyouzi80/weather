@@ -1,0 +1,4 @@
+# Cloudflare Pages 配置。functions/ 目录下的 Pages Functions 会被自动识别。
+name = "panyu-weather"
+compatibility_date = "2025-01-01"
+pages_build_output_dir = "dist"

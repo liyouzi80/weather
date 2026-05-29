@@ -10,7 +10,6 @@ interface KeyField {
 const FIELDS: KeyField[] = [
   { id: 'qweather', label: '和风天气 Key', desc: '在 dev.qweather.com 注册免费开发版后获取' },
   { id: 'caiyun', label: '彩云天气 Token', desc: '在 platform.caiyunapp.com 申请' },
-  { id: 'gzqx', label: '广州市气象局 密钥', desc: '广州市气象局数据接口密钥（仅覆盖广州地区）' },
 ]
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
@@ -30,7 +29,7 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h2>信源密钥设置</h2>
         <p className="hint" style={{ padding: '0 0 8px', textAlign: 'left' }}>
-          密钥仅保存在本机浏览器（localStorage），不会上传。Open-Meteo 与中央气象台无需密钥。
+          密钥仅保存在本机浏览器（localStorage），不会上传。Open-Meteo、中央气象台、广州市气象局无需密钥。
         </p>
         {FIELDS.map((f) => (
           <div className="key-row" key={f.id}>
