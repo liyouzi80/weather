@@ -59,32 +59,39 @@ function renderMain(w, data) {
   // ═══ 左右分割 ═══
   const root = w.addStack()
   root.layoutHorizontally()
-  root.spacing = 14
+  root.spacing = 12
 
   // ── 左面板：地名 + 温度 + 天气 ──
   const left = root.addStack()
   left.layoutVertically()
-  left.size = new Size(90, 0)
+  left.size = new Size(148, 0)
 
-  // 顶部：地名
+  // ── 右面板：信源汇总条 ──
+  const right = root.addStack()
+  right.layoutVertically()
+  right.size = new Size(148, 0)
+
+  // 顶部留白，整体下移
+  left.addSpacer(4)
+
+  // 地名
   const city = left.addText(data.city)
   city.font = Font.mediumSystemFont(14)
   city.textColor = C.text
   city.lineLimit = 1
 
-  left.addSpacer()
+  left.addSpacer(6)
 
-  // 中间：大号温度
+  // 大号温度
   const median = data.median != null ? Math.round(data.median) : '—'
   const big = left.addText(`${median}°`)
   big.font = Font.boldSystemFont(52)
   big.textColor = C.text
   big.lineLimit = 1
-  big.leftAlignText()
 
-  left.addSpacer()
+  left.addSpacer(6)
 
-  // 底部：天气（与地名上下对称）
+  // 天气
   if (data.text) {
     const wx = left.addText(data.text)
     wx.font = Font.mediumSystemFont(14)
@@ -94,12 +101,11 @@ function renderMain(w, data) {
     left.addText(' ')
   }
 
-  // ── 右面板：信源汇总条 ──
-  const right = root.addStack()
-  right.layoutVertically()
-  right.spacing = 5
+  left.addSpacer()
 
-  // 标题
+  right.spacing = 5
+  right.addSpacer(4)
+
   const title = right.addText(`${data.count} 个信源`)
   title.font = Font.regularSystemFont(10)
   title.textColor = C.dim
@@ -140,21 +146,6 @@ function renderMain(w, data) {
       else tp.textColor = C.text
       tp.lineLimit = 1
     }
-  }
-
-  // ── 底部：番禺气象台预报 ──
-  w.addSpacer(6)
-  const gzqx = data.providers.find(p => p.id === 'gzqx')
-  if (gzqx && gzqx.forecast) {
-    const div = w.addStack()
-    div.size = new Size(0, 0.5)
-    div.backgroundColor = new Color('#ffffff', 0.06)
-    w.addSpacer(4)
-    const fc = w.addText(gzqx.forecast)
-    fc.font = Font.regularSystemFont(9)
-    fc.textColor = C.dim
-    fc.lineLimit = 2
-    w.addSpacer(2)
   }
 
   // 底部：更新时间
