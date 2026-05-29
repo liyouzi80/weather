@@ -27,6 +27,7 @@
 * { box-sizing: border-box; }
 
 html, body, #root { height: 100%; margin: 0; }
+body { color-scheme: dark; background: var(--bg-deep); color: var(--text); }
 
 body {
   background: var(--bg-deep);
