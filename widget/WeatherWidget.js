@@ -66,6 +66,7 @@ function renderMain(w, data) {
   // ── 左面板：地名 + 温度 + 天气（垂直居中）──
   const left = root.addStack()
   left.layoutVertically()
+  left.size = new Size(160, 0)
 
   left.addSpacer()
 
@@ -101,6 +102,7 @@ function renderMain(w, data) {
   // ── 右面板：信源汇总 ──
   const right = root.addStack()
   right.layoutVertically()
+  right.size = new Size(160, 0)
   right.spacing = 5
 
   right.addSpacer(4)
