@@ -26,6 +26,7 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    color: #f5f5f7;
   }
 
   .root {
@@ -43,26 +44,34 @@
     justify-content: center;
   }
 
+  .left-top {
+    display: flex;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: center;
+    gap: 14px;
+  }
+
   .city {
     font-size: 16px;
     font-weight: 600;
     color: #f5f5f7;
-    line-height: 1.2;
-  }
-
-  .temp {
-    font-size: 34px;
-    font-weight: 700;
-    color: #f5f5f7;
-    line-height: 1.1;
-    margin: 8px 0;
+    white-space: nowrap;
   }
 
   .weather {
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 500;
     color: #98989d;
-    line-height: 1.2;
+  }
+
+  .temp {
+    font-size: 44px;
+    font-weight: 700;
+    color: #f5f5f7;
+    line-height: 1.05;
+    text-align: center;
+    margin-top: 12px;
   }
 
   /* Right panel: 160pt */
@@ -154,9 +163,11 @@
 <div class="widget" id="widget">
   <div class="root">
     <div class="left">
-      <div class="city" id="city">—</div>
+      <div class="left-top">
+        <div class="city" id="city">—</div>
+        <div class="weather" id="weather">—</div>
+      </div>
       <div class="temp" id="temp">—°</div>
-      <div class="weather" id="weather">—</div>
     </div>
     <div class="right">
       <div class="right-header" id="count">— 个信源</div>
