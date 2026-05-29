@@ -1,4 +1,5 @@
 // WeatherWidget.js — 多信源天气实况对比
+// 布局遵循 Apple HIG 中号组件设计规范
 // ===============================================
 
 const CONFIG = {
@@ -52,49 +53,43 @@ function bg(w) {
 // ── 中号 / 大号 ──
 function renderMain(w, data) {
   bg(w)
-  w.setPadding(14, 16, 12, 16)
+  // Apple HIG: 16pt 系统内容边距
+  w.setPadding(16, 16, 16, 16)
 
   const multi = data.count >= 2 && data.max !== data.min
 
-  // ═══ 左右分割 ═══
+  // ═══ 左右 50/50 ═══
   const root = w.addStack()
   root.layoutHorizontally()
   root.spacing = 12
 
-  // ── 左面板：地名 + 温度 + 天气 ──
+  // ── 左面板：地名 + 温度 + 天气（垂直居中）──
   const left = root.addStack()
   left.layoutVertically()
-  left.size = new Size(148, 0)
 
-  // ── 右面板：信源汇总条 ──
-  const right = root.addStack()
-  right.layoutVertically()
-  right.size = new Size(148, 0)
+  left.addSpacer()
 
-  // 顶部留白，整体下移
-  left.addSpacer(4)
-
-  // 地名
+  // 地名 — Apple HIG: 标题 17pt
   const city = left.addText(data.city)
-  city.font = Font.mediumSystemFont(14)
+  city.font = Font.semiboldSystemFont(16)
   city.textColor = C.text
   city.lineLimit = 1
 
-  left.addSpacer(6)
+  left.addSpacer(8)
 
-  // 大号温度
+  // 温度 — Apple HIG: 大标题 32-36pt
   const median = data.median != null ? Math.round(data.median) : '—'
   const big = left.addText(`${median}°`)
-  big.font = Font.boldSystemFont(52)
+  big.font = Font.boldSystemFont(34)
   big.textColor = C.text
   big.lineLimit = 1
 
-  left.addSpacer(6)
+  left.addSpacer(8)
 
-  // 天气
+  // 天气 — Apple HIG: 正文 13pt
   if (data.text) {
     const wx = left.addText(data.text)
-    wx.font = Font.mediumSystemFont(14)
+    wx.font = Font.mediumSystemFont(13)
     wx.textColor = C.text2
     wx.lineLimit = 1
   } else {
@@ -103,20 +98,25 @@ function renderMain(w, data) {
 
   left.addSpacer()
 
+  // ── 右面板：信源汇总 ──
+  const right = root.addStack()
+  right.layoutVertically()
   right.spacing = 5
+
   right.addSpacer(4)
 
+  // 标题 — Apple HIG: 标注 11pt
   const title = right.addText(`${data.count} 个信源`)
-  title.font = Font.regularSystemFont(10)
+  title.font = Font.regularSystemFont(11)
   title.textColor = C.dim
-  right.addSpacer(2)
+
+  right.addSpacer(4)
 
   for (const p of data.providers) {
     const row = right.addStack()
     row.layoutHorizontally()
     row.centerAlignContent()
 
-    // 圆点
     const hex = PC[p.id] || '#6e6e73'
     const d = row.addText('●')
     d.font = Font.regularSystemFont(6)
@@ -124,15 +124,14 @@ function renderMain(w, data) {
 
     row.addSpacer(4)
 
-    // 名称
+    // Apple HIG: 正文 13pt
     const nm = row.addText(SHORT[p.id] || p.name)
-    nm.font = Font.regularSystemFont(11)
+    nm.font = Font.regularSystemFont(12)
     nm.textColor = p.error ? C.dim : C.text
     nm.lineLimit = 1
 
     row.addSpacer()
 
-    // 温度
     if (p.error) {
       const er = row.addText('—')
       er.font = Font.regularSystemFont(12)
@@ -148,7 +147,9 @@ function renderMain(w, data) {
     }
   }
 
-  // 底部：更新时间
+  right.addSpacer()
+
+  // ── 底部更新 ──
   const ft = w.addStack()
   ft.layoutHorizontally()
   ft.addSpacer()
@@ -156,7 +157,7 @@ function renderMain(w, data) {
     ? new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '—'
   const f = ft.addText(`更新 ${time}`)
-  f.font = Font.regularSystemFont(8)
+  f.font = Font.regularSystemFont(10)
   f.textColor = C.dim
   ft.addSpacer()
 }
@@ -164,7 +165,7 @@ function renderMain(w, data) {
 // ── 小号 ──
 function renderSmall(w, data) {
   bg(w)
-  w.setPadding(14, 16, 12, 16)
+  w.setPadding(16, 16, 16, 16)
 
   const city = w.addText(data.city)
   city.font = Font.semiboldSystemFont(13)
@@ -175,7 +176,7 @@ function renderSmall(w, data) {
 
   if (data.median != null) {
     const t = w.addText(`${Math.round(data.median)}°`)
-    t.font = Font.boldSystemFont(42)
+    t.font = Font.boldSystemFont(36)
     t.textColor = C.text
     t.centerAlignText()
   }
@@ -197,7 +198,7 @@ function renderSmall(w, data) {
   for (const p of data.providers) {
     if (p.temp == null) continue
     const d = dots.addText('●')
-    d.font = Font.regularSystemFont(7)
+    d.font = Font.regularSystemFont(6)
     d.textColor = new Color(PC[p.id] || '#6e6e73')
     dots.addSpacer(3)
   }
@@ -205,7 +206,7 @@ function renderSmall(w, data) {
 
   w.addSpacer(6)
 
-  const ft = w.addText(`${data.count}信源  ·  ${data.max}° / ${data.min}°`)
+  const ft = w.addText(`${data.count}信源 · ${data.max}° / ${data.min}°`)
   ft.font = Font.regularSystemFont(8)
   ft.textColor = C.dim
   ft.centerAlignText()
@@ -215,9 +216,7 @@ function renderSmall(w, data) {
 function renderError(w, msg) {
   w.backgroundColor = new Color('#0a0d16')
   w.addSpacer()
-  const ic = w.addText('⚠')
-  ic.font = Font.systemFont(20)
-  ic.centerAlignText()
+  w.addText('⚠').centerAlignText()
   w.addSpacer(4)
   w.addText('无法加载')
   w.addSpacer(2)
