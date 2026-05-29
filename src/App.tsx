@@ -47,8 +47,21 @@ export default function App() {
 
   return (
     <div className="app">
-      <div className="topbar">
-        <h1>天气实况</h1>
+      <header className="loc-header">
+        <span className="city">{city.name}</span>
+        <div className="seg" role="tablist">
+          {CITIES.map((c, i) => (
+            <button
+              key={c.name}
+              role="tab"
+              aria-selected={i === cityIdx}
+              className={i === cityIdx ? 'active' : ''}
+              onClick={() => selectCity(i)}
+            >
+              {c.cityName}
+            </button>
+          ))}
+        </div>
         <button
           className={'icon-btn' + (loading ? ' spin' : '')}
           title="刷新"
@@ -61,31 +74,15 @@ export default function App() {
             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
           </svg>
         </button>
-      </div>
+      </header>
 
-      <div className="segmented" role="tablist">
-        {CITIES.map((c, i) => (
-          <button
-            key={c.name}
-            role="tab"
-            aria-selected={i === cityIdx}
-            className={i === cityIdx ? 'active' : ''}
-            onClick={() => selectCity(i)}
-          >
-            {c.name}
-          </button>
-        ))}
-      </div>
-
-      <div className="location-bar">
-        <span className="city">{city.name}</span>
-        {updatedAt && (
-          <span className="coords">更新于 {updatedAt.toLocaleTimeString('zh-CN')}</span>
-        )}
-      </div>
+      {updatedAt && (
+        <div className="updated">更新于 {updatedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
+      )}
 
       {stats && (
         <div className="summary">
+          {weatherEmoji(stats.text) && <div className="sum-icon">{weatherEmoji(stats.text)}</div>}
           <div className="big">{stats.avg.toFixed(1)}°</div>
           <div className="meta">
             <div>{stats.count}/{stats.total} 个信源有数据</div>
@@ -155,6 +152,7 @@ function ProviderCard({ r }: { r: Annotated }) {
       </div>
       <div className="row">
         <span className={r.textDiff ? 'text-diff' : ''}>
+          {weatherEmoji(c.text) && <span className="wx-emoji">{weatherEmoji(c.text)} </span>}
           <b>{c.text}</b>{r.textDiff && ' (!)'}
         </span>
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike}°</b></span>}
@@ -211,7 +209,7 @@ function TempRanking({ results, avg }: { results: Annotated[]; avg: number }) {
 
 function analyze(results: ProviderResult[]): {
   annotated: Annotated[]
-  stats: null | { avg: number; min: number; max: number; spread: number; count: number; total: number; textDisagree: boolean }
+  stats: null | { avg: number; min: number; max: number; spread: number; count: number; total: number; textDisagree: boolean; text: string }
 } {
   const ok = results.filter((r) => r.current)
   const temps = ok.map((r) => r.current!.temp)
@@ -243,7 +241,7 @@ function analyze(results: ProviderResult[]): {
 
   return {
     annotated,
-    stats: { avg, min, max, spread: max - min, count: temps.length, total: results.length, textDisagree },
+    stats: { avg, min, max, spread: max - min, count: temps.length, total: results.length, textDisagree, text: majorityText },
   }
 }
 
@@ -251,6 +249,19 @@ function sortedMedian(arr: number[]): number {
   const s = [...arr].sort((a, b) => a - b)
   const mid = Math.floor(s.length / 2)
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
+}
+
+// 天气文字 → 彩色 emoji 图标（无可用文字时返回空串，不显示图标）。
+function weatherEmoji(text?: string): string {
+  if (!text || text === '—') return ''
+  if (/雷/.test(text)) return '⛈️'
+  if (/雪/.test(text)) return '🌨️'
+  if (/雨/.test(text)) return '🌧️'
+  if (/雾|霾|沙|尘/.test(text)) return '🌫️'
+  if (/阴/.test(text)) return '☁️'
+  if (/多云|间/.test(text)) return '⛅️'
+  if (/晴/.test(text)) return '☀️'
+  return ''
 }
 
 // 番禺区气象台短时预报时效检测：按"预报窗口结束时间"（北京时）判断是否过期。

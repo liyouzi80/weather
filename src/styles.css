@@ -75,6 +75,69 @@ body::after {
   min-height: 100%;
 }
 
+/* ── 顶部：城市名 + 城市切换 + 刷新（合并到一行，去掉标题 banner）── */
+.loc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 10px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: linear-gradient(180deg, rgba(10, 13, 22, 0.82) 55%, transparent);
+  backdrop-filter: saturate(180%) blur(30px);
+  -webkit-backdrop-filter: saturate(180%) blur(30px);
+}
+.loc-header .city {
+  flex: 1;
+  min-width: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.seg {
+  display: flex;
+  gap: 0;
+  padding: 3px;
+  background: var(--fill);
+  border-radius: 10px;
+  flex: none;
+}
+.seg button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 590;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  letter-spacing: -0.01em;
+}
+.seg button.active {
+  background: var(--glass);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+}
+.updated {
+  color: var(--text-dim);
+  font-size: 12px;
+  font-weight: 500;
+  margin: 0 2px 16px;
+}
+.sum-icon { font-size: 42px; line-height: 1; flex: none; }
+.wx-emoji { font-size: 13px; }
+
 /* ── Top Bar ── */
 .topbar {
   display: flex;
