@@ -26,6 +26,8 @@ export const gzqxProvider: WeatherProvider = {
       windSpeed: d.windSpeed,
       windDir: d.windDir,
       observedAt: d.observedAt,
+      forecast: d.forecast,
+      forecastIssuedAt: d.forecastIssuedAt,
     }
   },
 }

@@ -23,6 +23,10 @@ export interface CurrentWeather {
   windDir?: string
   /** 数据观测/更新时间（ISO 字符串） */
   observedAt?: string
+  /** 官方文字预报补充（如番禺区气象台短时预报），可选 */
+  forecast?: string
+  /** 文字预报发布时间（原始字符串），可选 */
+  forecastIssuedAt?: string
 }
 
 /** 各信源拉取后的统一结果（成功或失败） */

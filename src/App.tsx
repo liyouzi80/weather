@@ -119,6 +119,12 @@ function ProviderCard({ r }: { r: Annotated }) {
         {c.windDir && <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed}km/h` : ''}</span>}
       </div>
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
+      {c.forecast && (
+        <div className="forecast">
+          <b>番禺区气象台</b>
+          {c.forecastIssuedAt ? ` · ${c.forecastIssuedAt}` : ''}：{c.forecast}
+        </div>
+      )}
     </div>
   )
 }
