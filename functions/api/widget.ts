@@ -15,6 +15,8 @@ interface ProviderResult {
   temp?: number
   text?: string
   error?: string
+  forecast?: string
+  forecastIssuedAt?: string
 }
 
 // ── Open-Meteo（免费，无需密钥）─────────────────────────────────
@@ -70,6 +72,8 @@ async function fetchGZQX(): Promise<ProviderResult> {
   return {
     id: 'gzqx', name: '广州市气象局', color: '#a855f7',
     temp: d.temp, text: d.text,
+    forecast: d.forecast,
+    forecastIssuedAt: d.forecastIssuedAt,
   }
 }
 

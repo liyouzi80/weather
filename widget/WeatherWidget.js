@@ -232,6 +232,26 @@ function renderCard(w, p, median, max, min, hasMultiple) {
         d.textColor = delta > 0 ? C.hot : C.cold
       }
     }
+
+    // 第三行：番禺气象台预报（仅 GZQX）
+    if (p.forecast) {
+      body.addSpacer(4)
+      const sep = body.addStack()
+      sep.size = new Size(0, 0.5)
+      sep.backgroundColor = new Color('#ffffff', 0.06)
+      body.addSpacer(4)
+
+      const fcLabel = body.addText('番禺区气象台')
+      fcLabel.font = Font.boldSystemFont(10)
+      fcLabel.textColor = new Color('#a855f7')
+
+      body.addSpacer(2)
+
+      const fcText = body.addText(p.forecast)
+      fcText.font = Font.regularSystemFont(10)
+      fcText.textColor = C.text2
+      fcText.lineLimit = 3
+    }
   } else {
     body.addSpacer(2)
     const errMsg = body.addText(p.error)
