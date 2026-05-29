@@ -1,11 +1,20 @@
 // 广州市气象局·番禺 实况抓取（服务端运行：Cloudflare Pages Function + vite 开发插件共用）。
-// 目标页面：http://www.tqyb.com.cn/gzpanyu/
 //
-// ⚠️ 解析说明：该页面无公开 API，只能抓 HTML。由于页面结构可能随时调整，
-//    下面用「正则 + 多候选」方式做尽量稳健的抽取；若某天解析不到，
-//    按浏览器里实际看到的 HTML/接口调整 PAGE_URL 或 extract() 里的正则即可。
-//    （很多此类政府页面其实由内部 XHR 拉 JSON 渲染——若你在开发者工具的
-//     Network 里发现这样的 JSON 接口，直接改成请求那个接口会更稳。）
+// ⚠️ 重要：页面 http://www.tqyb.com.cn/gzpanyu/ 的实况数值（温度/湿度/风/雨量/气压）
+//    并不在静态 HTML 里——HTML 中是 "--" 占位符，数据是页面加载后由 JS
+//    （require.js 模块 gzshi_obtAreaRep，区域代码 GDPY）通过 XHR 从 /data/ 下的
+//    接口异步拉取并填充的。因此必须直接请求那个底层数据接口，而不是抓 HTML。
+//
+//    待办：用浏览器打开该页面 → F12 → Network → 筛选 XHR/Fetch，找到能让
+//    「番禺代表站」温度出现的那个请求（多半在 http://www.tqyb.com.cn/data/ 下，
+//    返回 JSON），把它的完整 URL 填到 GZ_DATA_URL，并据其返回结构调整 mapData()。
+
+const AREA_CODE = 'GDPY' // 番禺区
+const ORIGIN = 'http://www.tqyb.com.cn'
+
+// TODO: 填入真实的实况数据接口 URL（从 Network 面板获取）。例如：
+//   `${ORIGIN}/data/gzobts/REP_${AREA_CODE}.json`
+const GZ_DATA_URL = ''
 
 export interface GzRealtime {
   temp?: number
@@ -14,86 +23,78 @@ export interface GzRealtime {
   humidity?: number
   windSpeed?: number // km/h
   windDir?: string
+  pressure?: number // hPa
+  rain1h?: number // mm
   observedAt?: string
 }
 
-const PAGE_URL = 'http://www.tqyb.com.cn/gzpanyu/'
-
 export async function scrapeGuangzhou(): Promise<GzRealtime> {
-  const res = await fetch(PAGE_URL, {
+  if (!GZ_DATA_URL) {
+    throw new Error(
+      '广州源待配置：该页面实况由 JS 异步加载，需在 functions/_lib/gz.ts 填入真实数据接口 URL（见文件注释）',
+    )
+  }
+  const res = await fetch(GZ_DATA_URL, {
     headers: {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
-      Referer: 'http://www.tqyb.com.cn/',
+      Referer: `${ORIGIN}/gzpanyu/`,
+      'X-Requested-With': 'XMLHttpRequest',
     },
   })
-  if (!res.ok) throw new Error(`页面请求失败 HTTP ${res.status}`)
-  const html = await res.text()
-  const data = extract(html)
-  if (data.temp == null && data.text == null) {
-    throw new Error('未能从页面解析到实况数据（结构可能已变，需调整解析规则）')
+  if (!res.ok) throw new Error(`数据接口请求失败 HTTP ${res.status}`)
+
+  // 有些站点返回 JSONP 或前缀，做一次宽松解析
+  const text = await res.text()
+  const data = parseLoose(text)
+  return mapData(data)
+}
+
+/** 把数据接口返回的 JSON 映射成统一模型。拿到真实返回结构后据此调整字段名。 */
+function mapData(d: any): GzRealtime {
+  // 占位映射：字段名需按真实接口调整。下面用「多候选取值」尽量兼容常见命名。
+  const pick = (...keys: string[]) => {
+    for (const k of keys) {
+      const v = getDeep(d, k)
+      if (v != null && v !== '') return v
+    }
+    return undefined
   }
-  return data
-}
-
-/** 从 HTML 中抽取实况字段。多组候选正则，命中第一个为准。 */
-function extract(html: string): GzRealtime {
-  const out: GzRealtime = {}
-
-  out.temp = num(
-    pick(html, [
-      /(?:实时气温|当前气温|气温|温度)[^0-9\-]*(-?\d+(?:\.\d+)?)\s*(?:°|℃|度)/,
-      /(-?\d+(?:\.\d+)?)\s*(?:°C|℃)/,
-      /"temp(?:erature)?"\s*:\s*"?(-?\d+(?:\.\d+)?)"?/i,
-    ]),
-  )
-
-  out.humidity = num(
-    pick(html, [
-      /(?:相对湿度|湿度)[^0-9]*(\d+(?:\.\d+)?)\s*%/,
-      /"(?:humidity|rh)"\s*:\s*"?(\d+(?:\.\d+)?)"?/i,
-    ]),
-  )
-
-  const text = pick(html, [
-    /(?:天气现象|天气状况|天气)[：:\s]*([一-龥]{1,6})/,
-    /"(?:weather|skycon|info|text)"\s*:\s*"([^"]{1,12})"/i,
-  ])
-  if (text) out.text = text.trim()
-
-  out.windDir = pick(html, [
-    /([东南西北]{1,2}风|偏[东南西北]风|无持续风向)/,
-    /"(?:windDir|wind_dir|direct)"\s*:\s*"([^"]{1,8})"/i,
-  ])?.trim()
-
-  const windSpeed = num(
-    pick(html, [
-      /风速[^0-9]*(\d+(?:\.\d+)?)\s*(?:米\/秒|m\/s)/,
-      /"(?:windSpeed|wind_speed|speed)"\s*:\s*"?(\d+(?:\.\d+)?)"?/i,
-    ]),
-  )
-  // 若疑似 m/s，转 km/h
-  if (windSpeed != null) out.windSpeed = Math.round(windSpeed * 3.6 * 10) / 10
-
-  const obs = pick(html, [
-    /(\d{4}[-/]\d{1,2}[-/]\d{1,2}\s+\d{1,2}:\d{2}(?::\d{2})?)/,
-    /(\d{1,2}月\d{1,2}日\s*\d{1,2}时)/,
-  ])
-  if (obs) out.observedAt = obs.trim()
-
-  return out
-}
-
-function pick(html: string, patterns: RegExp[]): string | undefined {
-  for (const re of patterns) {
-    const m = html.match(re)
-    if (m && m[1]) return m[1]
+  const num = (v: any) => {
+    const n = parseFloat(v)
+    return isNaN(n) ? undefined : n
   }
-  return undefined
+  const speed = num(pick('windSpeed', 'wind_speed', 'fs', 'WS', 'speed'))
+  return {
+    temp: num(pick('temp', 'temperature', 'wd', 'T', 'tmp')),
+    humidity: num(pick('humidity', 'rh', 'sd', 'RH')),
+    text: pick('weather', 'wp', 'text', 'tq'),
+    windDir: pick('windDir', 'wind_dir', 'fx', 'WD'),
+    windSpeed: speed != null ? Math.round(speed * 3.6 * 10) / 10 : undefined, // 若原单位 m/s 转 km/h
+    pressure: num(pick('pressure', 'qy', 'P', 'pa')),
+    rain1h: num(pick('rain', 'rain1h', 'jyl', 'R')),
+    observedAt: pick('time', 'obsTime', 'sj', 'datetime', 'updatetime'),
+  }
 }
 
-function num(s: string | undefined): number | undefined {
-  if (s == null) return undefined
-  const n = parseFloat(s)
-  return isNaN(n) ? undefined : n
+function parseLoose(text: string): any {
+  try {
+    return JSON.parse(text)
+  } catch {
+    // 去掉可能的 JSONP 包裹：callback({...})
+    const m = text.match(/^[^({]*\(([\s\S]*)\)\s*;?\s*$/)
+    if (m) {
+      try {
+        return JSON.parse(m[1])
+      } catch {
+        /* fallthrough */
+      }
+    }
+    throw new Error('数据接口返回非 JSON，需调整解析')
+  }
+}
+
+function getDeep(obj: any, path: string): any {
+  // 支持 "a.b.c" 路径，也支持顶层 key
+  return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj)
 }

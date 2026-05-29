@@ -5,13 +5,17 @@ import { qweatherProvider } from './qweather'
 import { caiyunProvider } from './caiyun'
 import { nmcProvider } from './nmc'
 import { gzqxProvider } from './gzqx'
+import { twcProvider } from './twc'
+import { appleProvider } from './apple'
 
 export const PROVIDERS: WeatherProvider[] = [
   openMeteoProvider,
   nmcProvider,
+  gzqxProvider,
   qweatherProvider,
   caiyunProvider,
-  gzqxProvider,
+  appleProvider,
+  twcProvider,
 ]
 
 /** 并发拉取所有「已配置」信源，逐个返回结果（失败也返回，便于 UI 展示错误） */

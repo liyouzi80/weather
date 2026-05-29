@@ -10,6 +10,7 @@ interface KeyField {
 const FIELDS: KeyField[] = [
   { id: 'qweather', label: '和风天气 Key', desc: '在 dev.qweather.com 注册免费开发版后获取' },
   { id: 'caiyun', label: '彩云天气 Token', desc: '在 platform.caiyunapp.com 申请' },
+  { id: 'twc', label: 'The Weather Channel apiKey', desc: 'weather.com（The Weather Company）v3 接口的 apiKey' },
 ]
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
