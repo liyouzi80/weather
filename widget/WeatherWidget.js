@@ -1,11 +1,12 @@
 // WeatherWidget.js — 多信源天气实况对比
 // ===============================================
 // 桌面小组件：展示所选城市的各信源实时温度对比
+// 为中号组件优化，兼顾小号和大号
 //
 // 使用：
 // 1. Scriptable App 中新建脚本，粘贴全部内容
-// 2. 添加到桌面（推荐中号或大号）
-// 3. Widget Parameter：填城市名「番禺」或「安福」
+// 2. 添加到桌面（推荐中号）
+// 3. Widget Parameter：填「番禺」或「安福」
 // ===============================================
 
 const CONFIG = {
@@ -17,32 +18,34 @@ const CONFIG = {
   defaultCityIdx: 0,
 }
 
-// ── 信源颜色（与网页版一致）───────────────────
-const COLORS = {
-  'nmc':        { hex: '#ef4444', name: '红' },
-  'gzqx':       { hex: '#a855f7', name: '紫' },
-  'qweather':   { hex: '#3b82f6', name: '蓝' },
-  'caiyun':     { hex: '#f59e0b', name: '黄' },
-  'owm':        { hex: '#f97316', name: '橙' },
-  'weatherapi': { hex: '#0ea5e9', name: '青' },
-  'open-meteo': { hex: '#22c55e', name: '绿' },
+// 短名称映射（中号组件空间有限）
+const SHORT_NAME = {
+  'open-meteo': 'Open-Meteo',
+  'nmc': '中央气象台',
+  'gzqx': '广州气象局',
+  'qweather': '和风天气',
+  'caiyun': '彩云天气',
+  'owm': 'OWM',
+  'weatherapi': 'WeatherAPI',
 }
-const DEFAULT_COLOR = '#6e6e73'
 
 const C = {
-  bg:      new Color('#03050b'),
-  surface: new Color('#0f1420'),
   text:    new Color('#f5f5f7'),
   text2:   new Color('#98989d'),
   dim:     new Color('#6e6e73'),
   hot:     new Color('#ff453a'),
   cold:    new Color('#40c8e0'),
   warn:    new Color('#ffd60a'),
-  border:  new Color('#ffffff', 0.06),
-  glass:   new Color('#ffffff', 0.04),
+  purple:  new Color('#a855f7'),
 }
 
-// ── 数据获取 ──
+const PROVIDER_COLORS = {
+  'nmc': '#ef4444', 'gzqx': '#a855f7', 'qweather': '#3b82f6',
+  'caiyun': '#f59e0b', 'owm': '#f97316', 'weatherapi': '#0ea5e9',
+  'open-meteo': '#22c55e',
+}
+
+// ── 数据 ──
 let _cacheKey = '', _cacheData = null
 
 async function fetchData(lat, lon, name, cityName) {
@@ -57,46 +60,32 @@ async function fetchData(lat, lon, name, cityName) {
   return res
 }
 
-// ── 辅助 ──
-function providerColor(id) {
-  return new Color((COLORS[id] || {}).hex || DEFAULT_COLOR)
-}
-
-function providerColorHex(id) {
-  return (COLORS[id] || {}).hex || DEFAULT_COLOR
-}
-
-// ── 渐变背景 ──
+// ── 背景 ──
 function setBackground(w) {
   const g = new LinearGradient()
-  g.colors = [new Color('#050810'), new Color('#0c1528'), new Color('#080e1c')]
+  g.colors = [new Color('#05080f'), new Color('#0a1224'), new Color('#070d18')]
   g.locations = [0, 0.45, 1]
   w.backgroundGradient = g
 }
 
-// ── 绘制一张卡片圆角矩形（模拟） ──
-function drawCard(stack, accentHex) {
-  stack.backgroundColor = C.glass
-  stack.cornerRadius = 12
-  stack.setPadding(12, 14, 12, 14)
-}
+// ──────────────── 中号 / 大号 布局 ──────────────
 
-// ── 页头：城市名 + 统计 ──
+// 顶部：城市名 + 天气 + 信源数
 function renderHeader(w, data) {
   const row = w.addStack()
   row.layoutHorizontally()
   row.centerAlignContent()
 
   const name = row.addText(data.city)
-  name.font = Font.boldSystemFont(22)
+  name.font = Font.boldSystemFont(18)
   name.textColor = C.text
   name.lineLimit = 1
 
-  row.addSpacer(8)
+  row.addSpacer(6)
 
   if (data.text) {
     const txt = row.addText(data.text)
-    txt.font = Font.mediumSystemFont(15)
+    txt.font = Font.mediumSystemFont(13)
     txt.textColor = C.text2
     txt.lineLimit = 1
   }
@@ -104,27 +93,28 @@ function renderHeader(w, data) {
   row.addSpacer()
 
   const badge = row.addText(`${data.count}/${data.total}`)
-  badge.font = Font.mediumSystemFont(11)
+  badge.font = Font.mediumSystemFont(10)
   badge.textColor = C.dim
 }
 
-// ── 统计摘要行 ──
+// 统计摘要行：最高 / 中位 / 最低 / 分歧
 function renderSummary(w, data) {
   if (data.count < 2) return
   const row = w.addStack()
   row.layoutHorizontally()
-  row.spacing = 14
+  row.centerAlignContent()
+  row.spacing = 10
 
   const hi = row.addText(`${data.max}°`)
-  hi.font = Font.boldSystemFont(13)
+  hi.font = Font.boldSystemFont(12)
   hi.textColor = C.hot
 
   const med = row.addText(`中位 ${data.median != null ? data.median.toFixed(1) : '—'}°`)
-  med.font = Font.mediumSystemFont(12)
+  med.font = Font.mediumSystemFont(11)
   med.textColor = C.text2
 
   const lo = row.addText(`${data.min}°`)
-  lo.font = Font.boldSystemFont(13)
+  lo.font = Font.boldSystemFont(12)
   lo.textColor = C.cold
 
   row.addSpacer()
@@ -132,72 +122,58 @@ function renderSummary(w, data) {
   const spread = data.max - data.min
   if (spread > 0) {
     const sp = row.addText(`分歧 ${spread.toFixed(1)}°`)
-    sp.font = Font.mediumSystemFont(11)
+    sp.font = Font.mediumSystemFont(10)
     sp.textColor = spread >= 2 ? C.warn : C.dim
   }
 }
 
-// ── 单张信源卡片 ──
-function renderCard(w, p, median, max, min, hasMultiple) {
-  // 卡片容器
-  const card = w.addStack()
-  card.layoutHorizontally()
-  card.backgroundColor = new Color('#ffffff', 0.04)
-  card.cornerRadius = 12
-  card.setPadding(0, 0, 0, 0)
+// 单行信源条目（紧凑版）
+function renderRow(w, p, median, max, min, hasMultiple) {
+  const row = w.addStack()
+  row.layoutHorizontally()
+  row.centerAlignContent()
 
-  // 左侧色条
-  const accent = new Color(providerColorHex(p.id))
-  const bar = card.addStack()
-  bar.size = new Size(4, 0)
-  bar.backgroundColor = accent
-  bar.cornerRadius = 2
+  // 彩色圆点
+  const hex = PROVIDER_COLORS[p.id] || '#6e6e73'
+  const dot = row.addText('●')
+  dot.font = Font.regularSystemFont(8)
+  dot.textColor = new Color(hex)
+  dot.lineLimit = 1
 
-  // 内容区
-  const body = card.addStack()
-  body.layoutVertically()
-  body.setPadding(12, 12, 12, 12)
-
-  // 第一行：名称 + 标签 + 温度
-  const top = body.addStack()
-  top.layoutHorizontally()
-  top.centerAlignContent()
+  row.addSpacer(5)
 
   // 名称
-  const nameLabel = top.addText(p.name)
-  nameLabel.font = Font.mediumSystemFont(14)
-  nameLabel.textColor = p.error ? C.dim : C.text
-  nameLabel.lineLimit = 1
+  const label = row.addText(SHORT_NAME[p.id] || p.name)
+  label.font = Font.mediumSystemFont(12)
+  label.textColor = p.error ? C.dim : C.text
+  label.lineLimit = 1
 
-  top.addSpacer(6)
+  row.addSpacer(4)
 
   // 最高/最低标签
   if (p.temp != null && hasMultiple && max !== min) {
     if (p.temp === max) {
-      const tagMax = top.addText('最高')
-      tagMax.font = Font.boldSystemFont(9)
-      tagMax.textColor = C.hot
-      tagMax.backgroundColor = new Color('#ff453a', 0.15)
-      tagMax.cornerRadius = 3
+      const tag = row.addText('最高')
+      tag.font = Font.boldSystemFont(8)
+      tag.textColor = C.hot
     } else if (p.temp === min) {
-      const tagMin = top.addText('最低')
-      tagMin.font = Font.boldSystemFont(9)
-      tagMin.textColor = C.cold
-      tagMin.backgroundColor = new Color('#40c8e0', 0.15)
-      tagMin.cornerRadius = 3
+      const tag = row.addText('最低')
+      tag.font = Font.boldSystemFont(8)
+      tag.textColor = C.cold
     }
+    row.addSpacer(4)
   }
 
-  top.addSpacer()
+  row.addSpacer()
 
   // 温度
   if (p.error) {
-    const err = top.addText('—')
-    err.font = Font.semiboldSystemFont(20)
+    const err = row.addText('—')
+    err.font = Font.semiboldSystemFont(14)
     err.textColor = C.dim
   } else {
-    const temp = top.addText(`${p.temp}°`)
-    temp.font = Font.boldSystemFont(24)
+    const temp = row.addText(`${p.temp}°`)
+    temp.font = Font.boldSystemFont(15)
     if (p.temp === max && hasMultiple && max !== min) {
       temp.textColor = C.hot
     } else if (p.temp === min && hasMultiple && max !== min) {
@@ -205,63 +181,45 @@ function renderCard(w, p, median, max, min, hasMultiple) {
     } else {
       temp.textColor = C.text
     }
-  }
+    temp.lineLimit = 1
 
-  // 第二行：天气描述 + 偏差
-  if (!p.error) {
-    body.addSpacer(2)
-    const bot = body.addStack()
-    bot.layoutHorizontally()
-    bot.centerAlignContent()
-
-    if (p.text) {
-      const txt = bot.addText(p.text)
-      txt.font = Font.regularSystemFont(12)
-      txt.textColor = C.text2
-      txt.lineLimit = 1
-    }
-
-    bot.addSpacer()
-
-    if (median != null && p.temp != null) {
+    // 偏差
+    if (median != null && Math.abs(p.temp - median) >= 0.05) {
+      row.addSpacer(3)
       const delta = p.temp - median
-      if (Math.abs(delta) >= 0.05) {
-        const sign = delta > 0 ? '+' : ''
-        const d = bot.addText(`${sign}${delta.toFixed(1)}°`)
-        d.font = Font.mediumSystemFont(12)
-        d.textColor = delta > 0 ? C.hot : C.cold
-      }
+      const sign = delta > 0 ? '+' : ''
+      const d = row.addText(`${sign}${delta.toFixed(1)}`)
+      d.font = Font.mediumSystemFont(10)
+      d.textColor = delta > 0 ? C.hot : C.cold
     }
-
-    // 第三行：番禺气象台预报（仅 GZQX）
-    if (p.forecast) {
-      body.addSpacer(4)
-      const sep = body.addStack()
-      sep.size = new Size(0, 0.5)
-      sep.backgroundColor = new Color('#ffffff', 0.06)
-      body.addSpacer(4)
-
-      const fcLabel = body.addText('番禺区气象台')
-      fcLabel.font = Font.boldSystemFont(10)
-      fcLabel.textColor = new Color('#a855f7')
-
-      body.addSpacer(2)
-
-      const fcText = body.addText(p.forecast)
-      fcText.font = Font.regularSystemFont(10)
-      fcText.textColor = C.text2
-      fcText.lineLimit = 3
-    }
-  } else {
-    body.addSpacer(2)
-    const errMsg = body.addText(p.error)
-    errMsg.font = Font.regularSystemFont(10)
-    errMsg.textColor = C.dim
-    errMsg.lineLimit = 1
   }
 }
 
-// ── 底部 ──
+// GZQX 预报展开了行
+function renderForecast(w, data) {
+  const gzqx = data.providers.find(p => p.id === 'gzqx')
+  if (!gzqx || !gzqx.forecast) return
+
+  w.addSpacer(4)
+
+  const sep = w.addStack()
+  sep.size = new Size(0, 0.5)
+  sep.backgroundColor = new Color('#ffffff', 0.06)
+
+  w.addSpacer(4)
+
+  const label = w.addText('番禺区气象台')
+  label.font = Font.boldSystemFont(10)
+  label.textColor = C.purple
+  w.addSpacer(2)
+
+  const txt = w.addText(gzqx.forecast)
+  txt.font = Font.regularSystemFont(10)
+  txt.textColor = C.text2
+  txt.lineLimit = 4
+}
+
+// 底部
 function renderFooter(w, updatedAt, count) {
   const row = w.addStack()
   row.layoutHorizontally()
@@ -269,52 +227,99 @@ function renderFooter(w, updatedAt, count) {
   const time = updatedAt
     ? new Date(updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '—'
-  const label = row.addText(`更新于 ${time} · ${count} 个信源`)
+  const label = row.addText(`更新 ${time} · ${count} 信源`)
   label.font = Font.regularSystemFont(9)
   label.textColor = C.dim
   row.addSpacer()
 }
 
-// ── 错误状态 ──
-function renderError(w, msg) {
-  w.backgroundColor = C.bg
-  w.addSpacer()
-  const icon = w.addText('⚠')
-  icon.font = Font.systemFont(24)
-  icon.centerAlignText()
-  w.addSpacer(6)
-  const title = w.addText('无法加载')
-  title.font = Font.semiboldSystemFont(15)
-  title.textColor = C.text
-  title.centerAlignText()
-  w.addSpacer(4)
-  const detail = w.addText(msg)
-  detail.font = Font.regularSystemFont(11)
-  detail.textColor = C.dim
-  detail.centerAlignText()
-  w.addSpacer()
-}
-
-// ── 组合渲染 ──
-function renderWidget(w, data) {
+// ── 中号 / 大号 主渲染 ──
+function renderMain(w, data) {
   setBackground(w)
-  w.setPadding(16, 16, 14, 16)
+  w.setPadding(14, 16, 12, 16)
 
   renderHeader(w, data)
   w.addSpacer(6)
   renderSummary(w, data)
 
   const hasMultiple = data.count >= 2 && data.max !== data.min
-  const ok = data.providers.filter(p => p.temp != null)
 
-  w.addSpacer(10)
+  w.addSpacer(8)
+
   for (const p of data.providers) {
-    renderCard(w, p, data.median, data.max, data.min, hasMultiple)
-    w.addSpacer(6)
+    renderRow(w, p, data.median, data.max, data.min, hasMultiple)
+    w.addSpacer(4)
+  }
+
+  renderForecast(w, data)
+  w.addSpacer(4)
+  renderFooter(w, data.updatedAt, data.count)
+}
+
+// ── 小号布局 ──
+function renderSmall(w, data) {
+  setBackground(w)
+  w.setPadding(14, 14, 12, 14)
+
+  const city = w.addText(data.city)
+  city.font = Font.boldSystemFont(16)
+  city.textColor = C.text
+  city.centerAlignText()
+
+  w.addSpacer(4)
+
+  if (data.median != null) {
+    const big = w.addText(`${data.median.toFixed(0)}°`)
+    big.font = Font.boldSystemFont(42)
+    big.textColor = C.text
+    big.centerAlignText()
   }
 
   w.addSpacer(2)
+
+  const info = w.addText(`${data.max}° / ${data.min}°  ${data.count}信源`)
+  info.font = Font.mediumSystemFont(11)
+  info.textColor = C.text2
+  info.centerAlignText()
+
+  w.addSpacer(6)
+
+  // 紧凑温度条
+  const bar = w.addStack()
+  bar.layoutHorizontally()
+  bar.addSpacer()
+  const ok = data.providers.filter(p => p.temp != null)
+  for (const p of ok) {
+    const hex = PROVIDER_COLORS[p.id] || '#6e6e73'
+    const dot = bar.addText('●')
+    dot.font = Font.regularSystemFont(7)
+    dot.textColor = new Color(hex)
+    bar.addSpacer(3)
+  }
+  bar.addSpacer()
+
+  w.addSpacer(4)
   renderFooter(w, data.updatedAt, data.count)
+}
+
+// ── 错误 ──
+function renderError(w, msg) {
+  w.backgroundColor = new Color('#0a0d16')
+  w.addSpacer()
+  const icon = w.addText('⚠')
+  icon.font = Font.systemFont(22)
+  icon.centerAlignText()
+  w.addSpacer(4)
+  const title = w.addText('无法加载')
+  title.font = Font.semiboldSystemFont(14)
+  title.textColor = C.text
+  title.centerAlignText()
+  w.addSpacer(2)
+  const detail = w.addText(msg)
+  detail.font = Font.regularSystemFont(10)
+  detail.textColor = C.dim
+  detail.centerAlignText()
+  w.addSpacer()
 }
 
 // ── Main ──
@@ -340,7 +345,11 @@ async function run() {
 
   try {
     const data = await fetchData(city.lat, city.lon, city.name, city.cityName)
-    renderWidget(w, data)
+    if (config.widgetFamily === 'small') {
+      renderSmall(w, data)
+    } else {
+      renderMain(w, data)
+    }
   } catch (e) {
     renderError(w, e.message || '未知错误')
   }

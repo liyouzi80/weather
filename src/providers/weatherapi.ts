@@ -3,6 +3,24 @@
 import type { CurrentWeather, GeoLocation, WeatherProvider } from './types'
 import { getKey } from './keys'
 
+/** 带重试和超时的 fetch */
+async function fetchWithRetry(url: string, retries = 2): Promise<Response> {
+  let lastErr: unknown
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 8000)
+      const res = await fetch(url, { signal: controller.signal })
+      clearTimeout(timer)
+      return res
+    } catch (e) {
+      lastErr = e
+      if (i < retries) await new Promise(r => setTimeout(r, 1000 * (i + 1)))
+    }
+  }
+  throw lastErr
+}
+
 // 风向英文方位 -> 中文
 const CARDINAL: Record<string, string> = {
   N: '北风', NNE: '东北偏北风', NE: '东北风', ENE: '东北偏东风',
@@ -23,7 +41,8 @@ export const weatherapiProvider: WeatherProvider = {
     const url =
       `https://api.weatherapi.com/v1/current.json?key=${key}` +
       `&q=${loc.lat},${loc.lon}&lang=zh`
-    const res = await fetch(url)
+
+    const res = await fetchWithRetry(url)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const d = await res.json()
     const c = d?.current

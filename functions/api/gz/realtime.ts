@@ -8,7 +8,8 @@ export const onRequest = async (): Promise<Response> => {
       headers: {
         'content-type': 'application/json; charset=utf-8',
         'access-control-allow-origin': '*',
-        'cache-control': 'public, max-age=300',
+        'cache-control': 'public, max-age=60',
+        'cdn-cache-control': 'public, max-age=60',
       },
     })
   } catch (e) {
