@@ -10,7 +10,8 @@ interface KeyField {
 const FIELDS: KeyField[] = [
   { id: 'qweather', label: '和风天气 Key', desc: '在 dev.qweather.com 注册免费开发版后获取' },
   { id: 'caiyun', label: '彩云天气 Token', desc: '在 platform.caiyunapp.com 申请' },
-  { id: 'twc', label: 'The Weather Channel apiKey', desc: 'weather.com（The Weather Company）v3 接口的 apiKey' },
+  { id: 'owm', label: 'OpenWeatherMap appid', desc: '在 openweathermap.org 免费注册获取（免费层）' },
+  { id: 'weatherapi', label: 'WeatherAPI.com key', desc: '在 weatherapi.com 免费注册获取（免费层每月 100 万次）' },
 ]
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {

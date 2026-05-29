@@ -6,7 +6,6 @@ const UPSTREAM: Record<string, string> = {
   qweather: 'https://devapi.qweather.com',
   caiyun: 'https://api.caiyunapp.com',
   nmc: 'http://www.nmc.cn',
-  twc: 'https://api.weather.com',
 }
 
 export const onRequest = async (context: { request: Request }): Promise<Response> => {
