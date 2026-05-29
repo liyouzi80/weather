@@ -70,29 +70,32 @@ function renderMain(w, data) {
 
   left.addSpacer()
 
-  // 地名 — Apple HIG: 标题 17pt
+  // 地名
   const city = left.addText(data.city)
   city.font = Font.semiboldSystemFont(16)
   city.textColor = C.text
   city.lineLimit = 1
+  city.centerAlignText()
 
   left.addSpacer(8)
 
-  // 温度 — Apple HIG: 大标题 32-36pt
+  // 温度
   const median = data.median != null ? Math.round(data.median) : '—'
   const big = left.addText(`${median}°`)
   big.font = Font.boldSystemFont(34)
   big.textColor = C.text
   big.lineLimit = 1
+  big.centerAlignText()
 
   left.addSpacer(8)
 
-  // 天气 — Apple HIG: 正文 13pt
+  // 天气
   if (data.text) {
     const wx = left.addText(data.text)
-    wx.font = Font.mediumSystemFont(13)
+    wx.font = Font.mediumSystemFont(15)
     wx.textColor = C.text2
     wx.lineLimit = 1
+    wx.centerAlignText()
   } else {
     left.addText(' ')
   }
