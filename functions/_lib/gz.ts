@@ -55,12 +55,41 @@ export async function scrapeGuangzhou(): Promise<GzRealtime> {
   if (fcRes.status === 'fulfilled') {
     const fc = fcRes.value
     const content = typeof fc?.content === 'string' ? fc.content.trim() : undefined
-    if (content) {
+    const issued = typeof fc?.ddatetime === 'string' ? fc.ddatetime : undefined
+    // 时效检测：仅当短时预报仍在有效窗口内才返回（过期不返回，任何消费方都拿不到）。
+    if (content && isForecastCurrent(content, issued)) {
       out.forecast = content
-      out.forecastIssuedAt = typeof fc?.ddatetime === 'string' ? fc.ddatetime : undefined
+      out.forecastIssuedAt = issued
     }
   }
   return out
+}
+
+/**
+ * 番禺区气象台短时预报时效检测：按"预报窗口结束时间"（北京时）判断是否过期。
+ * issued 形如「2026年05月29日 17:00」，content 含「…今天17时到20时…」。
+ * 解析不出窗口时回退为"发布后 4 小时"；过期返回 false。
+ */
+export function isForecastCurrent(content?: string, issued?: string): boolean {
+  if (!issued) return true
+  const m = issued.match(/(\d{4})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2})/)
+  if (!m) return true
+  const Y = +m[1], Mo = +m[2], D = +m[3], H = +m[4], Mi = +m[5]
+  // 发布时间为北京时间(UTC+8)，换算成 UTC 毫秒
+  const issuedUTC = Date.UTC(Y, Mo - 1, D, H - 8, Mi)
+  const now = Date.now()
+  if (now < issuedUTC - 3600_000) return true // 时钟偏差保护：发布时间"在未来"则照常显示
+
+  let limitUTC: number
+  const em = content ? content.match(/到\s*(\d{1,2})\s*时/) : null
+  if (em) {
+    const eh = +em[1]
+    const dayOffset = eh <= H ? 1 : 0 // 结束小时 ≤ 发布小时视为次日
+    limitUTC = Date.UTC(Y, Mo - 1, D + dayOffset, eh - 8, 0)
+  } else {
+    limitUTC = issuedUTC + 4 * 3600_000
+  }
+  return now <= limitUTC + 30 * 60_000 // 30 分钟宽限
 }
 
 /** 抓取一个 `try{ var <name> = {...};}catch(e){}` 数据文件并解析成对象。 */
