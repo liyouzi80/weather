@@ -43,6 +43,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/proxy\/nmc/, ''),
       },
+      '/proxy/weatherapi': {
+        target: 'https://api.weatherapi.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/proxy\/weatherapi/, ''),
+      },
     },
   },
 })

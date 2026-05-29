@@ -70,10 +70,10 @@ async function fetchData(url: string, varName: string): Promise<any> {
   return extractObject(await res.text(), varName)
 }
 
-/** 映射成统一模型：取 baseObtInfo（广州基本站），备用 gzObtInfo。 */
+/** 映射成统一模型：取 gzObtInfo（番禺本地站 G1099），备用 baseObtInfo（广州基本站）。 */
 function mapData(d: any): GzRealtime {
-  const obt = d?.baseObtInfo ?? d?.gzObtInfo
-  if (!obt) throw new Error(`数据缺少 baseObtInfo，顶层字段: [${d ? Object.keys(d).join(', ') : d}]`)
+  const obt = d?.gzObtInfo ?? d?.baseObtInfo
+  if (!obt) throw new Error(`数据缺少 gzObtInfo/baseObtInfo，顶层字段: [${d ? Object.keys(d).join(', ') : d}]`)
 
   // -999.9 等为缺测哨兵
   const clean = (v: any) => {
@@ -86,7 +86,7 @@ function mapData(d: any): GzRealtime {
 
   const speed = clean(obt.wd2ds) // m/s
   const deg = clean(obt.wd2dd) // 度
-  const ts = d.baseObtDate ?? d.gzObtDate
+  const ts = d.gzObtDate ?? d.baseObtDate
 
   return {
     temp,
