@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchAll, PROVIDERS } from './providers'
 import type { GeoLocation, ProviderResult } from './providers/types'
 
-// 仅覆盖两个城市：广州番禺区、江西安福县。
 const CITIES: GeoLocation[] = [
   { name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622 },
   { name: '安福县', cityName: '安福', lat: 27.3954, lon: 114.6195 },
@@ -11,8 +10,8 @@ const CITIES: GeoLocation[] = [
 interface Annotated extends ProviderResult {
   isMax?: boolean
   isMin?: boolean
-  delta?: number // 相对中位数的温差
-  textDiff?: boolean // 天气描述与多数信源不一致
+  delta?: number
+  textDiff?: boolean
 }
 
 export default function App() {
@@ -20,6 +19,7 @@ export default function App() {
   const [results, setResults] = useState<ProviderResult[]>([])
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+  const [initialLoad, setInitialLoad] = useState(true)
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -28,6 +28,7 @@ export default function App() {
       setUpdatedAt(new Date())
     } finally {
       setLoading(false)
+      setInitialLoad(false)
     }
   }, [cityIdx])
 
@@ -40,15 +41,26 @@ export default function App() {
     setCityIdx(i)
   }
 
-  // 统计 + 差异标注
   const { annotated, stats } = useMemo(() => analyze(results), [results])
   const city = CITIES[cityIdx]
+  const isEmpty = !loading && results.length === 0 && !initialLoad
 
   return (
     <div className="app">
       <div className="topbar">
-        <h1>多信源实况</h1>
-        <button className={'icon-btn' + (loading ? ' spin' : '')} title="刷新" onClick={refresh}>↻</button>
+        <h1>天气实况</h1>
+        <button
+          className={'icon-btn' + (loading ? ' spin' : '')}
+          title="刷新"
+          onClick={refresh}
+          aria-label="刷新"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+        </button>
       </div>
 
       <div className="segmented" role="tablist">
@@ -67,7 +79,9 @@ export default function App() {
 
       <div className="location-bar">
         <span className="city">{city.name}</span>
-        {updatedAt && <span className="coords">更新于 {updatedAt.toLocaleTimeString('zh-CN')}</span>}
+        {updatedAt && (
+          <span className="coords">更新于 {updatedAt.toLocaleTimeString('zh-CN')}</span>
+        )}
       </div>
 
       {stats && (
@@ -77,9 +91,11 @@ export default function App() {
             <div>{stats.count}/{stats.total} 个信源有数据</div>
             <div>
               区间 <b>{stats.min}°</b> ~ <b>{stats.max}°</b>
-              {stats.spread > 0 && <> · 最大分歧 <b className={stats.spread >= 2 ? 'warn-text' : ''}>{stats.spread.toFixed(1)}°</b></>}
+              {stats.spread > 0 && (
+                <> · 最大分歧 <b className={stats.spread >= 2 ? 'warn-text' : ''}>{stats.spread.toFixed(1)}°</b></>
+              )}
             </div>
-            {stats.textDisagree && <div className="warn-text">⚠ 各信源天气现象描述不一致</div>}
+            {stats.textDisagree && <div className="warn-text">天气现象描述不一致</div>}
           </div>
         </div>
       )}
@@ -87,16 +103,20 @@ export default function App() {
       {stats && stats.count >= 2 && <TempRanking results={annotated} avg={stats.avg} />}
 
       {loading && results.length === 0 ? (
-        <div className="spinner" />
-      ) : (
         <div className="cards">
-          {annotated.map((r) => <ProviderCard key={r.providerId} r={r} />)}
+          {[1, 2, 3, 4].map((i) => (
+            <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 0.08}s` }} />
+          ))}
+        </div>
+      ) : (
+        <div className="cards" key={cityIdx}>
+          {annotated.map((r) => (
+            <ProviderCard key={r.providerId} r={r} />
+          ))}
         </div>
       )}
 
-      {!loading && results.length === 0 && (
-        <div className="hint">暂无数据，点右上角 ↻ 重试。</div>
-      )}
+      {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
     </div>
   )
 }
@@ -107,12 +127,12 @@ function ProviderCard({ r }: { r: Annotated }) {
 
   if (r.error) {
     return (
-      <div className="card err">
+      <div className="card err" style={{ borderLeftColor: 'rgba(120,120,128,0.4)' }}>
         <div className="head">
           <span className="dot" style={{ background: color }} />
           <span className="name">{r.providerName}</span>
         </div>
-        <div className="err-msg">⚠ {r.error}</div>
+        <div className="err-msg">{r.error}</div>
       </div>
     )
   }
@@ -134,10 +154,14 @@ function ProviderCard({ r }: { r: Annotated }) {
         <span className="temp">{c.temp}°</span>
       </div>
       <div className="row">
-        <span className={r.textDiff ? 'text-diff' : ''}><b>{c.text}</b>{r.textDiff && ' ⚠'}</span>
+        <span className={r.textDiff ? 'text-diff' : ''}>
+          <b>{c.text}</b>{r.textDiff && ' (!)'}
+        </span>
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike}°</b></span>}
         {c.humidity != null && <span>湿度 <b>{c.humidity}%</b></span>}
-        {c.windDir && <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed}km/h` : ''}</span>}
+        {c.windDir && (
+          <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed}km/h` : ''}</span>
+        )}
       </div>
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
       {c.forecast && (
@@ -200,7 +224,6 @@ function analyze(results: ProviderResult[]): {
   const avg = temps.reduce((a, b) => a + b, 0) / temps.length
   const median = sortedMedian(temps)
 
-  // 天气现象多数投票
   const textCounts = new Map<string, number>()
   for (const r of ok) textCounts.set(r.current!.text, (textCounts.get(r.current!.text) ?? 0) + 1)
   const majorityText = [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
