@@ -245,13 +245,6 @@ async function run() {
   }
   if (!city) city = CONFIG.cities[CONFIG.defaultCityIdx]
 
-  if (!config.runsInWidget) {
-    const pv = new ListWidget()
-    pv.addText(`${city.name} · 天气实况对比`)
-    pv.addText(CONFIG.apiUrl)
-    pv.presentSmall()
-  }
-
   const w = new ListWidget()
 
   try {
