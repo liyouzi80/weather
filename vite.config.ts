@@ -48,6 +48,17 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/proxy\/weatherapi/, ''),
       },
+      '/proxy/weathercn': {
+        target: 'http://d1.weather.com.cn',
+        changeOrigin: true,
+        headers: { Referer: 'http://www.weather.com.cn/' },
+        rewrite: (p) => p.replace(/^\/proxy\/weathercn/, ''),
+      },
+      '/proxy/tencent': {
+        target: 'https://wis.qq.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/proxy\/tencent/, ''),
+      },
     },
   },
 })

@@ -7,6 +7,13 @@ const UPSTREAM: Record<string, string> = {
   caiyun: 'https://api.caiyunapp.com',
   nmc: 'http://www.nmc.cn',
   weatherapi: 'https://api.weatherapi.com',
+  weathercn: 'http://d1.weather.com.cn',
+  tencent: 'https://wis.qq.com',
+}
+
+// 部分上游需带 Referer 才返回数据
+const REFERER: Record<string, string> = {
+  weathercn: 'http://www.weather.com.cn/',
 }
 
 export const onRequest = async (context: { request: Request }): Promise<Response> => {
@@ -23,12 +30,12 @@ export const onRequest = async (context: { request: Request }): Promise<Response
 
   const target = base + tail + url.search
   try {
-    const upstream = await fetch(target, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
-      },
-    })
+    const headers: Record<string, string> = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+    }
+    if (REFERER[key]) headers.Referer = REFERER[key]
+    const upstream = await fetch(target, { headers })
     const body = await upstream.arrayBuffer()
     return new Response(body, {
       status: upstream.status,

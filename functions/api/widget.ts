@@ -63,6 +63,40 @@ async function fetchNMC(cityName: string): Promise<ProviderResult> {
   }
 }
 
+const WIDGET_UA = 'Mozilla/5.0 (compatible; WeatherWidget/1.0)'
+
+// ── 中国天气网（免费，无需密钥）────────────────────────────────
+const CN_CODE: Record<string, string> = { 番禺: '101280102', 安福: '101240612' }
+async function fetchWeatherCN(code: string): Promise<ProviderResult> {
+  const res = await fetch(`http://d1.weather.com.cn/sk_2d/${code}.html?_=${Date.now()}`, {
+    headers: { 'User-Agent': WIDGET_UA, Referer: 'http://www.weather.com.cn/' },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const m = (await res.text()).match(/\{[\s\S]*\}/)
+  if (!m) throw new Error('解析失败')
+  const d: any = JSON.parse(m[0])
+  const temp = parseFloat(d.temp)
+  if (isNaN(temp)) throw new Error('无温度')
+  return { id: 'weathercn', name: '中国天气网', color: '#14b8a6', temp, text: d.weather }
+}
+
+// ── 腾讯天气（免费，无需密钥）──────────────────────────────────
+const TENCENT_LOC: Record<string, { province: string; city: string; county: string }> = {
+  番禺: { province: '广东省', city: '广州市', county: '番禺区' },
+  安福: { province: '江西省', city: '吉安市', county: '安福县' },
+}
+async function fetchTencent(loc: { province: string; city: string; county: string }): Promise<ProviderResult> {
+  const p = new URLSearchParams({ source: 'pc', weather_type: 'observe', ...loc })
+  const res = await fetch(`https://wis.qq.com/weather/common?${p.toString()}`, { headers: { 'User-Agent': WIDGET_UA } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const j: any = await res.json()
+  const o = j?.data?.observe
+  if (!o || o.degree == null) throw new Error('无实况')
+  const temp = parseFloat(o.degree)
+  if (isNaN(temp)) throw new Error('无温度')
+  return { id: 'tencent', name: '腾讯天气', color: '#0ea5e9', temp, text: o.weather }
+}
+
 // ── 广州市气象局·番禺（免费，仅番禺）────────────────────────────
 // 复用 functions/_lib/gz.ts 的抓取逻辑
 import { scrapeGuangzhou } from '../_lib/gz'
@@ -153,12 +187,14 @@ export const onRequest = async (context: { request: Request; env: Record<string,
 
   // 收集所有可用的请求
   const tasks: Promise<ProviderResult>[] = [
-    fetchOpenMeteo(lat, lon),
     fetchNMC(cityName),
     isPanyu ? fetchGZQX() : null,
+    CN_CODE[cityName] ? fetchWeatherCN(CN_CODE[cityName]) : null,
+    TENCENT_LOC[cityName] ? fetchTencent(TENCENT_LOC[cityName]) : null,
     env.VITE_QWEATHER_KEY || env.QWEATHER_KEY ? fetchQWeather(lat, lon, env.VITE_QWEATHER_KEY || env.QWEATHER_KEY) : null,
     env.VITE_CAIYUN_KEY || env.CAIYUN_KEY ? fetchCaiyun(lat, lon, env.VITE_CAIYUN_KEY || env.CAIYUN_KEY) : null,
     env.VITE_OWM_KEY || env.OWM_KEY ? fetchOWM(lat, lon, env.VITE_OWM_KEY || env.OWM_KEY) : null,
+    fetchOpenMeteo(lat, lon),
   ].filter(Boolean) as Promise<ProviderResult>[]
 
   const settled = await Promise.allSettled(tasks)

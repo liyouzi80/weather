@@ -12,13 +12,13 @@ const CONFIG = {
 }
 
 const SHORT = {
-  'nmc': '中央气象台', 'gzqx': '番禺气象台', 'qweather': '和风天气',
-  'caiyun': '彩云天气', 'owm': 'OWM', 'open-meteo': 'Open-Meteo',
+  'nmc': '中央气象台', 'gzqx': '番禺气象台', 'weathercn': '中国天气网', 'tencent': '腾讯天气',
+  'qweather': '和风天气', 'caiyun': '彩云天气', 'owm': 'OWM', 'open-meteo': 'Open-Meteo',
 }
 
 const PC = {
-  'nmc': '#ef4444', 'gzqx': '#a855f7', 'qweather': '#3b82f6',
-  'caiyun': '#f59e0b', 'owm': '#f97316', 'open-meteo': '#22c55e',
+  'nmc': '#ef4444', 'gzqx': '#a855f7', 'weathercn': '#14b8a6', 'tencent': '#0ea5e9',
+  'qweather': '#3b82f6', 'caiyun': '#f59e0b', 'owm': '#f97316', 'open-meteo': '#22c55e',
 }
 
 const C = {
@@ -151,9 +151,11 @@ function renderMain(w, data) {
   ctx.setTextColor(new Color('#8a93a6'))
   ctx.drawTextInRect(`中位 · ${data.count}源`, new Rect(cx - 50, cy + 24, 100, 14))
 
-  // ═══ 右：6 信源彩色横条 ═══
-  const bx = 168, bw = 176, bh = 16, gap = 7
+  // ═══ 右：信源彩色横条（条高随数量自适应）═══
   const n = data.providers.length
+  const bx = 168, bw = 176
+  const bh = n > 6 ? 13 : 16
+  const gap = n > 6 ? 5 : 7
   const totalH = n * bh + (n - 1) * gap
   let by = (H - totalH) / 2 - 4
   const lo = (data.min != null ? data.min : 0) - 2

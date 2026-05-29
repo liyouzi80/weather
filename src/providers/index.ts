@@ -5,12 +5,16 @@ import { qweatherProvider } from './qweather'
 import { caiyunProvider } from './caiyun'
 import { nmcProvider } from './nmc'
 import { gzqxProvider } from './gzqx'
+import { weathercnProvider } from './weathercn'
+import { tencentProvider } from './tencent'
 import { owmProvider } from './owm'
 
-// 展示顺序：中央气象局 / 番禺气象台 / 和风 / 彩云 / openweathermap / open-meteo
+// 展示顺序：中央气象局 / 番禺气象台 / 中国天气网 / 腾讯天气 / 和风 / 彩云 / openweathermap / open-meteo
 export const PROVIDERS: WeatherProvider[] = [
   nmcProvider,
   gzqxProvider,
+  weathercnProvider,
+  tencentProvider,
   qweatherProvider,
   caiyunProvider,
   owmProvider,

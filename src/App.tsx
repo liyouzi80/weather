@@ -3,8 +3,16 @@ import { fetchAll, PROVIDERS } from './providers'
 import type { GeoLocation, ProviderResult } from './providers/types'
 
 const CITIES: GeoLocation[] = [
-  { name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622 },
-  { name: '安福县', cityName: '安福', lat: 27.3954, lon: 114.6195 },
+  {
+    name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622,
+    weatherCnCode: '101280102',
+    tencent: { province: '广东省', city: '广州市', county: '番禺区' },
+  },
+  {
+    name: '安福县', cityName: '安福', lat: 27.3954, lon: 114.6195,
+    weatherCnCode: '101240612',
+    tencent: { province: '江西省', city: '吉安市', county: '安福县' },
+  },
 ]
 
 interface Annotated extends ProviderResult {

@@ -6,6 +6,10 @@ export interface GeoLocation {
   lon: number
   /** 纯城市名（如「广州」），供按编码检索的官方信源做站点匹配 */
   cityName?: string
+  /** 中国天气网（weather.com.cn）城市码，如「101280102」 */
+  weatherCnCode?: string
+  /** 腾讯天气按省/市/区县中文名检索 */
+  tencent?: { province: string; city: string; county: string }
 }
 
 export interface CurrentWeather {
