@@ -221,9 +221,14 @@ function renderSmall(w, data) {
 function renderError(w, msg) {
   w.backgroundColor = new Color('#0a0d16')
   w.addSpacer()
-  w.addText('⚠').centerAlignText()
+  const ic = w.addText('⚠')
+  ic.textColor = C.dim
+  ic.centerAlignText()
   w.addSpacer(4)
-  w.addText('无法加载')
+  const t = w.addText('无法加载')
+  t.textColor = C.text
+  t.font = Font.mediumSystemFont(14)
+  t.centerAlignText()
   w.addSpacer(2)
   const d = w.addText(msg)
   d.font = Font.regularSystemFont(10)
