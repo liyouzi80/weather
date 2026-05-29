@@ -8,19 +8,20 @@ import { gzqxProvider } from './gzqx'
 import { owmProvider } from './owm'
 import { weatherapiProvider } from './weatherapi'
 
+// 展示顺序：中央气象局 / 广州市气象局 / 和风 / 彩云 / openweathermap / weatherapi / open-meteo
 export const PROVIDERS: WeatherProvider[] = [
-  openMeteoProvider,
   nmcProvider,
   gzqxProvider,
   qweatherProvider,
   caiyunProvider,
   owmProvider,
   weatherapiProvider,
+  openMeteoProvider,
 ]
 
 /** 并发拉取所有「已配置」信源，逐个返回结果（失败也返回，便于 UI 展示错误） */
 export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
-  const active = PROVIDERS.filter((p) => p.isConfigured())
+  const active = PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(loc) ?? true))
   return Promise.all(
     active.map(async (p): Promise<ProviderResult> => {
       try {

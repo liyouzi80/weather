@@ -12,6 +12,8 @@ export const gzqxProvider: WeatherProvider = {
   color: '#a855f7',
   requiresKey: false,
   isConfigured: () => true,
+  // 广州市气象局·番禺数据仅覆盖番禺，其它城市不展示本信源。
+  appliesTo: (loc: GeoLocation) => loc.cityName === '番禺',
   async fetchCurrent(_loc: GeoLocation): Promise<CurrentWeather> {
     const res = await fetch('/api/gz/realtime')
     if (!res.ok) throw new Error(`抓取失败 HTTP ${res.status}`)

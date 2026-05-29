@@ -50,6 +50,8 @@ export interface WeatherProvider {
   requiresKey: boolean
   /** 当前是否已配置可用（无需密钥的恒为 true） */
   isConfigured(): boolean
+  /** 该信源是否适用于给定地点（如本地气象局仅覆盖其辖区）。缺省视为通用。 */
+  appliesTo?(loc: GeoLocation): boolean
   /** 拉取某坐标的实时天气 */
   fetchCurrent(loc: GeoLocation): Promise<CurrentWeather>
 }

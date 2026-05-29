@@ -7,12 +7,6 @@ import type { CurrentWeather, GeoLocation, WeatherProvider } from './types'
 
 const BASE = '/proxy/nmc'
 
-interface NmcStation {
-  code: string
-  province?: string
-  city?: string
-}
-
 export const nmcProvider: WeatherProvider = {
   id: 'nmc',
   name: '中央气象台',
@@ -23,14 +17,15 @@ export const nmcProvider: WeatherProvider = {
     const keyword = (loc.cityName || loc.name || '').replace(/市$|区$|县$/g, '')
     if (!keyword) throw new Error('缺少城市名，无法匹配中央气象台站点')
 
-    // 1) 按城市名检索站点编码
-    const stRes = await fetch(`${BASE}/rest/findStation?keyword=${encodeURIComponent(keyword)}`)
+    // 1) 按城市名检索站点编码（旧的 /rest/findStation 已下线，改用站点搜索接口）。
+    //    返回 data 为竖线分隔的字符串数组：`编码|名称|省份|url|经度|纬度`。
+    const stRes = await fetch(`${BASE}/essearch/api/autocomplete?q=${encodeURIComponent(keyword)}`)
     if (!stRes.ok) throw new Error(`检索站点失败 HTTP ${stRes.status}`)
-    const stations: NmcStation[] = await stRes.json()
-    if (!Array.isArray(stations) || stations.length === 0) {
-      throw new Error(`未找到「${keyword}」对应的气象站`)
-    }
-    const stationId = stations[0].code
+    const stJson = await stRes.json()
+    const rows: string[] = Array.isArray(stJson?.data) ? stJson.data : []
+    if (rows.length === 0) throw new Error(`未找到「${keyword}」对应的气象站`)
+    const stationId = rows[0].split('|')[0]
+    if (!stationId) throw new Error(`「${keyword}」站点编码解析失败`)
 
     // 2) 拉取该站实况
     const wRes = await fetch(`${BASE}/rest/weather?stationid=${stationId}`)

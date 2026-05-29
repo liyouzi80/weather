@@ -1,10 +1,8 @@
-// API 密钥管理：优先读取构建时注入的环境变量（.env），
-// 同时支持用户在页面「设置」里临时填写，存到 localStorage。
-// 这样既能本地开发用 .env，也能让没有改代码能力的用户即填即用。
+// API 密钥：仅读取构建时注入的环境变量（.env / 部署平台的环境变量）。
+// 应用内不再提供密钥录入界面；需要密钥的信源在构建时配置好对应 VITE_* 即可启用，
+// 未配置则该信源自动不参与对比。
 
 export type KeyId = 'qweather' | 'caiyun' | 'owm' | 'weatherapi'
-
-const LS_PREFIX = 'weather_key_'
 
 const ENV_KEYS: Record<KeyId, string | undefined> = {
   qweather: import.meta.env.VITE_QWEATHER_KEY as string | undefined,
@@ -14,14 +12,5 @@ const ENV_KEYS: Record<KeyId, string | undefined> = {
 }
 
 export function getKey(id: KeyId): string | undefined {
-  const fromLs = localStorage.getItem(LS_PREFIX + id)?.trim()
-  if (fromLs) return fromLs
-  const fromEnv = ENV_KEYS[id]?.trim()
-  return fromEnv || undefined
-}
-
-export function setKey(id: KeyId, value: string): void {
-  const v = value.trim()
-  if (v) localStorage.setItem(LS_PREFIX + id, v)
-  else localStorage.removeItem(LS_PREFIX + id)
+  return ENV_KEYS[id]?.trim() || undefined
 }

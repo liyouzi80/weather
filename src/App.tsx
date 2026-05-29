@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchAll, PROVIDERS } from './providers'
 import type { GeoLocation, ProviderResult } from './providers/types'
-import { SettingsSheet } from './components/SettingsSheet'
 
-// 固定位置：广州市番禺区（市桥）
-const PANYU: GeoLocation = { name: '广州 番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622 }
+// 仅覆盖两个城市：广州番禺区、江西安福县。
+const CITIES: GeoLocation[] = [
+  { name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622 },
+  { name: '安福县', cityName: '安福', lat: 27.3954, lon: 114.6195 },
+]
 
 interface Annotated extends ProviderResult {
   isMax?: boolean
@@ -14,36 +16,57 @@ interface Annotated extends ProviderResult {
 }
 
 export default function App() {
+  const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
 
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      setResults(await fetchAll(PANYU))
+      setResults(await fetchAll(CITIES[cityIdx]))
       setUpdatedAt(new Date())
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [cityIdx])
 
   useEffect(() => { refresh() }, [refresh])
 
+  const selectCity = (i: number) => {
+    if (i === cityIdx) return
+    setResults([])
+    setUpdatedAt(null)
+    setCityIdx(i)
+  }
+
   // 统计 + 差异标注
   const { annotated, stats } = useMemo(() => analyze(results), [results])
+  const city = CITIES[cityIdx]
 
   return (
     <div className="app">
       <div className="topbar">
-        <h1>番禺 · 多信源实况</h1>
-        <button className="icon-btn" title="刷新" onClick={refresh}>↻</button>
-        <button className="icon-btn" title="设置密钥" onClick={() => setShowSettings(true)}>⚙</button>
+        <h1>多信源实况</h1>
+        <button className={'icon-btn' + (loading ? ' spin' : '')} title="刷新" onClick={refresh}>↻</button>
+      </div>
+
+      <div className="segmented" role="tablist">
+        {CITIES.map((c, i) => (
+          <button
+            key={c.name}
+            role="tab"
+            aria-selected={i === cityIdx}
+            className={i === cityIdx ? 'active' : ''}
+            onClick={() => selectCity(i)}
+          >
+            {c.name}
+          </button>
+        ))}
       </div>
 
       <div className="location-bar">
-        <span className="city">{PANYU.name}</span>
+        <span className="city">{city.name}</span>
         {updatedAt && <span className="coords">更新于 {updatedAt.toLocaleTimeString('zh-CN')}</span>}
       </div>
 
@@ -61,6 +84,8 @@ export default function App() {
         </div>
       )}
 
+      {stats && stats.count >= 2 && <TempRanking results={annotated} avg={stats.avg} />}
+
       {loading && results.length === 0 ? (
         <div className="spinner" />
       ) : (
@@ -70,11 +95,7 @@ export default function App() {
       )}
 
       {!loading && results.length === 0 && (
-        <div className="hint">暂无数据，点右上角 ↻ 重试，或在 ⚙ 设置里填写信源密钥。</div>
-      )}
-
-      {showSettings && (
-        <SettingsSheet onClose={() => { setShowSettings(false); refresh() }} />
+        <div className="hint">暂无数据，点右上角 ↻ 重试。</div>
       )}
     </div>
   )
@@ -82,7 +103,7 @@ export default function App() {
 
 function ProviderCard({ r }: { r: Annotated }) {
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
-  const color = meta?.color ?? '#3b82f6'
+  const color = meta?.color ?? '#0a84ff'
 
   if (r.error) {
     return (
@@ -125,6 +146,41 @@ function ProviderCard({ r }: { r: Annotated }) {
           {c.forecastIssuedAt ? ` · ${c.forecastIssuedAt}` : ''}：{c.forecast}
         </div>
       )}
+    </div>
+  )
+}
+
+function TempRanking({ results, avg }: { results: Annotated[]; avg: number }) {
+  const ranked = results
+    .filter((r) => r.current)
+    .sort((a, b) => b.current!.temp - a.current!.temp)
+  if (ranked.length < 2) return null
+  const hi = ranked[0].current!.temp
+  const lo = ranked[ranked.length - 1].current!.temp
+  const span = hi - lo || 1
+  return (
+    <div className="ranking">
+      <div className="ranking-title">温度排行</div>
+      {ranked.map((r, i) => {
+        const c = r.current!
+        const color = PROVIDERS.find((p) => p.id === r.providerId)?.color ?? '#0a84ff'
+        const diff = c.temp - avg
+        const pct = 14 + ((c.temp - lo) / span) * 86
+        return (
+          <div className="rank-row" key={r.providerId}>
+            <span className="rank-no">{i + 1}</span>
+            <span className="dot" style={{ background: color }} />
+            <span className="rank-name">{r.providerName}</span>
+            <span className="rank-bar">
+              <span className="rank-bar-fill" style={{ width: `${pct}%`, background: color }} />
+            </span>
+            <span className="rank-temp">{c.temp}°</span>
+            <span className={'rank-diff ' + (diff > 0.05 ? 'delta-hot' : diff < -0.05 ? 'delta-cold' : '')}>
+              {diff > 0 ? '+' : ''}{diff.toFixed(1)}
+            </span>
+          </div>
+        )
+      })}
     </div>
   )
 }
