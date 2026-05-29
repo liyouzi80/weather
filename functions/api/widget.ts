@@ -70,7 +70,7 @@ import { scrapeGuangzhou } from '../_lib/gz'
 async function fetchGZQX(): Promise<ProviderResult> {
   const d = await scrapeGuangzhou()
   return {
-    id: 'gzqx', name: '广州市气象局', color: '#a855f7',
+    id: 'gzqx', name: '番禺气象台', color: '#a855f7',
     temp: d.temp, text: d.text,
     forecast: d.forecast,
     forecastIssuedAt: d.forecastIssuedAt,
@@ -118,18 +118,6 @@ async function fetchOWM(lat: number, lon: number, key: string): Promise<Provider
   }
 }
 
-// ── WeatherAPI.com（需密钥）─────────────────────────────────────
-async function fetchWeatherAPI(lat: number, lon: number, key: string): Promise<ProviderResult> {
-  const url = `https://api.weatherapi.com/v1/current.json?key=${key}&q=${lat},${lon}&lang=zh`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const d: any = await res.json()
-  return {
-    id: 'weatherapi', name: 'WeatherAPI.com', color: '#0ea5e9',
-    temp: d.current.temp_c, text: d.current.condition?.text ?? '—',
-  }
-}
-
 // ── WMO 天气代码（精简版）───────────────────────────────────────
 const WMO_TEXT: Record<number, string> = {
   0: '晴', 1: '大部晴', 2: '多云', 3: '阴',
@@ -171,7 +159,6 @@ export const onRequest = async (context: { request: Request; env: Record<string,
     env.VITE_QWEATHER_KEY || env.QWEATHER_KEY ? fetchQWeather(lat, lon, env.VITE_QWEATHER_KEY || env.QWEATHER_KEY) : null,
     env.VITE_CAIYUN_KEY || env.CAIYUN_KEY ? fetchCaiyun(lat, lon, env.VITE_CAIYUN_KEY || env.CAIYUN_KEY) : null,
     env.VITE_OWM_KEY || env.OWM_KEY ? fetchOWM(lat, lon, env.VITE_OWM_KEY || env.OWM_KEY) : null,
-    env.VITE_WEATHERAPI_KEY || env.WEATHERAPI_KEY ? fetchWeatherAPI(lat, lon, env.VITE_WEATHERAPI_KEY || env.WEATHERAPI_KEY) : null,
   ].filter(Boolean) as Promise<ProviderResult>[]
 
   const settled = await Promise.allSettled(tasks)

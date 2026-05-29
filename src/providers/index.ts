@@ -6,16 +6,14 @@ import { caiyunProvider } from './caiyun'
 import { nmcProvider } from './nmc'
 import { gzqxProvider } from './gzqx'
 import { owmProvider } from './owm'
-import { weatherapiProvider } from './weatherapi'
 
-// 展示顺序：中央气象局 / 广州市气象局 / 和风 / 彩云 / openweathermap / weatherapi / open-meteo
+// 展示顺序：中央气象局 / 番禺气象台 / 和风 / 彩云 / openweathermap / open-meteo
 export const PROVIDERS: WeatherProvider[] = [
   nmcProvider,
   gzqxProvider,
   qweatherProvider,
   caiyunProvider,
   owmProvider,
-  weatherapiProvider,
   openMeteoProvider,
 ]
 

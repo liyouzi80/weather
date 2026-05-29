@@ -22,11 +22,10 @@ const CONFIG = {
 const SHORT_NAME = {
   'open-meteo': 'Open-Meteo',
   'nmc': '中央气象台',
-  'gzqx': '广州气象局',
+  'gzqx': '番禺气象台',
   'qweather': '和风天气',
   'caiyun': '彩云天气',
   'owm': 'OWM',
-  'weatherapi': 'WeatherAPI',
 }
 
 const C = {
@@ -41,7 +40,7 @@ const C = {
 
 const PROVIDER_COLORS = {
   'nmc': '#ef4444', 'gzqx': '#a855f7', 'qweather': '#3b82f6',
-  'caiyun': '#f59e0b', 'owm': '#f97316', 'weatherapi': '#0ea5e9',
+  'caiyun': '#f59e0b', 'owm': '#f97316',
   'open-meteo': '#22c55e',
 }
 
