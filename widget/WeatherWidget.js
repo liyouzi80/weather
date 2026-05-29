@@ -58,28 +58,31 @@ function renderMain(w, data) {
 
   const multi = data.count >= 2 && data.max !== data.min
 
-  // ═══ 左右分割 ═══
+  // 主体整体垂直居中：顶部弹性留白 → 主体 → 底部弹性留白 → 页脚钉底
+  w.addSpacer()
+
+  // ═══ 左右分栏 ═══
   const root = w.addStack()
   root.layoutHorizontally()
+  root.centerAlignContent() // 两栏相对彼此垂直居中
   root.spacing = 12
 
-  // ── 左面板 ──
+  // ── 左栏（固定宽，内容水平居中）──
   const left = root.addStack()
   left.layoutVertically()
+  left.size = new Size(150, 0)
 
-  left.addSpacer()
-
-  // 地名 + 天气 同行居中
+  // 地名 + 天气 同行、基线对齐、居中
   const topRow = left.addStack()
   topRow.layoutHorizontally()
-  topRow.centerAlignContent()
+  topRow.bottomAlignContent()
   topRow.addSpacer()
   const city = topRow.addText(data.city)
   city.font = Font.semiboldSystemFont(16)
   city.textColor = C.text
   city.lineLimit = 1
-  topRow.addSpacer(14)
   if (data.text) {
+    topRow.addSpacer(10)
     const wx = topRow.addText(data.text)
     wx.font = Font.mediumSystemFont(15)
     wx.textColor = C.text2
@@ -87,33 +90,31 @@ function renderMain(w, data) {
   }
   topRow.addSpacer()
 
-  left.addSpacer(10)
+  left.addSpacer(12)
 
-  // 温度
+  // 温度（中位数）水平居中
+  const tempRow = left.addStack()
+  tempRow.layoutHorizontally()
+  tempRow.addSpacer()
   const median = data.median != null ? Math.round(data.median) : '—'
-  const big = left.addText(`${median}°`)
+  const big = tempRow.addText(`${median}°`)
   big.font = Font.boldSystemFont(44)
   big.textColor = C.text
   big.lineLimit = 1
-  big.centerAlignText()
+  tempRow.addSpacer()
 
-  left.addSpacer()
-
-  // ── 右面板 ──
+  // ── 右栏（填充剩余宽，内容随 root 垂直居中）──
   const right = root.addStack()
   right.layoutVertically()
-  right.spacing = 5
-
-  right.addSpacer(4)
 
   // 标题 — Apple HIG: 标注 11pt
   const title = right.addText(`${data.count} 个信源`)
   title.font = Font.regularSystemFont(11)
   title.textColor = C.dim
-
   right.addSpacer(4)
 
-  for (const p of data.providers) {
+  data.providers.forEach((p, i) => {
+    if (i > 0) right.addSpacer(5)
     const row = right.addStack()
     row.layoutHorizontally()
     row.centerAlignContent()
@@ -123,9 +124,9 @@ function renderMain(w, data) {
     d.font = Font.regularSystemFont(6)
     d.textColor = new Color(hex)
 
-    row.addSpacer(4)
+    row.addSpacer(5)
 
-    // Apple HIG: 正文 13pt
+    // Apple HIG: 正文 13pt（此处用 12pt 适配多源）
     const nm = row.addText(SHORT[p.id] || p.name)
     nm.font = Font.regularSystemFont(12)
     nm.textColor = p.error ? C.dim : C.text
@@ -146,11 +147,11 @@ function renderMain(w, data) {
       else tp.textColor = C.text
       tp.lineLimit = 1
     }
-  }
+  })
 
-  right.addSpacer()
+  w.addSpacer()
 
-  // ── 底部更新 ──
+  // ── 底部更新时间（钉底、居中）──
   const ft = w.addStack()
   ft.layoutHorizontally()
   ft.addSpacer()
