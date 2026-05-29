@@ -8,7 +8,7 @@ import type { CurrentWeather, GeoLocation, WeatherProvider } from './types'
 
 export const gzqxProvider: WeatherProvider = {
   id: 'gzqx',
-  name: '广州市气象局·番禺',
+  name: '广州市气象局',
   color: '#a855f7',
   requiresKey: false,
   isConfigured: () => true,
