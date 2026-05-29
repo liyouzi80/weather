@@ -2,7 +2,7 @@
 // ===============================================
 // 使用：
 // 1. Scriptable App 中新建脚本，粘贴全部内容
-// 2. 添加到桌面（中号推荐，小号/大号也适配）
+// 2. 添加到桌面（推荐中号）
 // 3. Widget Parameter：填「番禺」或「安福」
 // ===============================================
 
@@ -26,12 +26,11 @@ const PC = {
 }
 
 const C = {
-  text:   new Color('#f5f5f7'),
-  text2:  new Color('#98989d'),
-  dim:    new Color('#6e6e73'),
-  hot:    new Color('#ff453a'),
-  cold:   new Color('#40c8e0'),
-  warn:   new Color('#ffd60a'),
+  text:  new Color('#f5f5f7'),
+  text2: new Color('#98989d'),
+  dim:   new Color('#6e6e73'),
+  hot:   new Color('#ff453a'),
+  cold:  new Color('#40c8e0'),
 }
 
 // ── 数据 ──
@@ -40,10 +39,11 @@ async function fetchData(lat, lon, name, cityName) {
   const key = `${lat},${lon},${name}`
   if (key === _k && _d) return _d
   const p = `lat=${lat}&lon=${lon}&name=${encodeURIComponent(name)}&cityName=${encodeURIComponent(cityName)}`
-  const r = new Request(`${CONFIG.apiUrl}?${p}`)
-  r.timeoutInterval = 15
-  const res = await r.loadJSON()
-  _k = key; _d = res; return res
+  const req = new Request(`${CONFIG.apiUrl}?${p}`)
+  req.timeoutInterval = 15
+  _d = await req.loadJSON()
+  _k = key
+  return _d
 }
 
 // ── 背景 ──
@@ -54,131 +54,122 @@ function bg(w) {
   w.backgroundGradient = g
 }
 
-// ── 辅助 ──
-function dot(color) {
-  return { text: '●', color: new Color(color), size: 7 }
-}
-
-// ══════════════════════════════════════
-// 中号 / 大号
-// ══════════════════════════════════════
-
+// ── 中号 / 大号 ──
 function renderMain(w, data) {
   bg(w)
-  w.setPadding(16, 18, 14, 18)
-  const ok = data.providers.filter(p => p.temp != null)
+  w.setPadding(14, 16, 12, 16)
+
   const multi = data.count >= 2 && data.max !== data.min
 
-  // ── 头部：城市 + 天气 + 信源数 ──
+  // ── 头部 ──
   const hdr = w.addStack()
   hdr.layoutHorizontally()
   hdr.centerAlignContent()
+
   const city = hdr.addText(data.city)
-  city.font = Font.semiboldSystemFont(17)
+  city.font = Font.semiboldSystemFont(15)
   city.textColor = C.text
+  city.lineLimit = 1
+
   hdr.addSpacer(6)
+
   if (data.text) {
     const tx = hdr.addText(data.text)
-    tx.font = Font.mediumSystemFont(14)
+    tx.font = Font.mediumSystemFont(12)
     tx.textColor = C.text2
+    tx.lineLimit = 1
   }
+
   hdr.addSpacer()
-  const n = hdr.addText(`${data.count}信源`)
-  n.font = Font.regularSystemFont(11)
-  n.textColor = C.dim
 
-  w.addSpacer(12)
+  const cnt = hdr.addText(`${data.count}信源`)
+  cnt.font = Font.regularSystemFont(10)
+  cnt.textColor = C.dim
 
-  // ── 主体：左侧中位温度 + 右侧温度条 ──
-  const body = w.addStack()
-  body.layoutHorizontally()
-  body.bottomAlignContent()
+  w.addSpacer(10)
 
-  // 左侧 —— 中位温度
-  const left = body.addStack()
-  left.layoutVertically()
+  // ── 主体：2列 × 3行 网格 ──
+  const ok = data.providers.filter(p => p.temp != null)
+  const cols = [[], []]
+  ok.forEach((p, i) => cols[i % 2].push(p))
 
-  if (data.median != null) {
-    const big = left.addText(`${data.median.toFixed(0)}`)
-    big.font = Font.boldSystemFont(58)
-    big.textColor = C.text
-    big.lineLimit = 1
-  }
+  const grid = w.addStack()
+  grid.layoutHorizontally()
+  grid.spacing = 16
 
-  left.addSpacer(2)
+  for (const col of cols) {
+    const stack = grid.addStack()
+    stack.layoutVertically()
+    stack.spacing = 6
 
-  // 温度范围
-  const range = left.addStack()
-  range.layoutHorizontally()
-  range.spacing = 4
-  if (data.max != null) {
-    const hi = range.addText(`${data.max}°`)
-    hi.font = Font.semiboldSystemFont(11)
-    hi.textColor = C.hot
-  }
-  const sep = range.addText('/')
-  sep.font = Font.regularSystemFont(11)
-  sep.textColor = C.dim
-  if (data.min != null) {
-    const lo = range.addText(`${data.min}°`)
-    lo.font = Font.semiboldSystemFont(11)
-    lo.textColor = C.cold
-  }
+    for (const p of col) {
+      const row = stack.addStack()
+      row.layoutHorizontally()
+      row.centerAlignContent()
 
-  body.addSpacer(20)
+      // 圆点
+      const hex = PC[p.id] || '#6e6e73'
+      const d = row.addText('●')
+      d.font = Font.regularSystemFont(7)
+      d.textColor = new Color(hex)
 
-  // 右侧 —— 信源列表
-  const right = body.addStack()
-  right.layoutVertically()
-  right.spacing = 5
+      row.addSpacer(4)
 
-  for (const p of data.providers) {
-    const row = right.addStack()
-    row.layoutHorizontally()
-    row.centerAlignContent()
+      // 名称
+      const nm = row.addText(SHORT[p.id] || p.name)
+      nm.font = Font.mediumSystemFont(12)
+      nm.textColor = C.text
+      nm.lineLimit = 1
 
-    // 彩色圆点
-    const hex = PC[p.id] || '#6e6e73'
-    const d = row.addText('●')
-    d.font = Font.regularSystemFont(7)
-    d.textColor = new Color(hex)
+      row.addSpacer()
 
-    row.addSpacer(4)
-
-    // 名称
-    const lb = row.addText(SHORT[p.id] || p.name)
-    lb.font = Font.mediumSystemFont(11)
-    lb.textColor = p.error ? C.dim : C.text
-    lb.lineLimit = 1
-
-    row.addSpacer(6)
-
-    // 温度
-    if (p.error) {
-      const er = row.addText('—')
-      er.font = Font.regularSystemFont(12)
-      er.textColor = C.dim
-    } else {
-      const tp = row.addText(`${p.temp}°`)
-      tp.font = Font.semiboldSystemFont(13)
-      if (p.temp === data.max && multi) tp.textColor = C.hot
-      else if (p.temp === data.min && multi) tp.textColor = C.cold
+      // 温度（整数）
+      const temp = Math.round(p.temp)
+      const tp = row.addText(`${temp}°`)
+      tp.font = Font.semiboldSystemFont(14)
+      if (multi && p.temp === data.max) tp.textColor = C.hot
+      else if (multi && p.temp === data.min) tp.textColor = C.cold
       else tp.textColor = C.text
       tp.lineLimit = 1
-
-      // 偏差
-      if (data.median != null && Math.abs(p.temp - data.median) >= 0.05) {
-        row.addSpacer(2)
-        const delta = p.temp - data.median
-        const sign = delta > 0 ? '+' : ''
-        const dl = row.addText(`${sign}${delta.toFixed(1)}`)
-        dl.font = Font.mediumSystemFont(9)
-        dl.textColor = delta > 0 ? C.hot : C.cold
-      }
     }
   }
 
-  w.addSpacer(10)
+  w.addSpacer(8)
+
+  // ── 温度范围条 ──
+  if (data.max != null && data.min != null) {
+    const bar = w.addStack()
+    bar.layoutHorizontally()
+    bar.centerAlignContent()
+
+    const lo = bar.addText(`${data.min}°`)
+    lo.font = Font.mediumSystemFont(10)
+    lo.textColor = C.cold
+
+    bar.addSpacer(6)
+
+    // 简易比例条
+    const track = bar.addStack()
+    track.backgroundColor = new Color('#ffffff', 0.08)
+    track.cornerRadius = 2
+    track.size = new Size(0, 3)
+
+    bar.addSpacer(6)
+
+    const hi = bar.addText(`${data.max}°`)
+    hi.font = Font.mediumSystemFont(10)
+    hi.textColor = C.hot
+
+    bar.addSpacer(10)
+
+    if (data.median != null) {
+      const med = bar.addText(`中位 ${data.median.toFixed(0)}°`)
+      med.font = Font.regularSystemFont(10)
+      med.textColor = C.text2
+    }
+  }
+
+  w.addSpacer(6)
 
   // ── 番禺气象台预报 ──
   const gzqx = data.providers.find(p => p.id === 'gzqx')
@@ -186,15 +177,15 @@ function renderMain(w, data) {
     const div = w.addStack()
     div.size = new Size(0, 0.5)
     div.backgroundColor = new Color('#ffffff', 0.06)
-    w.addSpacer(6)
+    w.addSpacer(5)
 
     const fc = w.addText(gzqx.forecast)
-    fc.font = Font.regularSystemFont(10)
-    fc.textColor = C.text2
-    fc.lineLimit = 2
+    fc.font = Font.regularSystemFont(9)
+    fc.textColor = C.dim
+    fc.lineLimit = 3
   }
 
-  w.addSpacer(6)
+  w.addSpacer(4)
 
   // ── 底部 ──
   const ft = w.addStack()
@@ -204,21 +195,18 @@ function renderMain(w, data) {
     ? new Date(data.updatedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
     : '—'
   const f = ft.addText(`更新 ${time}`)
-  f.font = Font.regularSystemFont(9)
+  f.font = Font.regularSystemFont(8)
   f.textColor = C.dim
   ft.addSpacer()
 }
 
-// ══════════════════════════════════════
-// 小号
-// ══════════════════════════════════════
-
+// ── 小号 ──
 function renderSmall(w, data) {
   bg(w)
   w.setPadding(14, 16, 12, 16)
 
   const city = w.addText(data.city)
-  city.font = Font.semiboldSystemFont(14)
+  city.font = Font.semiboldSystemFont(13)
   city.textColor = C.text2
   city.centerAlignText()
 
@@ -226,7 +214,7 @@ function renderSmall(w, data) {
 
   if (data.median != null) {
     const t = w.addText(`${data.median.toFixed(0)}°`)
-    t.font = Font.boldSystemFont(44)
+    t.font = Font.boldSystemFont(42)
     t.textColor = C.text
     t.centerAlignText()
   }
@@ -240,7 +228,6 @@ function renderSmall(w, data) {
 
   w.addSpacer(8)
 
-  // 彩色圆点行
   const dots = w.addStack()
   dots.layoutHorizontally()
   dots.addSpacer()
@@ -248,9 +235,9 @@ function renderSmall(w, data) {
     if (p.temp == null) continue
     const hex = PC[p.id] || '#6e6e73'
     const d = dots.addText('●')
-    d.font = Font.regularSystemFont(8)
+    d.font = Font.regularSystemFont(7)
     d.textColor = new Color(hex)
-    dots.addSpacer(4)
+    dots.addSpacer(3)
   }
   dots.addSpacer()
 
@@ -262,10 +249,7 @@ function renderSmall(w, data) {
   ft.centerAlignText()
 }
 
-// ══════════════════════════════════════
-// 错误
-// ══════════════════════════════════════
-
+// ── 错误 ──
 function renderError(w, msg) {
   w.backgroundColor = new Color('#0a0d16')
   w.addSpacer()
@@ -285,10 +269,7 @@ function renderError(w, msg) {
   w.addSpacer()
 }
 
-// ══════════════════════════════════════
-// Main
-// ══════════════════════════════════════
-
+// ── Main ──
 async function run() {
   const param = config.runsInWidget ? args.widgetParameter : null
   let city
