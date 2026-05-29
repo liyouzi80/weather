@@ -51,107 +51,73 @@ function bg(w) {
 }
 
 // ── 中号 / 大号 ──
+// 版式：顶部一行（城市 + 天气 + 中位温度）→ 下方 6 信源两列网格 → 页脚。
 function renderMain(w, data) {
   bg(w)
-  // Apple HIG: 16pt 系统内容边距
-  w.setPadding(16, 16, 16, 16)
+  w.setPadding(14, 16, 12, 16)
 
   const multi = data.count >= 2 && data.max !== data.min
 
-  // 主体整体垂直居中：顶部弹性留白 → 主体 → 底部弹性留白 → 页脚钉底
-  w.addSpacer()
+  // ── 顶部：城市 + 天气（左），中位温度（右）──
+  const header = w.addStack()
+  header.layoutHorizontally()
+  header.bottomAlignContent()
 
-  // ═══ 左右分栏 ═══
-  const root = w.addStack()
-  root.layoutHorizontally()
-  root.centerAlignContent() // 两栏相对彼此垂直居中
-  root.spacing = 12
-
-  // ── 左栏（固定宽，内容水平居中）──
-  const left = root.addStack()
-  left.layoutVertically()
-  left.size = new Size(150, 0)
-
-  // 地名 + 天气 同行、基线对齐、居中
-  const topRow = left.addStack()
-  topRow.layoutHorizontally()
-  topRow.bottomAlignContent()
-  topRow.addSpacer()
-  const city = topRow.addText(data.city)
-  city.font = Font.semiboldSystemFont(16)
+  const city = header.addText(data.city)
+  city.font = Font.semiboldSystemFont(18)
   city.textColor = C.text
   city.lineLimit = 1
   if (data.text) {
-    topRow.addSpacer(10)
-    const wx = topRow.addText(data.text)
-    wx.font = Font.mediumSystemFont(15)
+    header.addSpacer(8)
+    const wx = header.addText(data.text)
+    wx.font = Font.regularSystemFont(14)
     wx.textColor = C.text2
     wx.lineLimit = 1
   }
-  topRow.addSpacer()
-
-  left.addSpacer(12)
-
-  // 温度（中位数）水平居中
-  const tempRow = left.addStack()
-  tempRow.layoutHorizontally()
-  tempRow.addSpacer()
+  header.addSpacer()
   const median = data.median != null ? Math.round(data.median) : '—'
-  const big = tempRow.addText(`${median}°`)
-  big.font = Font.boldSystemFont(44)
+  const big = header.addText(`${median}°`)
+  big.font = Font.boldSystemFont(36)
   big.textColor = C.text
   big.lineLimit = 1
-  tempRow.addSpacer()
 
-  // ── 右栏（填充剩余宽，内容随 root 垂直居中）──
-  const right = root.addStack()
-  right.layoutVertically()
+  // 副标题：信源数 + 区间
+  const sub = w.addStack()
+  sub.layoutHorizontally()
+  const subL = sub.addText(`${data.count} 个信源`)
+  subL.font = Font.regularSystemFont(11)
+  subL.textColor = C.dim
+  if (multi) {
+    sub.addSpacer()
+    const subR = sub.addText(`${Math.round(data.max)}° / ${Math.round(data.min)}°`)
+    subR.font = Font.regularSystemFont(11)
+    subR.textColor = C.dim
+  }
 
-  // 标题 — Apple HIG: 标注 11pt
-  const title = right.addText(`${data.count} 个信源`)
-  title.font = Font.regularSystemFont(11)
-  title.textColor = C.dim
-  right.addSpacer(4)
+  w.addSpacer(11)
 
+  // ── 两列网格：左列前半、右列后半 ──
+  const grid = w.addStack()
+  grid.layoutHorizontally()
+  grid.spacing = 14
+
+  const colA = grid.addStack()
+  colA.layoutVertically()
+  colA.spacing = 8
+  colA.size = new Size(150, 0)
+
+  const colB = grid.addStack()
+  colB.layoutVertically()
+  colB.spacing = 8
+
+  const half = Math.ceil(data.providers.length / 2)
   data.providers.forEach((p, i) => {
-    if (i > 0) right.addSpacer(5)
-    const row = right.addStack()
-    row.layoutHorizontally()
-    row.centerAlignContent()
-
-    const hex = PC[p.id] || '#6e6e73'
-    const d = row.addText('●')
-    d.font = Font.regularSystemFont(6)
-    d.textColor = new Color(hex)
-
-    row.addSpacer(5)
-
-    // Apple HIG: 正文 13pt（此处用 12pt 适配多源）
-    const nm = row.addText(SHORT[p.id] || p.name)
-    nm.font = Font.regularSystemFont(12)
-    nm.textColor = p.error ? C.dim : C.text
-    nm.lineLimit = 1
-
-    row.addSpacer()
-
-    if (p.error) {
-      const er = row.addText('—')
-      er.font = Font.regularSystemFont(12)
-      er.textColor = C.dim
-    } else {
-      const t = Math.round(p.temp)
-      const tp = row.addText(`${t}°`)
-      tp.font = Font.semiboldSystemFont(13)
-      if (multi && p.temp === data.max) tp.textColor = C.hot
-      else if (multi && p.temp === data.min) tp.textColor = C.cold
-      else tp.textColor = C.text
-      tp.lineLimit = 1
-    }
+    addProviderRow(i < half ? colA : colB, p, data, multi)
   })
 
   w.addSpacer()
 
-  // ── 底部更新时间（钉底、居中）──
+  // ── 页脚：更新时间（钉底、居中）──
   const ft = w.addStack()
   ft.layoutHorizontally()
   ft.addSpacer()
@@ -162,6 +128,39 @@ function renderMain(w, data) {
   f.font = Font.regularSystemFont(10)
   f.textColor = C.dim
   ft.addSpacer()
+}
+
+// 一行信源：● 名称 …… 温度
+function addProviderRow(col, p, data, multi) {
+  const row = col.addStack()
+  row.layoutHorizontally()
+  row.centerAlignContent()
+
+  const d = row.addText('●')
+  d.font = Font.regularSystemFont(7)
+  d.textColor = new Color(PC[p.id] || '#6e6e73')
+
+  row.addSpacer(5)
+
+  const nm = row.addText(SHORT[p.id] || p.name)
+  nm.font = Font.regularSystemFont(13)
+  nm.textColor = p.error ? C.dim : C.text
+  nm.lineLimit = 1
+
+  row.addSpacer()
+
+  if (p.error) {
+    const er = row.addText('—')
+    er.font = Font.regularSystemFont(13)
+    er.textColor = C.dim
+  } else {
+    const tp = row.addText(`${Math.round(p.temp)}°`)
+    tp.font = Font.semiboldSystemFont(14)
+    if (multi && p.temp === data.max) tp.textColor = C.hot
+    else if (multi && p.temp === data.min) tp.textColor = C.cold
+    else tp.textColor = C.text
+    tp.lineLimit = 1
+  }
 }
 
 // ── 小号 ──
