@@ -58,21 +58,21 @@ function renderMain(w, data) {
 
   const multi = data.count >= 2 && data.max !== data.min
 
-  // ═══ 左右 50/50 ═══
+  // ═══ 左右分割 ═══
   const root = w.addStack()
   root.layoutHorizontally()
   root.spacing = 12
 
-  // ── 左面板：地名 + 温度 + 天气（垂直居中）──
+  // ── 左面板 ──
   const left = root.addStack()
   left.layoutVertically()
-  left.size = new Size(160, 0)
 
   left.addSpacer()
 
-  // 地名 + 天气（同一行，居中对称）
+  // 地名 + 天气 同行居中
   const topRow = left.addStack()
   topRow.layoutHorizontally()
+  topRow.centerAlignContent()
   topRow.addSpacer()
   const city = topRow.addText(data.city)
   city.font = Font.semiboldSystemFont(16)
@@ -87,9 +87,9 @@ function renderMain(w, data) {
   }
   topRow.addSpacer()
 
-  left.addSpacer(12)
+  left.addSpacer(10)
 
-  // 温度（居中）
+  // 温度
   const median = data.median != null ? Math.round(data.median) : '—'
   const big = left.addText(`${median}°`)
   big.font = Font.boldSystemFont(44)
@@ -99,10 +99,9 @@ function renderMain(w, data) {
 
   left.addSpacer()
 
-  // ── 右面板：信源汇总 ──
+  // ── 右面板 ──
   const right = root.addStack()
   right.layoutVertically()
-  right.size = new Size(160, 0)
   right.spacing = 5
 
   right.addSpacer(4)

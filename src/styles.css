@@ -26,8 +26,10 @@
 
 * { box-sizing: border-box; }
 
+:root { color-scheme: dark; }
 html, body, #root { height: 100%; margin: 0; }
-body { color-scheme: dark; background: var(--bg-deep); color: var(--text); }
+html { background: var(--bg-deep); }
+body { background: var(--bg-deep); color: var(--text); }
 
 body {
   background: var(--bg-deep);
