@@ -79,17 +79,19 @@ body::after {
 .loc-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 14px 0 10px;
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: linear-gradient(180deg, rgba(10, 13, 22, 0.82) 55%, transparent);
-  backdrop-filter: saturate(180%) blur(30px);
-  -webkit-backdrop-filter: saturate(180%) blur(30px);
+  gap: 8px;
+  padding: 18px 0 16px;
 }
+.loc-header .updated {
+  color: var(--text-dim);
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0 0 2px 2px;
+  align-self: flex-end;
+}
+.loc-header .switch { margin-left: auto; }
 .loc-header .city {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   font-size: 30px;
   font-weight: 700;

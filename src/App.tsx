@@ -10,8 +10,6 @@ const CITIES: GeoLocation[] = [
 interface Annotated extends ProviderResult {
   isMax?: boolean
   isMin?: boolean
-  delta?: number
-  textDiff?: boolean
 }
 
 export default function App() {
@@ -49,19 +47,22 @@ export default function App() {
     <div className="app">
       <header className="loc-header">
         <span className="city">{city.name}</span>
-        <div className="seg" role="tablist">
-          {CITIES.map((c, i) => (
-            <button
-              key={c.name}
-              role="tab"
-              aria-selected={i === cityIdx}
-              className={i === cityIdx ? 'active' : ''}
-              onClick={() => selectCity(i)}
-            >
-              {c.cityName}
-            </button>
-          ))}
-        </div>
+        {updatedAt && (
+          <span className="updated">{updatedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+        )}
+        <button
+          className="icon-btn switch"
+          title="切换城市"
+          onClick={() => selectCity((cityIdx + 1) % CITIES.length)}
+          aria-label="切换城市"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="17 1 21 5 17 9" />
+            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+            <polyline points="7 23 3 19 7 15" />
+            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+          </svg>
+        </button>
         <button
           className={'icon-btn' + (loading ? ' spin' : '')}
           title="刷新"
@@ -76,28 +77,18 @@ export default function App() {
         </button>
       </header>
 
-      {updatedAt && (
-        <div className="updated">更新于 {updatedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</div>
-      )}
-
       {stats && (
         <div className="summary">
           {weatherEmoji(stats.text) && <div className="sum-icon">{weatherEmoji(stats.text)}</div>}
           <div className="big">{stats.avg.toFixed(1)}°</div>
           <div className="meta">
-            <div>{stats.count}/{stats.total} 个信源有数据</div>
-            <div>
-              区间 <b>{stats.min}°</b> ~ <b>{stats.max}°</b>
-              {stats.spread > 0 && (
-                <> · 最大分歧 <b className={stats.spread >= 2 ? 'warn-text' : ''}>{stats.spread.toFixed(1)}°</b></>
-              )}
-            </div>
-            {stats.textDisagree && <div className="warn-text">天气现象描述不一致</div>}
+            <div>最高 <b>{stats.max}°</b></div>
+            <div>最低 <b>{stats.min}°</b></div>
           </div>
         </div>
       )}
 
-      {stats && stats.count >= 2 && <TempRanking results={annotated} avg={stats.avg} />}
+      {stats && stats.count >= 2 && <TempRanking results={annotated} />}
 
       {loading && results.length === 0 ? (
         <div className="cards">
@@ -143,17 +134,12 @@ function ProviderCard({ r }: { r: Annotated }) {
         <span className="name">{r.providerName}</span>
         {r.isMax && <span className="tag tag-hot">最高</span>}
         {r.isMin && <span className="tag tag-cold">最低</span>}
-        {r.delta != null && Math.abs(r.delta) >= 0.05 && (
-          <span className={'delta ' + (r.delta > 0 ? 'delta-hot' : 'delta-cold')}>
-            {r.delta > 0 ? '+' : ''}{r.delta.toFixed(1)}°
-          </span>
-        )}
         <span className="temp">{c.temp}°</span>
       </div>
       <div className="row">
-        <span className={r.textDiff ? 'text-diff' : ''}>
+        <span>
           {weatherEmoji(c.text) && <span className="wx-emoji">{weatherEmoji(c.text)} </span>}
-          <b>{c.text}</b>{r.textDiff && ' (!)'}
+          <b>{c.text}</b>
         </span>
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike}°</b></span>}
         {c.humidity != null && <span>湿度 <b>{c.humidity}%</b></span>}
@@ -172,7 +158,7 @@ function ProviderCard({ r }: { r: Annotated }) {
   )
 }
 
-function TempRanking({ results, avg }: { results: Annotated[]; avg: number }) {
+function TempRanking({ results }: { results: Annotated[] }) {
   const ranked = results
     .filter((r) => r.current)
     .sort((a, b) => b.current!.temp - a.current!.temp)
@@ -186,7 +172,6 @@ function TempRanking({ results, avg }: { results: Annotated[]; avg: number }) {
       {ranked.map((r, i) => {
         const c = r.current!
         const color = PROVIDERS.find((p) => p.id === r.providerId)?.color ?? '#0a84ff'
-        const diff = c.temp - avg
         const pct = 14 + ((c.temp - lo) / span) * 86
         return (
           <div className="rank-row" key={r.providerId}>
@@ -197,9 +182,6 @@ function TempRanking({ results, avg }: { results: Annotated[]; avg: number }) {
               <span className="rank-bar-fill" style={{ width: `${pct}%`, background: color }} />
             </span>
             <span className="rank-temp">{c.temp}°</span>
-            <span className={'rank-diff ' + (diff > 0.05 ? 'delta-hot' : diff < -0.05 ? 'delta-cold' : '')}>
-              {diff > 0 ? '+' : ''}{diff.toFixed(1)}
-            </span>
           </div>
         )
       })}
@@ -209,7 +191,7 @@ function TempRanking({ results, avg }: { results: Annotated[]; avg: number }) {
 
 function analyze(results: ProviderResult[]): {
   annotated: Annotated[]
-  stats: null | { avg: number; min: number; max: number; spread: number; count: number; total: number; textDisagree: boolean; text: string }
+  stats: null | { avg: number; min: number; max: number; count: number; text: string }
 } {
   const ok = results.filter((r) => r.current)
   const temps = ok.map((r) => r.current!.temp)
@@ -220,35 +202,26 @@ function analyze(results: ProviderResult[]): {
   const min = Math.min(...temps)
   const max = Math.max(...temps)
   const avg = temps.reduce((a, b) => a + b, 0) / temps.length
-  const median = sortedMedian(temps)
 
+  // 取多数天气现象用于概览图标
   const textCounts = new Map<string, number>()
   for (const r of ok) textCounts.set(r.current!.text, (textCounts.get(r.current!.text) ?? 0) + 1)
   const majorityText = [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
-  const textDisagree = textCounts.size > 1
 
   const annotated: Annotated[] = results.map((r) => {
     if (!r.current) return r
     const t = r.current.temp
     return {
       ...r,
-      delta: t - median,
       isMax: temps.length > 1 && min !== max && t === max,
       isMin: temps.length > 1 && min !== max && t === min,
-      textDiff: textDisagree && r.current.text !== majorityText,
     }
   })
 
   return {
     annotated,
-    stats: { avg, min, max, spread: max - min, count: temps.length, total: results.length, textDisagree, text: majorityText },
+    stats: { avg, min, max, count: temps.length, text: majorityText },
   }
-}
-
-function sortedMedian(arr: number[]): number {
-  const s = [...arr].sort((a, b) => a - b)
-  const mid = Math.floor(s.length / 2)
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
 }
 
 // 天气文字 → 彩色 emoji 图标（无可用文字时返回空串，不显示图标）。
