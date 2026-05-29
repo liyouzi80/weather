@@ -214,6 +214,7 @@ export const onRequest = async (context: { request: Request; env: Record<string,
   const ok = providers.filter(p => p.temp != null)
   const temps = ok.map(p => p.temp!)
   const median = temps.length > 0 ? sortedMedian(temps) : null
+  const avg = temps.length > 0 ? Math.round((temps.reduce((a, b) => a + b, 0) / temps.length) * 10) / 10 : null
   const max = temps.length > 0 ? Math.max(...temps) : null
   const min = temps.length > 0 ? Math.min(...temps) : null
 
@@ -224,6 +225,7 @@ export const onRequest = async (context: { request: Request; env: Record<string,
 
   const result = {
     city: name,
+    avg,
     median,
     max,
     min,
