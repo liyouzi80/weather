@@ -1,11 +1,11 @@
 {
-  "name": "番禺多信源实况",
-  "short_name": "番禺天气",
-  "description": "聚合 Open-Meteo、中央气象台、和风、彩云、广州市气象局多个信源的番禺实时天气，并高亮各信源差异",
+  "name": "多信源实况 · 番禺 / 安福",
+  "short_name": "多信源实况",
+  "description": "并排对比中央气象台、广州市气象局、和风、彩云、OpenWeatherMap、WeatherAPI、Open-Meteo 等多个信源在番禺区 / 安福县的实时天气，高亮差异并给出温度排行",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0b1220",
-  "theme_color": "#0b1220",
+  "background_color": "#0a0c12",
+  "theme_color": "#0a0c12",
   "icons": [
     { "src": "/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" }
   ]
