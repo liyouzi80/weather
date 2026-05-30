@@ -361,54 +361,90 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 概览次要指标小卡：体感 / 湿度 / 空气质量（仅渲染有数据的项）
+// 概览次要指标小卡：Apple Weather 风格 2 列网格 + 天气动效背景
 function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const tiles: { key: string; label: string; value: string; sub?: string; color?: string; icon: 'feels' | 'humid' | 'aqi' }[] = []
-  if (stats.feelsLike != null) tiles.push({ key: 'feels', label: '体感', value: `${stats.feelsLike.toFixed(1)}°`, icon: 'feels' })
-  if (stats.humidity != null) tiles.push({ key: 'humid', label: '湿度', value: `${stats.humidity}%`, icon: 'humid' })
-  if (avgAqi != null) {
-    tiles.push({
-      key: 'aqi', label: '空气', icon: 'aqi',
-      value: aqiCategory(avgAqi),
-      sub: `AQI ${avgAqi}`,
-      color: aqiColor(avgAqi),
-    })
-  }
-  if (tiles.length === 0) return null
+  if (stats.feelsLike == null && stats.humidity == null && avgAqi == null) return null
   return (
     <div className="metric-tiles">
-      {tiles.map((t) => (
-        <div className="metric-tile" key={t.key}>
-          <div className="mt-head"><MetricIcon kind={t.icon} color={t.color} /><span className="mt-label">{t.label}</span></div>
-          <div className="mt-value" style={t.color ? { color: t.color } : undefined}>{t.value}</div>
-          {t.sub && <div className="mt-sub">{t.sub}</div>}
+      {stats.feelsLike != null && (
+        <div className="metric-tile">
+          <span className="mt-label">体感</span>
+          <span className="mt-value">{stats.feelsLike.toFixed(1)}°</span>
+          <FeelsAnim temp={stats.feelsLike} />
         </div>
-      ))}
+      )}
+      {stats.humidity != null && (
+        <div className="metric-tile">
+          <span className="mt-label">湿度</span>
+          <span className="mt-value">{stats.humidity}%</span>
+          <HumidAnim pct={stats.humidity} />
+        </div>
+      )}
+      {avgAqi != null && (
+        <div className="metric-tile tile-wide">
+          <span className="mt-label">空气质量</span>
+          <span className="mt-value" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
+          <span className="mt-sub">AQI {avgAqi}</span>
+          <AqiAnim color={aqiColor(avgAqi)} />
+        </div>
+      )}
     </div>
   )
 }
 
-function MetricIcon({ kind, color }: { kind: 'feels' | 'humid' | 'aqi'; color?: string }) {
-  const c = '#8b97a8'
-  if (kind === 'feels') {
-    return (
-      <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
-        <path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z" />
-      </svg>
-    )
-  }
-  if (kind === 'humid') {
-    return (
-      <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill={c}>
-        <path d="M12 3 C12 3 5 11 5 15 a7 7 0 0 0 14 0 C19 11 12 3 12 3 Z" />
-      </svg>
-    )
-  }
-  // aqi leaf icon
+// 体感：温度计 + 汞柱随温度变化
+function FeelsAnim({ temp }: { temp: number }) {
+  const pct = Math.min(100, Math.max(0, ((temp - 5) / 35) * 100))
+  const mercH = Math.max(3, pct * 0.33)
+  const mercY = 39 - mercH
+  const col = temp < 16 ? '#40c8e0' : temp < 28 ? '#ffd60a' : '#ff6b3d'
   return (
-    <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color ?? c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 22 L11 13" />
-      <path d="M12 2 C12 2 20 4 20 12 C20 18 14 20 8 18 C4 16 2 10 4 6 C6 2 12 2 12 2 Z" />
+    <svg className="tile-anim" viewBox="0 0 36 76" aria-hidden="true" overflow="visible">
+      <rect x="14" y="6" width="8" height="36" rx="4"
+        fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
+      <rect x="16" y={mercY} width="4" height={mercH} rx="2" fill={col} className="therm-mercury" />
+      {[12, 19, 26, 33].map((y) => (
+        <line key={y} x1="22" y1={y} x2="26" y2={y}
+          stroke="rgba(255,255,255,0.15)" strokeWidth="0.8" />
+      ))}
+      <circle cx="18" cy="54" r="9" fill={col} />
+      <circle cx="18" cy="54" r="14" fill={col} opacity="0.15" className="therm-glow" />
+    </svg>
+  )
+}
+
+// 湿度：水滴 + 水面波纹随湿度升降
+function HumidAnim({ pct }: { pct: number }) {
+  const fillY = 46 - (pct / 100) * 38
+  return (
+    <svg className="tile-anim" viewBox="0 0 44 58" aria-hidden="true" overflow="visible">
+      <defs>
+        <clipPath id="tile-drop-clip">
+          <path d="M22 6 C22 6 6 24 6 35 a16 16 0 0 0 32 0 C38 24 22 6 22 6Z" />
+        </clipPath>
+      </defs>
+      <path d="M22 6 C22 6 6 24 6 35 a16 16 0 0 0 32 0 C38 24 22 6 22 6Z"
+        fill="rgba(96,190,255,0.07)" stroke="rgba(96,190,255,0.22)" strokeWidth="1.2" />
+      <g clipPath="url(#tile-drop-clip)">
+        <rect x="-5" y={fillY} width="54" height="60" fill="rgba(64,200,224,0.28)" />
+        <path
+          className="wave-svg"
+          d={`M-22 ${fillY} q11-3.5 22 0 t22 0 t22 0 t22 0 V58 H-22Z`}
+          fill="rgba(64,200,224,0.42)"
+        />
+      </g>
+    </svg>
+  )
+}
+
+// 空气质量：呼吸光环，颜色随 AQI 等级
+function AqiAnim({ color }: { color: string }) {
+  return (
+    <svg className="tile-anim tile-anim-wide" viewBox="0 0 160 64" aria-hidden="true" overflow="visible">
+      <circle cx="122" cy="32" r="7" fill={color} opacity="0.75" className="aqi-core" />
+      <circle cx="122" cy="32" r="19" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
+      <circle cx="122" cy="32" r="32" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
+      <circle cx="122" cy="32" r="47" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
     </svg>
   )
 }
