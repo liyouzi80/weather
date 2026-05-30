@@ -127,28 +127,26 @@ html[data-sky='fog'] body::before {
   min-height: 100%;
 }
 
-/* ── 顶部：城市名 + 城市切换 + 刷新（合并到一行，去掉标题 banner）── */
+/* ── 顶部：[切换] 居中城市名 [刷新] ── */
 .loc-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 18px 0 16px;
+  padding: 16px 0 6px;
 }
-.loc-header .updated {
-  color: var(--text-dim);
-  font-size: 13px;
-  font-weight: 500;
-  margin: 0 0 2px 2px;
-  align-self: flex-end;
-}
-.loc-header .switch { margin-left: auto; }
-.loc-header .city {
-  flex: 0 1 auto;
+.loc-center {
+  flex: 1;
   min-width: 0;
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.loc-header .city {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -156,6 +154,11 @@ html[data-sky='fog'] body::before {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+.loc-header .updated {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-weight: 500;
 }
 .sum-icon { display: flex; align-items: center; flex: none; }
 .sum-icon svg { display: block; }
@@ -297,47 +300,41 @@ html[data-sky='fog'] body::before {
 .icon-btn:active { transform: scale(0.9); }
 .icon-btn.spin { animation: spin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 
-/* ── Summary Hero ── */
-.summary {
-  background: var(--glass);
-  border: 0.5px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  padding: 24px;
-  margin-bottom: 16px;
-  display: flex;
-  gap: 18px;
-  align-items: center;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+/* ── Hero：浮在天空背景上，无玻璃卡 ── */
+.hero {
+  text-align: center;
+  padding: 4px 0 44px;
+  animation: riseIn 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
-.summary:hover {
-  box-shadow:
-    0 12px 40px rgba(0, 0, 0, 0.4),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
-}
-.summary .big {
-  flex: 1;
-  min-width: 0;
-  font-size: 56px;
-  font-weight: 700;
-  line-height: 0.9;
+.hero-temp {
+  font-size: clamp(72px, 22vw, 96px);
+  font-weight: 200;
+  line-height: 0.88;
   letter-spacing: -0.04em;
-  background: linear-gradient(180deg, #ffffff 0%, #c7c7cc 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
 }
-.summary .meta {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.75;
+.hero-cond {
+  font-size: 20px;
   font-weight: 500;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 10px;
 }
-.summary .meta b { color: var(--text); font-weight: 600; }
+.hero-hilo {
+  display: flex;
+  justify-content: center;
+  gap: 22px;
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  margin-top: 5px;
+}
+.hero-hilo b { font-weight: 600; color: #fff; }
+.hero-feels {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+}
 
 /* ── Temperature Ranking ── */
 .ranking {
@@ -521,27 +518,6 @@ html[data-sky='fog'] body::before {
   box-shadow: 0 0 12px var(--cold-glow);
 }
 
-/* ── 空气质量（美国 AQI）── */
-.sum-right {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 9px;
-  flex: none;
-}
-.aqi-pill {
-  flex: none;
-  display: flex;
-  flex-direction: row;
-  align-items: baseline;
-  gap: 5px;
-  padding: 4px 11px;
-  border: 1.5px solid;
-  border-radius: 12px;
-  white-space: nowrap;
-}
-.aqi-cat-big { font-size: 16px; font-weight: 700; line-height: 1.1; }
-.aqi-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; opacity: 0.9; }
 .aqi-section { margin-top: 20px; }
 .aqi-section .cards { margin-top: 4px; }
 
@@ -580,10 +556,10 @@ html[data-sky='fog'] body::before {
 /* ── Responsive ── */
 @media (max-width: 400px) {
   .app { padding: env(safe-area-inset-top) 12px 40px; }
-  .topbar h1 { font-size: 22px; }
-  .loc-header .city { font-size: 26px; }
-  .summary { padding: 18px; gap: 16px; }
-  .summary .big { font-size: 44px; }
+  .loc-header .city { font-size: 20px; }
+  .hero-temp { font-size: 72px; }
+  .hero-cond { font-size: 18px; }
+  .hero-hilo { font-size: 16px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }
   .rank-name { min-width: 80px; font-size: 13px; }
@@ -601,7 +577,6 @@ html[data-sky='fog'] body::before {
 
 .loc-header { animation: fadeIn 0.45s ease both; }
 .loc-header .city { animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
-.summary { animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
 .ranking { animation: riseIn 0.5s 0.06s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
 
 /* 排行行依次入场 */
@@ -621,7 +596,7 @@ html[data-sky='fog'] body::before {
 .icon-btn.switch:active svg { transform: rotate(180deg) scale(0.9); }
 
 /* 数值 / 进度条平滑过渡 */
-.summary .big,
+.hero-temp,
 .card .temp,
 .rank-temp { transition: color var(--transition-fast); }
 

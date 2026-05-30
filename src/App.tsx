@@ -78,10 +78,6 @@ export default function App() {
   return (
     <div className="app">
       <header className="loc-header">
-        <span className="city">{city.name}</span>
-        {updatedAt && (
-          <span className="updated">{updatedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
-        )}
         <button
           className="icon-btn switch"
           title="切换城市"
@@ -95,6 +91,12 @@ export default function App() {
             <path d="M21 13v2a4 4 0 0 1-4 4H3" />
           </svg>
         </button>
+        <div className="loc-center">
+          <span className="city">{city.name}</span>
+          {updatedAt && (
+            <span className="updated">{updatedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+          )}
+        </div>
         <button
           className={'icon-btn' + (loading ? ' spin' : '')}
           title="刷新"
@@ -110,21 +112,16 @@ export default function App() {
       </header>
 
       {stats && (
-        <div className="summary" key={cityIdx}>
-          <div className="sum-icon"><WeatherIcon text={stats.text} size={50} /></div>
-          <div className="big">{stats.avg.toFixed(1)}°</div>
-          <div className="sum-right">
-            <div className="meta">
-              <div>最高 <b>{stats.max.toFixed(1)}°</b></div>
-              <div>最低 <b>{stats.min.toFixed(1)}°</b></div>
-            </div>
-            {avgAqi != null && (
-              <div className="aqi-pill" style={{ borderColor: aqiColor(avgAqi), background: aqiColor(avgAqi) + '22' }}>
-                <span className="aqi-cat-big" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
-                <span className="aqi-num" style={{ color: aqiColor(avgAqi) }}>{avgAqi}</span>
-              </div>
-            )}
+        <div className="hero" key={`hero-${cityIdx}`}>
+          <div className="hero-temp">{stats.avg.toFixed(1)}°</div>
+          <div className="hero-cond">{stats.text}</div>
+          <div className="hero-hilo">
+            <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
+            <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
           </div>
+          {stats.feelsLike != null && (
+            <div className="hero-feels">体感温度: {stats.feelsLike.toFixed(1)}°</div>
+          )}
         </div>
       )}
 
