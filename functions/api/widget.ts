@@ -19,20 +19,6 @@ interface ProviderResult {
   forecastIssuedAt?: string
 }
 
-// ── Open-Meteo（免费，无需密钥）─────────────────────────────────
-async function fetchOpenMeteo(lat: number, lon: number): Promise<ProviderResult> {
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=auto`
-  const res = await fetch(url)
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
-  const d = await res.json()
-  const c = d.current
-  const text = WMO_TEXT[c.weather_code] ?? `代码${c.weather_code}`
-  return {
-    id: 'open-meteo', name: 'Open-Meteo', color: '#22c55e',
-    temp: Math.round(c.temperature_2m * 10) / 10, text,
-  }
-}
-
 // ── 中央气象台 NMC（免费，无需密钥）────────────────────────────
 async function fetchNMC(cityName: string): Promise<ProviderResult> {
   const keyword = cityName.replace(/市$|区$|县$/g, '')
@@ -152,18 +138,6 @@ async function fetchOWM(lat: number, lon: number, key: string): Promise<Provider
   }
 }
 
-// ── WMO 天气代码（精简版）───────────────────────────────────────
-const WMO_TEXT: Record<number, string> = {
-  0: '晴', 1: '大部晴', 2: '多云', 3: '阴',
-  45: '雾', 48: '雾凇',
-  51: '毛毛雨', 53: '毛毛雨', 55: '毛毛雨',
-  61: '小雨', 63: '中雨', 65: '大雨',
-  71: '小雪', 73: '中雪', 75: '大雪',
-  80: '阵雨', 81: '阵雨', 82: '强阵雨',
-  85: '阵雪', 86: '阵雪',
-  95: '雷暴', 96: '雷暴冰雹', 99: '强雷暴冰雹',
-}
-
 const CAIYUN_TEXT: Record<string, string> = {
   CLEAR_DAY: '晴', CLEAR_NIGHT: '晴',
   PARTLY_CLOUDY_DAY: '多云', PARTLY_CLOUDY_NIGHT: '多云',
@@ -172,6 +146,80 @@ const CAIYUN_TEXT: Record<string, string> = {
   LIGHT_SNOW: '小雪', MODERATE_SNOW: '中雪', HEAVY_SNOW: '大雪',
   STORM_SNOW: '暴雪', WIND: '大风', DUST: '浮尘', SAND: '沙尘',
   LIGHT_HAZE: '轻度雾霾', MODERATE_HAZE: '中度雾霾', HEAVY_HAZE: '重度雾霾',
+}
+
+// ── 美国 AQI 信源（服务端直抓站点页，无需密钥）──────────────────
+const AM_PATH: Record<string, string> = {
+  番禺: 'place/china/fanyudaxuecheng/3b401494',
+  安福: 'place/china/anfuxianwenhuaguangchang/cd272b77',
+}
+const IQAIR_PATH: Record<string, string> = {
+  番禺: 'cn/china/guangdong/guangzhou/panyu-university-town',
+  安福: 'cn/china/jiangxi/jian/anfu-county-environmental-protection-bureau',
+}
+const POL: Record<string, string> = { O3: 'O₃', 'PM2.5': 'PM2.5', PM10: 'PM10', NO2: 'NO₂', SO2: 'SO₂', CO: 'CO' }
+const AM_CATS = '优|良好|良|中等|轻度污染|中度污染|重度污染|严重污染|对敏感人群不健康|不健康|非常不健康|危险|危害'
+
+interface AqiSource {
+  id: string
+  name: string
+  color: string
+  aqi?: number
+  dominant?: string
+  forecast?: string
+  error?: string
+}
+
+// 在意空气（air-quality.com）
+async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
+  const res = await fetch(`https://air-quality.com/${path}?lang=zh-Hans&standard=aqi_us`, {
+    headers: { 'User-Agent': WIDGET_UA, Referer: 'https://air-quality.com/' },
+  })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const html = await res.text()
+  const m = html.match(/AQI \(美国标准\)\s*(\d+)/)
+  if (!m) throw new Error('解析失败')
+  const items = [
+    ...html.matchAll(
+      /<div class='name'>([^<]+)<\/div><div class='unit'>[^<]*<\/div><div class='value'>([\d.]+)<\/div><div class='ratio-bar' style='[^']*\*([\d.]+)\)/g,
+    ),
+  ].map((x) => ({ name: x[1], ratio: parseFloat(x[3]) }))
+  const dom = items.length ? items.reduce((a, b) => (b.ratio > a.ratio ? b : a)) : undefined
+  const s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  const days = [
+    ...s.matchAll(new RegExp(`\\d{4}-\\d{2}-\\d{2}[^0-9]*?\\d+°[^0-9]*?\\d+°[^0-9]*?\\d+°[^~]*?(\\d+)~(\\d+)\\s*(?:${AM_CATS})`, 'g')),
+  ]
+  const forecast = days.length
+    ? `今 ${days[0][1]}~${days[0][2]}` + (days[1] ? ` · 明 ${days[1][1]}~${days[1][2]}` : '')
+    : undefined
+  return {
+    id: 'airmatters', name: '在意空气', color: '#f59e0b',
+    aqi: parseInt(m[1]), dominant: dom ? POL[dom.name] ?? dom.name : undefined, forecast,
+  }
+}
+
+// IQAir（iqair.cn）
+async function fetchIQAirAqi(path: string): Promise<AqiSource> {
+  const res = await fetch(`https://www.iqair.cn/${path}`, { headers: { 'User-Agent': WIDGET_UA } })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const s = (await res.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
+  const cat = '优秀|优|良好|良|中等|对敏感人群不健康|不健康|非常不健康|危险|危害'
+  const m = s.match(new RegExp(`(\\d+)\\s*美国 AQI⁺?\\s*(?:${cat})\\s*主要污染物[：:]\\s*(\\S+)\\s*[\\d.]+\\s*µg`))
+  let aqi: number
+  let dominant: string | undefined
+  if (m) {
+    aqi = parseInt(m[1])
+    dominant = m[2]
+  } else {
+    const l = s.match(/(\d+)\s*美国 AQI/)
+    if (!l) throw new Error('解析失败')
+    aqi = parseInt(l[1])
+  }
+  const fi = s.indexOf('每日预报')
+  const seg = fi >= 0 ? s.slice(fi, fi + 280) : ''
+  const days = [...seg.matchAll(/(?:今天|明天|周[一二三四五六日])\s+(\d+)\s+\d+°/g)]
+  const forecast = days.length ? `今 ${days[0][1]}` + (days[1] ? ` · 明 ${days[1][1]}` : '') : undefined
+  return { id: 'iqair', name: 'IQAir', color: '#0ea5e9', aqi, dominant, forecast }
 }
 
 // ── Handler ─────────────────────────────────────────────────────
@@ -194,8 +242,14 @@ export const onRequest = async (context: { request: Request; env: Record<string,
     env.VITE_QWEATHER_KEY || env.QWEATHER_KEY ? fetchQWeather(lat, lon, env.VITE_QWEATHER_KEY || env.QWEATHER_KEY) : null,
     env.VITE_CAIYUN_KEY || env.CAIYUN_KEY ? fetchCaiyun(lat, lon, env.VITE_CAIYUN_KEY || env.CAIYUN_KEY) : null,
     env.VITE_OWM_KEY || env.OWM_KEY ? fetchOWM(lat, lon, env.VITE_OWM_KEY || env.OWM_KEY) : null,
-    fetchOpenMeteo(lat, lon),
   ].filter(Boolean) as Promise<ProviderResult>[]
+
+  // 美国 AQI 信源（与天气并发）
+  const aqiTasks: Promise<AqiSource>[] = [
+    AM_PATH[cityName] ? fetchAirMattersAqi(AM_PATH[cityName]) : null,
+    IQAIR_PATH[cityName] ? fetchIQAirAqi(IQAIR_PATH[cityName]) : null,
+  ].filter(Boolean) as Promise<AqiSource>[]
+  const aqiPromise = Promise.allSettled(aqiTasks)
 
   const settled = await Promise.allSettled(tasks)
   const providers: ProviderResult[] = settled.map((s, i) => {
@@ -223,12 +277,23 @@ export const onRequest = async (context: { request: Request; env: Record<string,
   ok.forEach(p => { if (p.text) textCounts.set(p.text, (textCounts.get(p.text) ?? 0) + 1) })
   const majorityText = [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
 
+  // 汇总 AQI
+  const aqiSettled = await aqiPromise
+  const aqiSources: AqiSource[] = aqiSettled.map((s, i) =>
+    s.status === 'fulfilled'
+      ? s.value
+      : { id: `aqi-err-${i}`, name: 'AQI', color: '#6e6e73', error: s.reason instanceof Error ? s.reason.message : String(s.reason) },
+  )
+  const aqiVals = aqiSources.filter((a) => a.aqi != null).map((a) => a.aqi!)
+  const aqiAvg = aqiVals.length ? Math.round(aqiVals.reduce((a, b) => a + b, 0) / aqiVals.length) : null
+
   const result = {
     city: name,
     avg,
     median,
     max,
     min,
+    aqi: { avg: aqiAvg, sources: aqiSources },
     count: ok.length,
     total: providers.length,
     text: majorityText,
