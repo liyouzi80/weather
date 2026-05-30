@@ -2,6 +2,7 @@
 // 同样存在 CORS 问题，开发环境经 vite 代理 /proxy/caiyun 转发。
 import type { CurrentWeather, GeoLocation, WeatherProvider } from './types'
 import { getKey } from './keys'
+import { degToDir } from './utils'
 
 const BASE = '/proxy/caiyun'
 
@@ -57,8 +58,3 @@ export const caiyunProvider: WeatherProvider = {
   },
 }
 
-function degToDir(deg?: number): string | undefined {
-  if (deg == null) return undefined
-  const dirs = ['北', '东北', '东', '东南', '南', '西南', '西', '西北']
-  return dirs[Math.round(deg / 45) % 8] + '风'
-}

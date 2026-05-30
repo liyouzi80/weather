@@ -2,6 +2,7 @@
 // api.openweathermap.org 支持 CORS，浏览器可直连，无需代理。
 import type { CurrentWeather, GeoLocation, WeatherProvider } from './types'
 import { getKey } from './keys'
+import { degToDir } from './utils'
 
 export const owmProvider: WeatherProvider = {
   id: 'owm',
@@ -29,10 +30,4 @@ export const owmProvider: WeatherProvider = {
       observedAt: d.dt ? new Date(d.dt * 1000).toISOString() : undefined,
     }
   },
-}
-
-function degToDir(deg?: number): string | undefined {
-  if (deg == null) return undefined
-  const dirs = ['北', '东北', '东', '东南', '南', '西南', '西', '西北']
-  return dirs[Math.round(deg / 45) % 8] + '风'
 }

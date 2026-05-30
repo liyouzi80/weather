@@ -53,6 +53,7 @@ export default function App() {
     setResults([])
     setAir([])
     setUpdatedAt(null)
+    setInitialLoad(true)
     setCityIdx(i)
   }
 
@@ -232,9 +233,9 @@ function ProviderCard({ r }: { r: Annotated }) {
           <b>{c.text}</b>
         </span>
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike.toFixed(1)}°</b></span>}
-        {c.humidity != null && <span>湿度 <b>{c.humidity}%</b></span>}
+        {c.humidity != null && <span>湿度 <b>{Math.round(c.humidity)}%</b></span>}
         {c.windDir && (
-          <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed}km/h` : ''}</span>
+          <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed.toFixed(1)}km/h` : ''}</span>
         )}
       </div>
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
@@ -284,14 +285,15 @@ function analyze(results: ProviderResult[]): {
   stats: null | { avg: number; min: number; max: number; count: number; text: string }
 } {
   const ok = results.filter((r) => r.current)
-  const temps = ok.map((r) => r.current!.temp)
+  // round to 1 decimal to avoid float comparison issues
+  const temps = ok.map((r) => Math.round(r.current!.temp * 10) / 10)
   if (temps.length === 0) {
     return { annotated: results, stats: null }
   }
 
   const min = Math.min(...temps)
   const max = Math.max(...temps)
-  const avg = temps.reduce((a, b) => a + b, 0) / temps.length
+  const avg = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10
 
   // 取多数天气现象用于概览图标
   const textCounts = new Map<string, number>()
@@ -300,7 +302,7 @@ function analyze(results: ProviderResult[]): {
 
   const annotated: Annotated[] = results.map((r) => {
     if (!r.current) return r
-    const t = r.current.temp
+    const t = Math.round(r.current.temp * 10) / 10
     return {
       ...r,
       isMax: temps.length > 1 && min !== max && t === max,

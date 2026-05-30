@@ -65,5 +65,4 @@ export async function fetchAllAqi(loc: GeoLocation): Promise<AqiResult[]> {
   )
 }
 
-export type { WeatherProvider, ProviderResult, GeoLocation, AqiProvider, AqiResult }
 export * from './types'
