@@ -1,6 +1,5 @@
 // 信源注册表：在这里登记所有信源。新增信源只需实现 WeatherProvider 并加进数组。
 import type { AqiProvider, AqiResult, GeoLocation, ProviderResult, WeatherProvider } from './types'
-import { openMeteoProvider } from './openMeteo'
 import { qweatherProvider } from './qweather'
 import { caiyunProvider } from './caiyun'
 import { nmcProvider } from './nmc'
@@ -9,10 +8,9 @@ import { weathercnProvider } from './weathercn'
 import { tencentProvider } from './tencent'
 import { owmProvider } from './owm'
 import { airMattersAqiProvider } from './aqiAirMatters'
-import { openMeteoAqiProvider } from './aqiOpenMeteo'
 import { iqairAqiProvider } from './aqiIqair'
 
-// 展示顺序：中央气象局 / 番禺气象台 / 中国天气网 / 腾讯天气 / 和风 / 彩云 / openweathermap / open-meteo
+// 展示顺序：中央气象局 / 番禺气象台 / 中国天气网 / 腾讯天气 / 和风 / 彩云 / openweathermap
 export const PROVIDERS: WeatherProvider[] = [
   nmcProvider,
   gzqxProvider,
@@ -21,7 +19,6 @@ export const PROVIDERS: WeatherProvider[] = [
   qweatherProvider,
   caiyunProvider,
   owmProvider,
-  openMeteoProvider,
 ]
 
 /** 并发拉取所有「已配置」信源，逐个返回结果（失败也返回，便于 UI 展示错误） */
@@ -43,11 +40,10 @@ export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
   )
 }
 
-// 美国标准 AQI 信源（展示顺序：在意空气 / IQAir / Open-Meteo）
+// 美国标准 AQI 信源（展示顺序：在意空气 / IQAir）
 export const AQI_PROVIDERS: AqiProvider[] = [
   airMattersAqiProvider,
   iqairAqiProvider,
-  openMeteoAqiProvider,
 ]
 
 /** 并发拉取所有「已配置」AQI 信源 */

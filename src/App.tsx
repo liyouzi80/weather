@@ -103,13 +103,13 @@ export default function App() {
           {weatherEmoji(stats.text) && <div className="sum-icon">{weatherEmoji(stats.text)}</div>}
           <div className="big">{stats.avg.toFixed(1)}°</div>
           <div className="meta">
-            <div>最高 <b>{stats.max}°</b></div>
-            <div>最低 <b>{stats.min}°</b></div>
+            <div>最高 <b>{stats.max.toFixed(1)}°</b></div>
+            <div>最低 <b>{stats.min.toFixed(1)}°</b></div>
           </div>
           {avgAqi != null && (
-            <div className="aqi-pill" style={{ borderColor: aqiColor(avgAqi) }}>
+            <div className="aqi-pill" style={{ borderColor: aqiColor(avgAqi), background: aqiColor(avgAqi) + '22' }}>
+              <div className="aqi-cat-big" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</div>
               <div className="aqi-num" style={{ color: aqiColor(avgAqi) }}>{avgAqi}</div>
-              <div className="aqi-lbl">美国AQI<br />{aqiCategory(avgAqi)}</div>
             </div>
           )}
         </div>
@@ -185,10 +185,10 @@ function AqiSection({ air }: { air: AqiResult[] }) {
                 <span className="temp" style={{ color: col }}>{a.aqi}</span>
               </div>
               <div className="row">
+                {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
                 {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
-                {a.dominant && <span>主要 <b>{a.dominant}</b></span>}
               </div>
-              {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
+              {a.forecast && <div className="aqi-fc">预报 <b>{a.forecast}</b></div>}
             </div>
           )
         })}
