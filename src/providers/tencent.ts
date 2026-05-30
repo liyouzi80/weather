@@ -40,10 +40,11 @@ export const tencentProvider: WeatherProvider = {
   },
 }
 
-// update_time 形如「202605300015」（北京时 yyyymmddHHMM）→ ISO
+// update_time 形如「202605300015」（北京时 yyyymmddHHMM）。
+// 把北京墙上时间原样写入 ISO 的 UTC 字段，前端按 UTC 渲染即原样显示，不做时区换算。
 function parseTencentTime(s?: string): string | undefined {
   if (!s || !/^\d{12}$/.test(s)) return undefined
   const Y = +s.slice(0, 4), Mo = +s.slice(4, 6), D = +s.slice(6, 8)
   const H = +s.slice(8, 10), Mi = +s.slice(10, 12)
-  return new Date(Date.UTC(Y, Mo - 1, D, H - 8, Mi)).toISOString()
+  return new Date(Date.UTC(Y, Mo - 1, D, H, Mi)).toISOString()
 }

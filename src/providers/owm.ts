@@ -27,7 +27,8 @@ export const owmProvider: WeatherProvider = {
       humidity: d.main.humidity,
       windSpeed: d.wind?.speed != null ? Math.round(d.wind.speed * 3.6 * 10) / 10 : undefined, // m/s -> km/h
       windDir: degToDir(d.wind?.deg),
-      observedAt: d.dt ? new Date(d.dt * 1000).toISOString() : undefined,
+      // dt 为 UTC 时间戳；+8h 转北京墙上时间后写入 UTC 字段，前端按 UTC 原样显示
+      observedAt: d.dt ? new Date((d.dt + 8 * 3600) * 1000).toISOString() : undefined,
     }
   },
 }

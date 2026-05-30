@@ -46,7 +46,8 @@ export const nmcProvider: WeatherProvider = {
       humidity: clean(w.humidity),
       windSpeed: isNaN(speedMs) ? undefined : Math.round(speedMs * 3.6 * 10) / 10, // m/s -> km/h
       windDir: wind.direct,
-      observedAt: real.publish_time,
+      // publish_time 形如「2026-05-31 10:00」（北京时）；原样写入 UTC 字段，前端按 UTC 显示
+      observedAt: real.publish_time ? `${real.publish_time.replace(' ', 'T').slice(0, 16)}:00Z` : undefined,
     }
   },
 }
