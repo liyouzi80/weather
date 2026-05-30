@@ -181,12 +181,14 @@ function AqiSection({ air }: { air: AqiResult[] }) {
                 <span className="dot" style={{ background: r.color }} />
                 <span className="name">{r.providerName}</span>
                 <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
-                <span className="temp" style={{ color: col }}>{a.aqi}</span>
+                <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
               </div>
-              <div className="row">
-                {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
-                {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
-              </div>
+              {(a.dominant || a.pm25 != null) && (
+                <div className="row">
+                  {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
+                  {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
+                </div>
+              )}
               {a.forecast && <div className="aqi-fc">预报 <b>{a.forecast}</b></div>}
             </div>
           )

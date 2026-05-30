@@ -4,11 +4,17 @@
 
 const CONFIG = {
   apiUrl: 'https://weather-8za.pages.dev/api/widget',
+  siteUrl: 'https://weather-8za.pages.dev/',
   cities: [
     { name: '番禺区', lat: 22.9468, lon: 113.3622, cityName: '番禺' },
     { name: '安福县', lat: 27.3954, lon: 114.6195, cityName: '安福' },
   ],
   defaultCityIdx: 0,
+}
+
+// 温度取整字符串
+function tempStr(v) {
+  return v != null ? `${Math.round(v)}°` : '—'
 }
 
 const C = {
@@ -117,58 +123,60 @@ function addHL(parent, label, val, color, labelSize, valSize) {
   v.textColor = color
 }
 
-// ── 中号 / 大号 ──
+// ── 中号 / 大号（仿苹果天气：左侧实况，右侧高低 + AQI）──
 function renderMain(w, data) {
   bg(w)
-  w.setPadding(18, 20, 16, 20)
-  w.addSpacer()
+  w.setPadding(16, 18, 14, 18)
 
-  const city = w.addText(data.city)
-  city.font = Font.semiboldSystemFont(18)
-  city.textColor = C.text2
-  city.centerAlignText()
+  const row = w.addStack()
+  row.layoutHorizontally()
+  row.topAlignContent()
 
-  w.addSpacer(6)
-
+  // 左：城市 / 大温度 / 天气
+  const left = row.addStack()
+  left.layoutVertically()
+  const city = left.addText(data.city)
+  city.font = Font.semiboldSystemFont(17)
+  city.textColor = C.text
+  left.addSpacer(2)
+  const big = left.addText(avgStr(data))
+  big.font = Font.boldSystemFont(52)
+  big.textColor = C.text
+  big.minimumScaleFactor = 0.6
+  big.lineLimit = 1
   if (data.text) {
-    const e = w.addText(weatherEmoji(data.text))
-    e.font = Font.systemFont(40)
-    e.centerAlignText()
-    w.addSpacer(2)
+    left.addSpacer(3)
+    const cond = left.addStack()
+    cond.layoutHorizontally()
+    cond.centerAlignContent()
+    const e = cond.addText(weatherEmoji(data.text) + ' ')
+    e.font = Font.systemFont(14)
+    const ct = cond.addText(data.text)
+    ct.font = Font.systemFont(14)
+    ct.textColor = C.text2
+    ct.lineLimit = 1
   }
 
-  const big = w.addText(avgStr(data))
-  big.font = Font.boldSystemFont(56)
-  big.textColor = C.text
-  big.centerAlignText()
-  big.minimumScaleFactor = 0.6
+  row.addSpacer()
 
-  w.addSpacer(10)
-
-  const hilo = w.addStack()
-  hilo.layoutHorizontally()
-  hilo.centerAlignContent()
-  hilo.addSpacer()
-  addHL(hilo, '最高', data.max, C.hot, 14, 16)
-  hilo.addSpacer(22)
-  addHL(hilo, '最低', data.min, C.cold, 14, 16)
-  hilo.addSpacer()
-
-  // 美国 AQI：评级 chip + 主要污染物
+  // 右：高/低 + AQI 评级 + 主要污染物
+  const right = row.addStack()
+  right.layoutVertically()
+  right.addSpacer(4)
+  const hi = right.addStack(); hi.layoutHorizontally(); hi.addSpacer(); addHL(hi, '高', data.max, C.hot, 12, 15)
+  right.addSpacer(4)
+  const lo = right.addStack(); lo.layoutHorizontally(); lo.addSpacer(); addHL(lo, '低', data.min, C.cold, 12, 15)
   if (avgAqi(data) != null) {
-    w.addSpacer(11)
-    const arow = w.addStack()
-    arow.layoutHorizontally()
-    arow.centerAlignContent()
-    arow.addSpacer()
-    addAqiChip(arow, avgAqi(data), 14, 13)
+    right.addSpacer(12)
+    const ar = right.addStack(); ar.layoutHorizontally(); ar.addSpacer(); addAqiChip(ar, avgAqi(data), 14, 12)
     const src = (data.aqi.sources || []).find(s => s.dominant)
     if (src && src.dominant) {
-      const d = arow.addText('  主要 ' + src.dominant)
-      d.font = Font.systemFont(12)
+      right.addSpacer(4)
+      const dr = right.addStack(); dr.layoutHorizontally(); dr.addSpacer()
+      const d = dr.addText('主要 ' + src.dominant)
+      d.font = Font.systemFont(11)
       d.textColor = C.text2
     }
-    arow.addSpacer()
   }
 
   w.addSpacer()
@@ -176,7 +184,6 @@ function renderMain(w, data) {
   const ft = w.addText(`更新 ${clock(data)}`)
   ft.font = Font.regularSystemFont(10)
   ft.textColor = C.dim
-  ft.centerAlignText()
 }
 
 // ── 小号（仿苹果天气：左对齐，地名→大温度→天气→高低；右上角 AQI 评级）──
@@ -207,12 +214,14 @@ function renderSmall(w, data) {
 
   w.addSpacer(3)
 
-  // 天气：emoji + 文案
+  // 天气：emoji + 文案（无数据时不显示默认云图标）
   const cond = w.addStack()
   cond.layoutHorizontally()
   cond.centerAlignContent()
-  const e = cond.addText(weatherEmoji(data.text) + ' ')
-  e.font = Font.systemFont(13)
+  if (data.text) {
+    const e = cond.addText(weatherEmoji(data.text) + ' ')
+    e.font = Font.systemFont(13)
+  }
   const ct = cond.addText(data.text || '—')
   ct.font = Font.systemFont(13)
   ct.textColor = C.text2
@@ -228,6 +237,43 @@ function renderSmall(w, data) {
   hilo.addSpacer(12)
   addHL(hilo, '低', data.min, C.cold, 11, 13)
   hilo.addSpacer()
+}
+
+// ── 锁屏小组件（iOS 16+ accessory，系统单色渲染，不设背景/颜色）──
+function renderInline(w, data) {
+  const a = avgAqi(data)
+  const aqi = a != null ? ` · AQI ${aqiCategory(a)}${a}` : ''
+  w.addText(`${data.city} ${avgStr(data)} ${data.text || ''}${aqi}`)
+}
+function renderCircular(w, data) {
+  w.addSpacer()
+  const s = w.addStack()
+  s.layoutVertically()
+  s.centerAlignContent()
+  const big = s.addText(avgStr(data))
+  big.font = Font.boldSystemFont(22)
+  big.centerAlignText()
+  big.minimumScaleFactor = 0.5
+  big.lineLimit = 1
+  const a = avgAqi(data)
+  const sub = s.addText(a != null ? `${aqiCategory(a)}${a}` : data.city)
+  sub.font = Font.systemFont(9)
+  sub.centerAlignText()
+  sub.minimumScaleFactor = 0.5
+  sub.lineLimit = 1
+  w.addSpacer()
+}
+function renderRectangular(w, data) {
+  const l1 = w.addText(`${data.city}  ${avgStr(data)}`)
+  l1.font = Font.semiboldSystemFont(15)
+  l1.lineLimit = 1
+  const l2 = w.addText(`${data.text || '—'}  高${tempStr(data.max)} 低${tempStr(data.min)}`)
+  l2.font = Font.systemFont(12)
+  l2.lineLimit = 1
+  const a = avgAqi(data)
+  const l3 = w.addText(a != null ? `AQI ${aqiCategory(a)} ${a}${data.aqi.sources?.find(s => s.dominant)?.dominant ? ' · 主要 ' + data.aqi.sources.find(s => s.dominant).dominant : ''}` : 'AQI —')
+  l3.font = Font.systemFont(12)
+  l3.lineLimit = 1
 }
 
 // ── 错误 ──
@@ -259,14 +305,16 @@ async function run() {
   if (!city) city = CONFIG.cities[CONFIG.defaultCityIdx]
 
   const w = new ListWidget()
+  w.url = CONFIG.siteUrl // 点按打开网页 App
 
   try {
     const data = await fetchData(city.lat, city.lon, city.name, city.cityName)
-    if (config.widgetFamily === 'small') {
-      renderSmall(w, data)
-    } else {
-      renderMain(w, data)
-    }
+    const fam = config.widgetFamily
+    if (fam === 'accessoryInline') renderInline(w, data)
+    else if (fam === 'accessoryCircular') renderCircular(w, data)
+    else if (fam === 'accessoryRectangular') renderRectangular(w, data)
+    else if (fam === 'small') renderSmall(w, data)
+    else renderMain(w, data)
   } catch (e) {
     renderError(w, e.message || '未知错误')
   }

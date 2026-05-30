@@ -387,6 +387,7 @@ body::after {
 .aqi-section { margin-top: 20px; }
 .aqi-section .cards { margin-top: 4px; }
 .aqi-cat { font-size: 13px; font-weight: 600; }
+.aqi-unit { font-size: 11px; font-weight: 600; opacity: 0.7; margin-left: 3px; letter-spacing: 0.02em; }
 .aqi-fc { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
 .aqi-fc b { color: var(--text); font-weight: 600; }
 
