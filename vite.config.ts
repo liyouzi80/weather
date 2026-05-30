@@ -59,6 +59,17 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/proxy\/tencent/, ''),
       },
+      '/proxy/airquality': {
+        target: 'https://air-quality.com',
+        changeOrigin: true,
+        headers: { Referer: 'https://air-quality.com/', 'X-Requested-With': 'XMLHttpRequest' },
+        rewrite: (p) => p.replace(/^\/proxy\/airquality/, ''),
+      },
+      '/proxy/airvisual': {
+        target: 'https://api.airvisual.com',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/proxy\/airvisual/, ''),
+      },
     },
   },
 })

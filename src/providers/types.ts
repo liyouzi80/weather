@@ -10,6 +10,8 @@ export interface GeoLocation {
   weatherCnCode?: string
   /** 腾讯天气按省/市/区县中文名检索 */
   tencent?: { province: string; city: string; county: string }
+  /** 在意空气（air-quality.com）站点页路径，如「place/china/fanyudaxuecheng/3b401494」 */
+  airMatters?: { path: string }
 }
 
 export interface CurrentWeather {
@@ -58,4 +60,36 @@ export interface WeatherProvider {
   appliesTo?(loc: GeoLocation): boolean
   /** 拉取某坐标的实时天气 */
   fetchCurrent(loc: GeoLocation): Promise<CurrentWeather>
+}
+
+/** 美国标准空气质量（US AQI）数据模型 */
+export interface AirQuality {
+  /** 美国 AQI 数值 */
+  aqi: number
+  /** 主要污染物中文名（如「PM2.5」「臭氧」），可选 */
+  dominant?: string
+  /** PM2.5 浓度 μg/m³（部分源提供），可选 */
+  pm25?: number
+  /** 数据观测/更新时间（ISO 字符串），可选 */
+  observedAt?: string
+}
+
+/** AQI 信源拉取结果 */
+export interface AqiResult {
+  providerId: string
+  providerName: string
+  color: string
+  air?: AirQuality
+  error?: string
+}
+
+/** 一个 AQI 信源需要实现的接口 */
+export interface AqiProvider {
+  id: string
+  name: string
+  color: string
+  requiresKey: boolean
+  isConfigured(): boolean
+  appliesTo?(loc: GeoLocation): boolean
+  fetchAqi(loc: GeoLocation): Promise<AirQuality>
 }

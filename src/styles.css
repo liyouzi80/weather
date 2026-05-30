@@ -502,6 +502,26 @@ body::after {
 .text-diff { color: var(--warn) !important; }
 .warn-text { color: var(--warn); }
 
+/* ── 空气质量（美国 AQI）── */
+.aqi-pill {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 66px;
+  padding: 8px 12px;
+  border: 1.5px solid var(--glass-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.aqi-num { font-size: 28px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.aqi-lbl { font-size: 10px; color: var(--text-dim); text-align: center; margin-top: 4px; line-height: 1.3; }
+.aqi-section { margin-top: 20px; }
+.aqi-section .cards { margin-top: 4px; }
+.aqi-cat { font-size: 13px; font-weight: 600; }
+
 /* ── Loading ── */
 .hint {
   color: var(--text-dim);

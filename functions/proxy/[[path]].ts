@@ -1,6 +1,6 @@
 // Cloudflare Pages Function：通用反向代理，解决浏览器直连各天气信源的 CORS 问题。
 // 路由：/proxy/<upstream>/<剩余路径>?<query>  ->  对应上游域名。
-// 与 vite 开发代理（vite.config.ts）的路径保持一致，开发/生产无缝切换。
+// 转发请求方法与请求体（支持 POST），与 vite 开发代理（vite.config.ts）路径一致。
 
 const UPSTREAM: Record<string, string> = {
   qweather: 'https://devapi.qweather.com',
@@ -9,11 +9,15 @@ const UPSTREAM: Record<string, string> = {
   weatherapi: 'https://api.weatherapi.com',
   weathercn: 'http://d1.weather.com.cn',
   tencent: 'https://wis.qq.com',
+  airquality: 'https://air-quality.com',
+  waqi: 'https://api.waqi.info',
+  airvisual: 'https://api.airvisual.com',
 }
 
-// 部分上游需带 Referer 才返回数据
-const REFERER: Record<string, string> = {
-  weathercn: 'http://www.weather.com.cn/',
+// 部分上游需带特定请求头才返回数据
+const EXTRA_HEADERS: Record<string, Record<string, string>> = {
+  weathercn: { Referer: 'http://www.weather.com.cn/' },
+  airquality: { Referer: 'https://air-quality.com/', 'X-Requested-With': 'XMLHttpRequest' },
 }
 
 export const onRequest = async (context: { request: Request }): Promise<Response> => {
@@ -29,13 +33,22 @@ export const onRequest = async (context: { request: Request }): Promise<Response
   }
 
   const target = base + tail + url.search
+  const method = context.request.method
   try {
     const headers: Record<string, string> = {
       'User-Agent':
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+      ...(EXTRA_HEADERS[key] ?? {}),
     }
-    if (REFERER[key]) headers.Referer = REFERER[key]
-    const upstream = await fetch(target, { headers })
+    const ct = context.request.headers.get('content-type')
+    if (ct) headers['content-type'] = ct
+
+    const init: RequestInit = { method, headers }
+    if (method !== 'GET' && method !== 'HEAD') {
+      init.body = await context.request.arrayBuffer()
+    }
+
+    const upstream = await fetch(target, init)
     const body = await upstream.arrayBuffer()
     return new Response(body, {
       status: upstream.status,

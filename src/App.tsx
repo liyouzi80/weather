@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { fetchAll, PROVIDERS } from './providers'
-import type { GeoLocation, ProviderResult } from './providers/types'
+import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
+import type { AqiResult, GeoLocation, ProviderResult } from './providers/types'
 
 const CITIES: GeoLocation[] = [
   {
     name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622,
     weatherCnCode: '101280102',
     tencent: { province: '广东省', city: '广州市', county: '番禺区' },
+    airMatters: { path: 'place/china/fanyudaxuecheng/3b401494' }, // 番禺大学城
   },
   {
     name: '安福县', cityName: '安福', lat: 27.3954, lon: 114.6195,
     weatherCnCode: '101240612',
     tencent: { province: '江西省', city: '吉安市', county: '安福县' },
+    airMatters: { path: 'place/china/anfuxianwenhuaguangchang/cd272b77' }, // 安福县文化广场
   },
 ]
 
@@ -23,14 +25,18 @@ interface Annotated extends ProviderResult {
 export default function App() {
   const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
+  const [air, setAir] = useState<AqiResult[]>([])
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [initialLoad, setInitialLoad] = useState(true)
 
   const refresh = useCallback(async () => {
     setLoading(true)
+    const loc = CITIES[cityIdx]
     try {
-      setResults(await fetchAll(CITIES[cityIdx]))
+      const [weather, aqi] = await Promise.all([fetchAll(loc), fetchAllAqi(loc)])
+      setResults(weather)
+      setAir(aqi)
       setUpdatedAt(new Date())
     } finally {
       setLoading(false)
@@ -43,11 +49,16 @@ export default function App() {
   const selectCity = (i: number) => {
     if (i === cityIdx) return
     setResults([])
+    setAir([])
     setUpdatedAt(null)
     setCityIdx(i)
   }
 
   const { annotated, stats } = useMemo(() => analyze(results), [results])
+  const avgAqi = useMemo(() => {
+    const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
+    return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
+  }, [air])
   const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
 
@@ -93,6 +104,12 @@ export default function App() {
             <div>最高 <b>{stats.max}°</b></div>
             <div>最低 <b>{stats.min}°</b></div>
           </div>
+          {avgAqi != null && (
+            <div className="aqi-pill" style={{ borderColor: aqiColor(avgAqi) }}>
+              <div className="aqi-num" style={{ color: aqiColor(avgAqi) }}>{avgAqi}</div>
+              <div className="aqi-lbl">美国AQI<br />{aqiCategory(avgAqi)}</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -112,7 +129,68 @@ export default function App() {
         </div>
       )}
 
+      {air.length > 0 && <AqiSection air={air} key={`aqi-${cityIdx}`} />}
+
       {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
+    </div>
+  )
+}
+
+// 美国 AQI 等级 → 颜色（US EPA）
+function aqiColor(aqi: number): string {
+  if (aqi <= 50) return '#34c759'
+  if (aqi <= 100) return '#ffd60a'
+  if (aqi <= 150) return '#ff9f0a'
+  if (aqi <= 200) return '#ff453a'
+  if (aqi <= 300) return '#af52de'
+  return '#a1304e'
+}
+// 美国 AQI 等级 → 中文
+function aqiCategory(aqi: number): string {
+  if (aqi <= 50) return '优'
+  if (aqi <= 100) return '良'
+  if (aqi <= 150) return '轻度污染'
+  if (aqi <= 200) return '中度污染'
+  if (aqi <= 300) return '重度污染'
+  return '严重污染'
+}
+
+function AqiSection({ air }: { air: AqiResult[] }) {
+  return (
+    <div className="aqi-section">
+      <div className="ranking-title">空气质量 · 美国 AQI</div>
+      <div className="cards">
+        {air.map((r) => {
+          if (r.error || !r.air) {
+            return (
+              <div className="card err" key={r.providerId} style={{ borderLeftColor: 'rgba(120,120,128,0.4)' }}>
+                <div className="head">
+                  <span className="dot" style={{ background: r.color }} />
+                  <span className="name">{r.providerName}</span>
+                </div>
+                <div className="err-msg">{r.error ?? '无数据'}</div>
+              </div>
+            )
+          }
+          const a = r.air
+          const col = aqiColor(a.aqi)
+          return (
+            <div className="card" key={r.providerId} style={{ borderLeftColor: r.color }}>
+              <div className="head">
+                <span className="dot" style={{ background: r.color }} />
+                <span className="name">{r.providerName}</span>
+                <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
+                <span className="temp" style={{ color: col }}>{a.aqi}</span>
+              </div>
+              <div className="row">
+                {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
+                {a.dominant && <span>主要 <b>{a.dominant}</b></span>}
+              </div>
+              {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
