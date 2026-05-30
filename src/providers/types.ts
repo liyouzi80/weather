@@ -90,6 +90,8 @@ export interface AqiResult {
   providerName: string
   color: string
   air?: AirQuality
+  /** 源站点页地址（点击卡片跳转） */
+  url?: string
   error?: string
 }
 

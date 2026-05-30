@@ -51,6 +51,7 @@ interface AqiApiSource {
   dominant?: string
   pm25?: number
   observedAt?: string
+  url?: string
   error?: string
 }
 
@@ -65,11 +66,12 @@ export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResul
     const data = (await res.json()) as { sources?: AqiApiSource[] }
     const sources = (data.sources ?? []).map((s) =>
       s.error || s.aqi == null
-        ? { providerId: s.id, providerName: s.name, color: s.color, error: s.error ?? '无数据' }
+        ? { providerId: s.id, providerName: s.name, color: s.color, url: s.url, error: s.error ?? '无数据' }
         : {
             providerId: s.id,
             providerName: s.name,
             color: s.color,
+            url: s.url,
             air: { aqi: s.aqi, dominant: s.dominant, pm25: s.pm25, observedAt: s.observedAt },
           },
     )

@@ -26,7 +26,17 @@ export interface AqiSource {
   pm25?: number
   /** 观测时间（ISO 字符串） */
   observedAt?: string
+  /** 源站点页地址（点击卡片跳转） */
+  url?: string
   error?: string
+}
+
+/** 各源对应城市的站点页完整地址（供前端点击跳转） */
+function sourceUrl(id: string, cityName: string): string | undefined {
+  if (id === 'airmatters' && AM_PATH[cityName])
+    return `https://air-quality.com/${AM_PATH[cityName]}?lang=zh-Hans&standard=aqi_us`
+  if (id === 'iqair' && IQAIR_PATH[cityName]) return `https://www.iqair.cn/${IQAIR_PATH[cityName]}`
+  return undefined
 }
 
 // 北京墙上时间 → ISO（把墙上时间原样写入 UTC 字段，前端按 UTC 渲染即原样显示）
@@ -109,6 +119,8 @@ export async function aggregateAqi(
       ? r.value
       : { id: `aqi-err-${i}`, name: 'AQI', color: '#6e6e73', error: r.reason instanceof Error ? r.reason.message : String(r.reason) },
   )
+  // 附上各源站点页地址，供前端点击跳转
+  for (const s of sources) s.url = sourceUrl(s.id, cityName)
   const vals = sources.filter((a) => a.aqi != null).map((a) => a.aqi!)
   const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null
   return { avg, sources }

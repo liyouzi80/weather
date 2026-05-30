@@ -61,6 +61,28 @@ export default function App() {
     setCityIdx(i)
   }
 
+  // 下拉刷新（移动端）：页面顶部下拉超过阈值即触发刷新
+  const [pull, setPull] = useState(0)
+  const pullStart = useRef<number | null>(null)
+  const PULL_MAX = 90
+  const PULL_TRIGGER = 64
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY <= 0 && !loading) pullStart.current = e.touches[0].clientY
+    else pullStart.current = null
+  }
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (pullStart.current == null) return
+    const dy = e.touches[0].clientY - pullStart.current
+    if (dy > 0) setPull(Math.min(dy * 0.5, PULL_MAX))
+    else { pullStart.current = null; setPull(0) }
+  }
+  const onTouchEnd = () => {
+    if (pullStart.current == null) return
+    if (pull >= PULL_TRIGGER) refresh()
+    pullStart.current = null
+    setPull(0)
+  }
+
   const { annotated, stats } = useMemo(() => analyze(results), [results])
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
@@ -97,8 +119,26 @@ export default function App() {
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
 
   return (
-    <div className="app">
+    <div className="app" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
       <WeatherFX kind={fx} />
+      <div
+        className="pull-indicator"
+        style={{
+          height: pull,
+          opacity: pull > 6 ? 1 : 0,
+        }}
+      >
+        <svg
+          width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"
+          className={loading ? 'spin' : ''}
+          style={{ transform: `rotate(${loading ? 0 : Math.min(pull / PULL_TRIGGER, 1) * 270}deg)`, opacity: 0.85 }}
+        >
+          <polyline points="23 4 23 10 17 10" />
+          <polyline points="1 20 1 14 7 14" />
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+        </svg>
+      </div>
       <header className="loc-header">
         <button
           className="icon-btn switch"
@@ -259,11 +299,24 @@ function AqiSection({ air }: { air: AqiResult[] }) {
           }
           const a = r.air
           const col = aqiColor(a.aqi)
+          const Tag = r.url ? 'a' : 'div'
           return (
-            <div className="card" key={r.providerId} style={{ borderLeftColor: r.color }}>
+            <Tag
+              className={'card' + (r.url ? ' card-link' : '')}
+              key={r.providerId}
+              style={{ borderLeftColor: r.color }}
+              {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
+            >
               <div className="head">
                 <span className="dot" style={{ background: r.color }} />
                 <span className="name">{r.providerName}</span>
+                {r.url && (
+                  <svg className="card-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                )}
                 <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
                 <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
               </div>
@@ -274,7 +327,7 @@ function AqiSection({ air }: { air: AqiResult[] }) {
                 </div>
               )}
               {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
-            </div>
+            </Tag>
           )
         })}
       </div>

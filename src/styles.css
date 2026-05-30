@@ -127,6 +127,17 @@ html[data-sky='fog'] body::before {
   min-height: 100%;
 }
 
+/* 下拉刷新指示器：随下拉距离展开高度 */
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: var(--text-secondary);
+  transition: opacity 0.2s ease;
+}
+.pull-indicator svg { transition: transform 0.1s linear; }
+
 /* 实时天气动效：全屏背景层，浮在天空渐变之上、内容之下 */
 .weather-fx {
   position: fixed;
@@ -504,7 +515,15 @@ html[data-sky='fog'] body::before {
   flex: none;
   box-shadow: 0 0 8px currentColor;
 }
-.card .name { font-weight: 600; font-size: 15px; flex: 1; }
+.card .name { font-weight: 600; font-size: 15px; }
+/* AQI 卡可点击跳源站 */
+a.card { text-decoration: none; color: inherit; display: block; }
+.card-link { cursor: pointer; }
+.card-link:active { transform: scale(0.985); }
+.card-ext { color: var(--text-dim); flex: none; margin-left: 2px; opacity: 0.7; transition: opacity var(--transition-fast); }
+.card-link:hover .card-ext { opacity: 1; }
+/* provider 卡名占满剩余宽度；AQI 卡名后跟外链图标，故名不再强制 flex:1，由 head 控制 */
+.card .head .name { flex: 1; }
 .card .temp {
   font-size: 26px;
   font-weight: 700;
