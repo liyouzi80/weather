@@ -143,8 +143,6 @@ export default function App() {
         </div>
       )}
 
-      {avgAqi != null && <AqiAdvice aqi={avgAqi} key={`adv-${cityIdx}`} />}
-
       {stats && stats.count >= 2 && <TempRanking results={annotated} key={`rank-${cityIdx}`} />}
 
       {loading && results.length === 0 ? (
@@ -186,26 +184,6 @@ function aqiCategory(aqi: number): string {
   if (aqi <= 300) return '重度污染'
   return '严重污染'
 }
-// 美国 AQI 等级 → 健康建议
-function aqiAdvice(aqi: number): string {
-  if (aqi <= 50) return '空气质量令人满意，适合户外活动。'
-  if (aqi <= 100) return '空气质量可接受，敏感人群如长时间户外建议适当减少剧烈运动。'
-  if (aqi <= 150) return '敏感人群应减少户外活动，一般人群适当减少长时间剧烈运动。'
-  if (aqi <= 200) return '敏感人群避免户外，一般人群减少户外活动并适当防护。'
-  if (aqi <= 300) return '尽量留在室内、关好门窗，外出佩戴口罩。'
-  return '健康警报：避免户外活动，留在室内并使用空气净化。'
-}
-
-// 空气质量健康建议条
-function AqiAdvice({ aqi }: { aqi: number }) {
-  return (
-    <div className="aqi-advice" style={{ borderLeftColor: aqiColor(aqi) }}>
-      <span className="aqi-advice-cat" style={{ color: aqiColor(aqi) }}>{aqiCategory(aqi)} {aqi}</span>
-      <span className="aqi-advice-text">{aqiAdvice(aqi)}</span>
-    </div>
-  )
-}
-
 function AqiSection({ air }: { air: AqiResult[] }) {
   return (
     <div className="aqi-section">
