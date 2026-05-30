@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, ForecastDay, GeoLocation, ProviderResult } from './providers/types'
+import { WeatherIcon } from './WeatherIcon'
 
 const CITIES: GeoLocation[] = [
   {
@@ -107,7 +108,7 @@ export default function App() {
 
       {stats && (
         <div className="summary" key={cityIdx}>
-          {weatherEmoji(stats.text) && <div className="sum-icon">{weatherEmoji(stats.text)}</div>}
+          <div className="sum-icon"><WeatherIcon text={stats.text} size={50} /></div>
           <div className="big">{stats.avg.toFixed(1)}°</div>
           <div className="sum-right">
             <div className="meta">
@@ -123,6 +124,8 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {stats && <MetricTiles stats={stats} key={`mt-${cityIdx}`} />}
 
       {avgAqi != null && <AqiAdvice aqi={avgAqi} key={`adv-${cityIdx}`} />}
 
@@ -293,8 +296,8 @@ function ProviderCard({ r }: { r: Annotated }) {
         <span className="temp">{c.temp.toFixed(1)}°</span>
       </div>
       <div className="row">
-        <span>
-          {weatherEmoji(c.text) && <span className="wx-emoji">{weatherEmoji(c.text)} </span>}
+        <span className="wx">
+          <WeatherIcon text={c.text} size={17} className="wx-icon" />
           <b>{c.text}</b>
         </span>
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike.toFixed(1)}°</b></span>}
@@ -345,10 +348,12 @@ function TempRanking({ results }: { results: Annotated[] }) {
   )
 }
 
-function analyze(results: ProviderResult[]): {
-  annotated: Annotated[]
-  stats: null | { avg: number; min: number; max: number; count: number; text: string }
-} {
+interface Stats {
+  avg: number; min: number; max: number; count: number; text: string
+  feelsLike?: number; humidity?: number; windSpeed?: number; windDir?: string
+}
+
+function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
   const ok = results.filter((r) => r.current)
   // round to 1 decimal to avoid float comparison issues
   const temps = ok.map((r) => Math.round(r.current!.temp * 10) / 10)
@@ -365,6 +370,17 @@ function analyze(results: ProviderResult[]): {
   for (const r of ok) textCounts.set(r.current!.text, (textCounts.get(r.current!.text) ?? 0) + 1)
   const majorityText = [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
 
+  // 多源聚合的体感/湿度/风（仅取提供该字段的源求平均）
+  const avgOf = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : undefined)
+  const r1 = (x?: number) => (x == null ? undefined : Math.round(x * 10) / 10)
+  const feels = ok.map((r) => r.current!.feelsLike).filter((n): n is number => n != null)
+  const hums = ok.map((r) => r.current!.humidity).filter((n): n is number => n != null)
+  const winds = ok.map((r) => r.current!.windSpeed).filter((n): n is number => n != null)
+  const dirCounts = new Map<string, number>()
+  for (const r of ok) { const d = r.current!.windDir; if (d) dirCounts.set(d, (dirCounts.get(d) ?? 0) + 1) }
+  const windDir = [...dirCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
+  const humAvg = avgOf(hums)
+
   const annotated: Annotated[] = results.map((r) => {
     if (!r.current) return r
     const t = Math.round(r.current.temp * 10) / 10
@@ -377,7 +393,13 @@ function analyze(results: ProviderResult[]): {
 
   return {
     annotated,
-    stats: { avg, min, max, count: temps.length, text: majorityText },
+    stats: {
+      avg, min, max, count: temps.length, text: majorityText,
+      feelsLike: r1(avgOf(feels)),
+      humidity: humAvg != null ? Math.round(humAvg) : undefined,
+      windSpeed: r1(avgOf(winds)),
+      windDir,
+    },
   }
 }
 
@@ -393,17 +415,54 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 天气文字 → 彩色 emoji 图标（无可用文字时返回空串，不显示图标）。
-function weatherEmoji(text?: string): string {
-  if (!text || text === '—') return ''
-  if (/雷/.test(text)) return '⛈️'
-  if (/雪/.test(text)) return '🌨️'
-  if (/雨/.test(text)) return '🌧️'
-  if (/雾|霾|沙|尘/.test(text)) return '🌫️'
-  if (/阴/.test(text)) return '☁️'
-  if (/多云|间/.test(text)) return '⛅️'
-  if (/晴/.test(text)) return '☀️'
-  return ''
+// 概览次要指标小卡：体感 / 湿度 / 风（仅渲染有数据的项）
+function MetricTiles({ stats }: { stats: Stats }) {
+  const tiles: { key: string; label: string; value: string; sub?: string; icon: 'feels' | 'humid' | 'wind' }[] = []
+  if (stats.feelsLike != null) tiles.push({ key: 'feels', label: '体感', value: `${stats.feelsLike.toFixed(1)}°`, icon: 'feels' })
+  if (stats.humidity != null) tiles.push({ key: 'humid', label: '湿度', value: `${stats.humidity}%`, icon: 'humid' })
+  if (stats.windDir || stats.windSpeed != null) {
+    tiles.push({
+      key: 'wind', label: '风', icon: 'wind',
+      value: stats.windDir ?? '—',
+      sub: stats.windSpeed != null ? `${stats.windSpeed.toFixed(1)} km/h` : undefined,
+    })
+  }
+  if (tiles.length === 0) return null
+  return (
+    <div className="metric-tiles">
+      {tiles.map((t) => (
+        <div className="metric-tile" key={t.key}>
+          <div className="mt-head"><MetricIcon kind={t.icon} /><span className="mt-label">{t.label}</span></div>
+          <div className="mt-value">{t.value}</div>
+          {t.sub && <div className="mt-sub">{t.sub}</div>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function MetricIcon({ kind }: { kind: 'feels' | 'humid' | 'wind' }) {
+  const c = '#8b97a8'
+  if (kind === 'feels') {
+    return (
+      <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
+        <path d="M14 14.76V5a2 2 0 0 0-4 0v9.76a4 4 0 1 0 4 0z" />
+      </svg>
+    )
+  }
+  if (kind === 'humid') {
+    return (
+      <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill={c}>
+        <path d="M12 3 C12 3 5 11 5 15 a7 7 0 0 0 14 0 C19 11 12 3 12 3 Z" />
+      </svg>
+    )
+  }
+  return (
+    <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
+      <path d="M3 8h11a3 3 0 1 0-3-3" />
+      <path d="M3 16h15a3 3 0 1 1-3 3" />
+    </svg>
+  )
 }
 
 // 番禺区气象台短时预报时效检测：按"预报窗口结束时间"（北京时）判断是否过期。
