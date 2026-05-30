@@ -1,9 +1,10 @@
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { scrapeGuangzhou } from './functions/_lib/gz'
+import { aggregateAqi } from './functions/_lib/aqi'
 
-// 开发环境插件：在 vite dev server 里实现 /api/gz/realtime，
-// 复用与 Cloudflare Pages Function 相同的抓取逻辑，这样本地无需 wrangler 也能调试广州源。
+// 开发环境插件：在 vite dev server 里实现 /api/gz/realtime 与 /api/aqi，
+// 复用与 Cloudflare Pages Function 相同的抓取逻辑，这样本地无需 wrangler 也能调试。
 function devApi(): Plugin {
   return {
     name: 'dev-api',
@@ -12,6 +13,16 @@ function devApi(): Plugin {
         res.setHeader('content-type', 'application/json; charset=utf-8')
         try {
           res.end(JSON.stringify(await scrapeGuangzhou()))
+        } catch (e) {
+          res.statusCode = 502
+          res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }))
+        }
+      })
+      server.middlewares.use('/api/aqi', async (req, res) => {
+        res.setHeader('content-type', 'application/json; charset=utf-8')
+        const cityName = new URL(req.originalUrl ?? '/', 'http://localhost').searchParams.get('cityName') ?? '番禺'
+        try {
+          res.end(JSON.stringify({ ...(await aggregateAqi(cityName)), updatedAt: new Date().toISOString() }))
         } catch (e) {
           res.statusCode = 502
           res.end(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }))
@@ -58,17 +69,6 @@ export default defineConfig({
         target: 'https://wis.qq.com',
         changeOrigin: true,
         rewrite: (p) => p.replace(/^\/proxy\/tencent/, ''),
-      },
-      '/proxy/airquality': {
-        target: 'https://air-quality.com',
-        changeOrigin: true,
-        headers: { Referer: 'https://air-quality.com/', 'X-Requested-With': 'XMLHttpRequest' },
-        rewrite: (p) => p.replace(/^\/proxy\/airquality/, ''),
-      },
-      '/proxy/iqaircn': {
-        target: 'https://www.iqair.cn',
-        changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/proxy\/iqaircn/, ''),
       },
     },
   },

@@ -10,10 +10,6 @@ export interface GeoLocation {
   weatherCnCode?: string
   /** 腾讯天气按省/市/区县中文名检索 */
   tencent?: { province: string; city: string; county: string }
-  /** 在意空气（air-quality.com）站点页路径，如「place/china/fanyudaxuecheng/3b401494」 */
-  airMatters?: { path: string }
-  /** IQAir（iqair.cn）站点页路径，如「cn/china/guangdong/guangzhou/panyu-university-town」 */
-  iqair?: { path: string }
 }
 
 export interface CurrentWeather {
@@ -78,22 +74,11 @@ export interface AirQuality {
   observedAt?: string
 }
 
-/** AQI 信源拉取结果 */
+/** AQI 信源拉取结果（来自服务端 /api/aqi） */
 export interface AqiResult {
   providerId: string
   providerName: string
   color: string
   air?: AirQuality
   error?: string
-}
-
-/** 一个 AQI 信源需要实现的接口 */
-export interface AqiProvider {
-  id: string
-  name: string
-  color: string
-  requiresKey: boolean
-  isConfigured(): boolean
-  appliesTo?(loc: GeoLocation): boolean
-  fetchAqi(loc: GeoLocation): Promise<AirQuality>
 }

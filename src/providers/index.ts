@@ -1,5 +1,5 @@
 // 信源注册表：在这里登记所有信源。新增信源只需实现 WeatherProvider 并加进数组。
-import type { AqiProvider, AqiResult, GeoLocation, ProviderResult, WeatherProvider } from './types'
+import type { AqiResult, GeoLocation, ProviderResult, WeatherProvider } from './types'
 import { qweatherProvider } from './qweather'
 import { caiyunProvider } from './caiyun'
 import { nmcProvider } from './nmc'
@@ -7,8 +7,6 @@ import { gzqxProvider } from './gzqx'
 import { weathercnProvider } from './weathercn'
 import { tencentProvider } from './tencent'
 import { owmProvider } from './owm'
-import { airMattersAqiProvider } from './aqiAirMatters'
-import { iqairAqiProvider } from './aqiIqair'
 
 // 展示顺序：中央气象局 / 番禺气象台 / 中国天气网 / 腾讯天气 / 和风 / 彩云 / openweathermap
 export const PROVIDERS: WeatherProvider[] = [
@@ -40,29 +38,37 @@ export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
   )
 }
 
-// 美国标准 AQI 信源（展示顺序：在意空气 / IQAir）
-export const AQI_PROVIDERS: AqiProvider[] = [
-  airMattersAqiProvider,
-  iqairAqiProvider,
-]
+interface AqiApiSource {
+  id: string
+  name: string
+  color: string
+  aqi?: number
+  dominant?: string
+  pm25?: number
+  forecast?: string
+  error?: string
+}
 
-/** 并发拉取所有「已配置」AQI 信源 */
+/** 美国 AQI：调用服务端 /api/aqi（服务端抓站点页并归一化，避免浏览器下载整页 HTML） */
 export async function fetchAllAqi(loc: GeoLocation): Promise<AqiResult[]> {
-  const active = AQI_PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(loc) ?? true))
-  return Promise.all(
-    active.map(async (p): Promise<AqiResult> => {
-      try {
-        return { providerId: p.id, providerName: p.name, color: p.color, air: await p.fetchAqi(loc) }
-      } catch (e) {
-        return {
-          providerId: p.id,
-          providerName: p.name,
-          color: p.color,
-          error: e instanceof Error ? e.message : String(e),
-        }
-      }
-    }),
-  )
+  const city = loc.cityName ?? loc.name
+  try {
+    const res = await fetch(`/api/aqi?cityName=${encodeURIComponent(city)}`)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data = (await res.json()) as { sources?: AqiApiSource[] }
+    return (data.sources ?? []).map((s) =>
+      s.error || s.aqi == null
+        ? { providerId: s.id, providerName: s.name, color: s.color, error: s.error ?? '无数据' }
+        : {
+            providerId: s.id,
+            providerName: s.name,
+            color: s.color,
+            air: { aqi: s.aqi, dominant: s.dominant, pm25: s.pm25, forecast: s.forecast },
+          },
+    )
+  } catch {
+    return []
+  }
 }
 
 export * from './types'

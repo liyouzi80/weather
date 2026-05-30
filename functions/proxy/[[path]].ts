@@ -9,14 +9,11 @@ const UPSTREAM: Record<string, string> = {
   weatherapi: 'https://api.weatherapi.com',
   weathercn: 'http://d1.weather.com.cn',
   tencent: 'https://wis.qq.com',
-  airquality: 'https://air-quality.com',
-  iqaircn: 'https://www.iqair.cn',
 }
 
 // 部分上游需带特定请求头才返回数据
 const EXTRA_HEADERS: Record<string, Record<string, string>> = {
   weathercn: { Referer: 'http://www.weather.com.cn/' },
-  airquality: { Referer: 'https://air-quality.com/', 'X-Requested-With': 'XMLHttpRequest' },
 }
 
 export const onRequest = async (context: { request: Request }): Promise<Response> => {
