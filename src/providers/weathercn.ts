@@ -12,7 +12,7 @@ export const weathercnProvider: WeatherProvider = {
   appliesTo: (loc: GeoLocation) => !!loc.weatherCnCode,
   async fetchCurrent(loc: GeoLocation): Promise<CurrentWeather> {
     if (!loc.weatherCnCode) throw new Error('缺少城市码')
-    const res = await fetch(`/proxy/weathercn/sk_2d/${loc.weatherCnCode}.html?_=${Date.now()}`)
+    const res = await fetch(`/proxy/weathercn/sk_2d/${loc.weatherCnCode}.html`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const text = await res.text()
     const m = text.match(/\{[\s\S]*\}/)

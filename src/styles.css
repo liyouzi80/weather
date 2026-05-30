@@ -160,8 +160,6 @@ html[data-sky='fog'] body::before {
   font-size: 11px;
   font-weight: 500;
 }
-.sum-icon { display: flex; align-items: center; flex: none; }
-.sum-icon svg { display: block; }
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
 
@@ -330,11 +328,18 @@ html[data-sky='fog'] body::before {
   margin-top: 5px;
 }
 .hero-hilo b { font-weight: 600; color: #fff; }
-.hero-feels {
-  font-size: 15px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 4px;
+
+/* Hero 骨架屏（加载中占位，结构与真实 hero 对齐） */
+.hero-skeleton { pointer-events: none; }
+.hskel {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  margin: 0 auto;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
+.hskel-temp  { width: clamp(140px, 40vw, 190px); height: clamp(62px, 18vw, 84px); border-radius: 16px; }
+.hskel-cond  { width: 80px;  height: 18px; margin-top: 14px; }
+.hskel-hilo  { width: 148px; height: 17px; margin-top: 7px; }
 
 /* ── Temperature Ranking ── */
 .ranking {

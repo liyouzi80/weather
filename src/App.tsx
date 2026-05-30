@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, ProviderResult } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
@@ -28,18 +28,24 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [initialLoad, setInitialLoad] = useState(true)
+  // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
+  const refreshIdRef = useRef(0)
 
   const refresh = useCallback(async () => {
+    const id = ++refreshIdRef.current
     setLoading(true)
     const loc = CITIES[cityIdx]
     try {
       const [weather, aqi] = await Promise.all([fetchAll(loc), fetchAllAqi(loc)])
+      if (id !== refreshIdRef.current) return
       setResults(weather)
       setAir(aqi.sources)
       setUpdatedAt(new Date())
     } finally {
-      setLoading(false)
-      setInitialLoad(false)
+      if (id === refreshIdRef.current) {
+        setLoading(false)
+        setInitialLoad(false)
+      }
     }
   }, [cityIdx])
 
@@ -67,6 +73,10 @@ export default function App() {
   }, [results])
   const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
+  const activeCount = useMemo(
+    () => PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(city) ?? true)).length,
+    [city],
+  )
 
   // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky
   useEffect(() => {
@@ -111,7 +121,7 @@ export default function App() {
         </button>
       </header>
 
-      {stats && (
+      {stats ? (
         <div className="hero" key={`hero-${cityIdx}`}>
           <div className="hero-temp">{stats.avg.toFixed(1)}°</div>
           <div className="hero-cond">{stats.text}</div>
@@ -119,9 +129,12 @@ export default function App() {
             <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
             <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
           </div>
-          {stats.feelsLike != null && (
-            <div className="hero-feels">体感温度: {stats.feelsLike.toFixed(1)}°</div>
-          )}
+        </div>
+      ) : (
+        <div className="hero hero-skeleton">
+          <div className="hskel hskel-temp" />
+          <div className="hskel hskel-cond" />
+          <div className="hskel hskel-hilo" />
         </div>
       )}
 
@@ -144,7 +157,7 @@ export default function App() {
 
       {loading && results.length === 0 ? (
         <div className="cards">
-          {[1, 2, 3, 4].map((i) => (
+          {Array.from({ length: activeCount }, (_, i) => (
             <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 0.08}s` }} />
           ))}
         </div>

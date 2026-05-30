@@ -19,13 +19,18 @@ export const PROVIDERS: WeatherProvider[] = [
   owmProvider,
 ]
 
+const FETCH_TIMEOUT = 8000
+
+const timeout = (ms: number): Promise<never> =>
+  new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), ms))
+
 /** 并发拉取所有「已配置」信源，逐个返回结果（失败也返回，便于 UI 展示错误） */
 export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
   const active = PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(loc) ?? true))
   return Promise.all(
     active.map(async (p): Promise<ProviderResult> => {
       try {
-        const current = await p.fetchCurrent(loc)
+        const current = await Promise.race([p.fetchCurrent(loc), timeout(FETCH_TIMEOUT)])
         return { providerId: p.id, providerName: p.name, current }
       } catch (e) {
         return {
@@ -52,8 +57,10 @@ interface AqiApiSource {
 /** 美国 AQI：调用服务端 /api/aqi（服务端抓站点页并归一化，避免浏览器下载整页 HTML） */
 export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResult[] }> {
   const city = loc.cityName ?? loc.name
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), 12000)
   try {
-    const res = await fetch(`/api/aqi?cityName=${encodeURIComponent(city)}`)
+    const res = await fetch(`/api/aqi?cityName=${encodeURIComponent(city)}`, { signal: ctrl.signal })
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = (await res.json()) as { sources?: AqiApiSource[] }
     const sources = (data.sources ?? []).map((s) =>
@@ -69,6 +76,8 @@ export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResul
     return { sources }
   } catch {
     return { sources: [] }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
