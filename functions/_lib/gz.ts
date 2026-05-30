@@ -124,7 +124,9 @@ function mapData(d: any): GzRealtime {
     windDir: deg != null ? degToDir(deg) : undefined,
     rain1h: clean(obt.hourrf),
     text: undefined, // 基本站实况无天气现象描述
-    observedAt: ts ? new Date(ts).toISOString() : undefined,
+    // ts 形如「2026-05-30 22:00」（北京时）；原样写入 ISO 的 UTC 字段，
+    // 前端按 UTC 渲染即原样显示，不随运行环境/设备时区偏移。
+    observedAt: typeof ts === 'string' ? `${ts.replace(' ', 'T').slice(0, 16)}:00Z` : undefined,
   }
 }
 
