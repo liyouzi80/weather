@@ -62,6 +62,12 @@ export default function App() {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
     return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
   }, [air])
+  // 番禺区气象台短时预报（仅当前有效时展示）
+  const panyuForecast = useMemo(() => {
+    const f = results.find((r) => r.current?.forecast)?.current
+    if (!f?.forecast || !isForecastCurrent(f.forecast, f.forecastIssuedAt)) return null
+    return { text: f.forecast, issuedAt: f.forecastIssuedAt }
+  }, [results])
   const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
 
@@ -126,6 +132,19 @@ export default function App() {
       )}
 
       {stats && <MetricTiles stats={stats} key={`mt-${cityIdx}`} />}
+
+      {panyuForecast && (
+        <div className="notice-card" key={`notice-${cityIdx}`}>
+          <div className="notice-head">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 11l18-5v12L3 14v-3z" />
+              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+            </svg>
+            <span>番禺区气象台{panyuForecast.issuedAt ? ` · ${panyuForecast.issuedAt}` : ''}</span>
+          </div>
+          <div className="notice-text">{panyuForecast.text}</div>
+        </div>
+      )}
 
       {avgAqi != null && <AqiAdvice aqi={avgAqi} key={`adv-${cityIdx}`} />}
 
@@ -307,12 +326,6 @@ function ProviderCard({ r }: { r: Annotated }) {
         )}
       </div>
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
-      {c.forecast && isForecastCurrent(c.forecast, c.forecastIssuedAt) && (
-        <div className="forecast">
-          <b>番禺区气象台</b>
-          {c.forecastIssuedAt ? ` · ${c.forecastIssuedAt}` : ''}：{c.forecast}
-        </div>
-      )}
     </div>
   )
 }
