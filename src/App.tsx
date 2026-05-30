@@ -64,6 +64,13 @@ export default function App() {
   const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
 
+  // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky
+  useEffect(() => {
+    const h = new Date().getHours()
+    const night = h < 6 || h >= 19
+    document.documentElement.dataset.sky = skyKey(stats?.text, night)
+  }, [stats, updatedAt])
+
   return (
     <div className="app">
       <header className="loc-header">
@@ -372,6 +379,18 @@ function analyze(results: ProviderResult[]): {
     annotated,
     stats: { avg, min, max, count: temps.length, text: majorityText },
   }
+}
+
+// 天气文字 + 昼夜 → 背景主题 key（驱动 CSS 的动态天气背景）
+function skyKey(text: string | undefined, night: boolean): string {
+  if (text) {
+    if (/雷|雨/.test(text)) return 'rain'
+    if (/雪/.test(text)) return 'snow'
+    if (/雾|霾|沙|尘/.test(text)) return 'fog'
+    if (/阴/.test(text)) return 'overcast'
+    if (/多云|间/.test(text)) return 'cloudy'
+  }
+  return night ? 'clear-night' : 'clear-day'
 }
 
 // 天气文字 → 彩色 emoji 图标（无可用文字时返回空串，不显示图标）。
