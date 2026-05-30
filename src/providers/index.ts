@@ -50,7 +50,7 @@ interface AqiApiSource {
   aqi?: number
   dominant?: string
   pm25?: number
-  forecast?: string
+  observedAt?: string
   error?: string
 }
 
@@ -70,7 +70,7 @@ export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResul
             providerId: s.id,
             providerName: s.name,
             color: s.color,
-            air: { aqi: s.aqi, dominant: s.dominant, pm25: s.pm25, forecast: s.forecast },
+            air: { aqi: s.aqi, dominant: s.dominant, pm25: s.pm25, observedAt: s.observedAt },
           },
     )
     return { sources }

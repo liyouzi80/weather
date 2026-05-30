@@ -15,7 +15,6 @@ export const IQAIR_PATH: Record<string, string> = {
 }
 
 const POL: Record<string, string> = { O3: 'O₃', 'PM2.5': 'PM2.5', PM10: 'PM10', NO2: 'NO₂', SO2: 'SO₂', CO: 'CO' }
-const AM_CATS = '优|良好|良|中等|轻度污染|中度污染|重度污染|严重污染|对敏感人群不健康|不健康|非常不健康|危险|危害'
 const IQAIR_CATS = '优秀|优|良好|良|中等|对敏感人群不健康|不健康|非常不健康|危险|危害'
 
 export interface AqiSource {
@@ -25,8 +24,14 @@ export interface AqiSource {
   aqi?: number
   dominant?: string
   pm25?: number
-  forecast?: string
+  /** 观测时间（ISO 字符串） */
+  observedAt?: string
   error?: string
+}
+
+// 「YYYY-MM-DD HH:MM」（北京/当地时）→ ISO 字符串
+function beijingToISO(y: number, mo: number, d: number, h: number, mi: number): string {
+  return new Date(Date.UTC(y, mo - 1, d, h - 8, mi)).toISOString()
 }
 
 // 在意空气（air-quality.com）
@@ -47,17 +52,15 @@ export async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
   const dom = items.length ? items.reduce((a, b) => (b.ratio > a.ratio ? b : a)) : undefined
   const pm = items.find((i) => i.name === 'PM2.5')
   const s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
-  // AQI 预报摘要（今/明）
-  const dm = [
-    ...s.matchAll(new RegExp(`(\\d{4})-(\\d{2})-(\\d{2})[^0-9]*?\\d+°\\s*/\\s*\\d+°[^~]*?(\\d+)~(\\d+)\\s*(?:${AM_CATS})`, 'g')),
-  ]
-  const forecast = dm.length
-    ? `今 ${dm[0][4]}~${dm[0][5]}` + (dm[1] ? ` · 明 ${dm[1][4]}~${dm[1][5]}` : '')
+  // 观测时间：实时块「YYYY-MM-DD HH:MM (当地时间)」
+  const tm = s.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\s*\(当地时间\)/)
+  const observedAt = tm
+    ? beijingToISO(+tm[1], +tm[2], +tm[3], +tm[4], +tm[5])
     : undefined
   return {
     id: 'airmatters', name: '在意空气', color: '#f59e0b',
     aqi: parseInt(m[1]), dominant: dom ? POL[dom.name] ?? dom.name : undefined,
-    pm25: pm ? pm.value : undefined, forecast,
+    pm25: pm ? pm.value : undefined, observedAt,
   }
 }
 
@@ -79,12 +82,12 @@ export async function fetchIQAirAqi(path: string): Promise<AqiSource> {
     if (!l) throw new Error('解析失败')
     aqi = parseInt(l[1])
   }
-  // AQI 预报摘要（今/明）
-  const fi = s.indexOf('每日预报')
-  const seg = fi >= 0 ? s.slice(fi, fi + 460) : ''
-  const dm = [...seg.matchAll(/(今天|明天|周[一二三四五六日])\s+(\d+)\s+\d+°\s+\d+°/g)]
-  const forecast = dm.length ? `今 ${dm[0][2]}` + (dm[1] ? ` · 明 ${dm[1][2]}` : '') : undefined
-  return { id: 'iqair', name: 'IQAir', color: '#0ea5e9', aqi, dominant, pm25, forecast }
+  // 观测时间：实时块「HH:MM, M月 D日 当地时间」（无年份，按当前年补全）
+  const tm = s.match(/(\d{1,2}):(\d{2})\s*,?\s*(\d{1,2})月\s*(\d{1,2})日\s*当地时间/)
+  const observedAt = tm
+    ? beijingToISO(new Date().getUTCFullYear(), +tm[3], +tm[4], +tm[1], +tm[2])
+    : undefined
+  return { id: 'iqair', name: 'IQAir', color: '#0ea5e9', aqi, dominant, pm25, observedAt }
 }
 
 /** 聚合某城市的多源 AQI，返回平均值与逐源结果（含失败项） */

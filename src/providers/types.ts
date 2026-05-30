@@ -68,8 +68,6 @@ export interface AirQuality {
   dominant?: string
   /** PM2.5 浓度 μg/m³（部分源提供），可选 */
   pm25?: number
-  /** AQI 预报摘要（如「今 113 · 明 114」），可选 */
-  forecast?: string
   /** 数据观测/更新时间（ISO 字符串），可选 */
   observedAt?: string
 }

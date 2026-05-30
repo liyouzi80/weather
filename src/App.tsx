@@ -227,7 +227,7 @@ function AqiSection({ air }: { air: AqiResult[] }) {
                   {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
                 </div>
               )}
-              {a.forecast && <div className="aqi-fc">预报 <b>{a.forecast}</b></div>}
+              {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
             </div>
           )
         })}
