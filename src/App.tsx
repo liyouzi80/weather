@@ -102,16 +102,18 @@ export default function App() {
         <div className="summary" key={cityIdx}>
           {weatherEmoji(stats.text) && <div className="sum-icon">{weatherEmoji(stats.text)}</div>}
           <div className="big">{stats.avg.toFixed(1)}°</div>
-          <div className="meta">
-            <div>最高 <b>{stats.max.toFixed(1)}°</b></div>
-            <div>最低 <b>{stats.min.toFixed(1)}°</b></div>
-          </div>
-          {avgAqi != null && (
-            <div className="aqi-pill" style={{ borderColor: aqiColor(avgAqi), background: aqiColor(avgAqi) + '22' }}>
-              <div className="aqi-cat-big" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</div>
-              <div className="aqi-num" style={{ color: aqiColor(avgAqi) }}>{avgAqi}</div>
+          <div className="sum-right">
+            <div className="meta">
+              <div>最高 <b>{stats.max.toFixed(1)}°</b></div>
+              <div>最低 <b>{stats.min.toFixed(1)}°</b></div>
             </div>
-          )}
+            {avgAqi != null && (
+              <div className="aqi-pill" style={{ borderColor: aqiColor(avgAqi), background: aqiColor(avgAqi) + '22' }}>
+                <span className="aqi-cat-big" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
+                <span className="aqi-num" style={{ color: aqiColor(avgAqi) }}>{avgAqi}</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

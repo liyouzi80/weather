@@ -249,7 +249,7 @@ body::after {
   padding: 24px;
   margin-bottom: 16px;
   display: flex;
-  gap: 24px;
+  gap: 18px;
   align-items: center;
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
@@ -264,6 +264,8 @@ body::after {
     inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
 }
 .summary .big {
+  flex: 1;
+  min-width: 0;
   font-size: 56px;
   font-weight: 700;
   line-height: 0.9;
@@ -503,21 +505,26 @@ body::after {
 .warn-text { color: var(--warn); }
 
 /* ── 空气质量（美国 AQI）── */
-.aqi-pill {
-  margin-left: auto;
-  align-self: center;
-  flex: none;
+.sum-right {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-width: 72px;
-  padding: 8px 14px;
-  border: 1.5px solid;
-  border-radius: 16px;
+  align-items: flex-end;
+  gap: 9px;
+  flex: none;
 }
-.aqi-cat-big { font-size: 18px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
-.aqi-num { font-size: 15px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.aqi-pill {
+  flex: none;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 5px;
+  padding: 4px 11px;
+  border: 1.5px solid;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+.aqi-cat-big { font-size: 16px; font-weight: 700; line-height: 1.1; }
+.aqi-num { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; opacity: 0.9; }
 .aqi-section { margin-top: 20px; }
 .aqi-section .cards { margin-top: 4px; }
 .aqi-cat { font-size: 13px; font-weight: 600; }
