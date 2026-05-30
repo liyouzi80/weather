@@ -46,8 +46,8 @@ export const caiyunProvider: WeatherProvider = {
     if (data.status !== 'ok') throw new Error(`接口返回 status=${data.status}`)
     const r = data.result.realtime
     return {
-      temp: r.temperature,
-      feelsLike: r.apparent_temperature,
+      temp: Math.round(r.temperature * 10) / 10,
+      feelsLike: Math.round(r.apparent_temperature * 10) / 10,
       text: SKYCON[r.skycon] ?? r.skycon,
       humidity: Math.round(r.humidity * 100),
       windSpeed: r.wind?.speed,

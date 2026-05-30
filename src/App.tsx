@@ -224,14 +224,14 @@ function ProviderCard({ r }: { r: Annotated }) {
         <span className="name">{r.providerName}</span>
         {r.isMax && <span className="tag tag-hot">最高</span>}
         {r.isMin && <span className="tag tag-cold">最低</span>}
-        <span className="temp">{c.temp}°</span>
+        <span className="temp">{c.temp.toFixed(1)}°</span>
       </div>
       <div className="row">
         <span>
           {weatherEmoji(c.text) && <span className="wx-emoji">{weatherEmoji(c.text)} </span>}
           <b>{c.text}</b>
         </span>
-        {c.feelsLike != null && <span>体感 <b>{c.feelsLike}°</b></span>}
+        {c.feelsLike != null && <span>体感 <b>{c.feelsLike.toFixed(1)}°</b></span>}
         {c.humidity != null && <span>湿度 <b>{c.humidity}%</b></span>}
         {c.windDir && (
           <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed}km/h` : ''}</span>
@@ -271,7 +271,7 @@ function TempRanking({ results }: { results: Annotated[] }) {
             <span className="rank-bar">
               <span className="rank-bar-fill" style={{ width: `${pct}%`, background: color }} />
             </span>
-            <span className="rank-temp">{c.temp}°</span>
+            <span className="rank-temp">{c.temp.toFixed(1)}°</span>
           </div>
         )
       })}
