@@ -1,5 +1,5 @@
 // 信源注册表：在这里登记所有信源。新增信源只需实现 WeatherProvider 并加进数组。
-import type { AqiResult, ForecastDay, GeoLocation, ProviderResult, WeatherProvider } from './types'
+import type { AqiResult, GeoLocation, ProviderResult, WeatherProvider } from './types'
 import { qweatherProvider } from './qweather'
 import { caiyunProvider } from './caiyun'
 import { nmcProvider } from './nmc'
@@ -50,12 +50,12 @@ interface AqiApiSource {
 }
 
 /** 美国 AQI：调用服务端 /api/aqi（服务端抓站点页并归一化，避免浏览器下载整页 HTML） */
-export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResult[]; forecast: ForecastDay[] }> {
+export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResult[] }> {
   const city = loc.cityName ?? loc.name
   try {
     const res = await fetch(`/api/aqi?cityName=${encodeURIComponent(city)}`)
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = (await res.json()) as { sources?: AqiApiSource[]; forecast?: ForecastDay[] }
+    const data = (await res.json()) as { sources?: AqiApiSource[] }
     const sources = (data.sources ?? []).map((s) =>
       s.error || s.aqi == null
         ? { providerId: s.id, providerName: s.name, color: s.color, error: s.error ?? '无数据' }
@@ -66,9 +66,9 @@ export async function fetchAllAqi(loc: GeoLocation): Promise<{ sources: AqiResul
             air: { aqi: s.aqi, dominant: s.dominant, pm25: s.pm25, forecast: s.forecast },
           },
     )
-    return { sources, forecast: data.forecast ?? [] }
+    return { sources }
   } catch {
-    return { sources: [], forecast: [] }
+    return { sources: [] }
   }
 }
 

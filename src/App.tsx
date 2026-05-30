@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
-import type { AqiResult, ForecastDay, GeoLocation, ProviderResult } from './providers/types'
+import type { AqiResult, GeoLocation, ProviderResult } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
 
 const CITIES: GeoLocation[] = [
@@ -25,7 +25,6 @@ export default function App() {
   const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
   const [air, setAir] = useState<AqiResult[]>([])
-  const [forecast, setForecast] = useState<ForecastDay[]>([])
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [initialLoad, setInitialLoad] = useState(true)
@@ -37,7 +36,6 @@ export default function App() {
       const [weather, aqi] = await Promise.all([fetchAll(loc), fetchAllAqi(loc)])
       setResults(weather)
       setAir(aqi.sources)
-      setForecast(aqi.forecast)
       setUpdatedAt(new Date())
     } finally {
       setLoading(false)
@@ -51,7 +49,6 @@ export default function App() {
     if (i === cityIdx) return
     setResults([])
     setAir([])
-    setForecast([])
     setUpdatedAt(null)
     setInitialLoad(true)
     setCityIdx(i)
@@ -131,7 +128,7 @@ export default function App() {
         </div>
       )}
 
-      {stats && <MetricTiles stats={stats} key={`mt-${cityIdx}`} />}
+      {stats && <MetricTiles stats={stats} avgAqi={avgAqi} key={`mt-${cityIdx}`} />}
 
       {panyuForecast && (
         <div className="notice-card" key={`notice-${cityIdx}`}>
@@ -147,8 +144,6 @@ export default function App() {
       )}
 
       {avgAqi != null && <AqiAdvice aqi={avgAqi} key={`adv-${cityIdx}`} />}
-
-      {forecast.length > 0 && <ForecastStrip days={forecast} key={`fc-${cityIdx}`} />}
 
       {stats && stats.count >= 2 && <TempRanking results={annotated} key={`rank-${cityIdx}`} />}
 
@@ -201,41 +196,7 @@ function aqiAdvice(aqi: number): string {
   return '健康警报：避免户外活动，留在室内并使用空气净化。'
 }
 
-// 未来几天预报：日期 + 温度区间条 + 当天 AQI 等级
-function ForecastStrip({ days }: { days: ForecastDay[] }) {
-  const his = days.map((d) => d.hi).filter((x): x is number => x != null)
-  const los = days.map((d) => d.lo).filter((x): x is number => x != null)
-  const wMax = his.length ? Math.max(...his) : 0
-  const wMin = los.length ? Math.min(...los) : 0
-  const span = wMax - wMin || 1
-  return (
-    <div className="ranking forecast-card">
-      <div className="ranking-title">未来几天 · 温度 / AQI</div>
-      {days.map((d, i) => {
-        const col = aqiColor(d.aqi)
-        const hasT = d.hi != null && d.lo != null
-        const left = hasT ? ((d.lo! - wMin) / span) * 100 : 0
-        const width = hasT ? Math.max(((d.hi! - d.lo!) / span) * 100, 8) : 0
-        return (
-          <div className="fc-row" key={i}>
-            <span className="fc-label">{d.label}</span>
-            <span className="fc-lo">{d.lo != null ? `${d.lo}°` : ''}</span>
-            <span className="fc-bar">
-              {hasT && <span className="fc-bar-fill" style={{ marginLeft: `${left}%`, width: `${width}%` }} />}
-            </span>
-            <span className="fc-hi">{d.hi != null ? `${d.hi}°` : ''}</span>
-            <span className="fc-aqi" style={{ color: col }}>
-              <span className="fc-dot" style={{ background: col }} />
-              {aqiCategory(d.aqi)} {d.aqi}
-            </span>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-// 空气质量健康建议条（独立置于概览卡与预报条之间）
+// 空气质量健康建议条
 function AqiAdvice({ aqi }: { aqi: number }) {
   return (
     <div className="aqi-advice" style={{ borderLeftColor: aqiColor(aqi) }}>
@@ -363,7 +324,7 @@ function TempRanking({ results }: { results: Annotated[] }) {
 
 interface Stats {
   avg: number; min: number; max: number; count: number; text: string
-  feelsLike?: number; humidity?: number; windSpeed?: number; windDir?: string
+  feelsLike?: number; humidity?: number
 }
 
 function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
@@ -388,10 +349,6 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
   const r1 = (x?: number) => (x == null ? undefined : Math.round(x * 10) / 10)
   const feels = ok.map((r) => r.current!.feelsLike).filter((n): n is number => n != null)
   const hums = ok.map((r) => r.current!.humidity).filter((n): n is number => n != null)
-  const winds = ok.map((r) => r.current!.windSpeed).filter((n): n is number => n != null)
-  const dirCounts = new Map<string, number>()
-  for (const r of ok) { const d = r.current!.windDir; if (d) dirCounts.set(d, (dirCounts.get(d) ?? 0) + 1) }
-  const windDir = [...dirCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
   const humAvg = avgOf(hums)
 
   const annotated: Annotated[] = results.map((r) => {
@@ -410,8 +367,6 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
       avg, min, max, count: temps.length, text: majorityText,
       feelsLike: r1(avgOf(feels)),
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
-      windSpeed: r1(avgOf(winds)),
-      windDir,
     },
   }
 }
@@ -428,16 +383,17 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 概览次要指标小卡：体感 / 湿度 / 风（仅渲染有数据的项）
-function MetricTiles({ stats }: { stats: Stats }) {
-  const tiles: { key: string; label: string; value: string; sub?: string; icon: 'feels' | 'humid' | 'wind' }[] = []
+// 概览次要指标小卡：体感 / 湿度 / 空气质量（仅渲染有数据的项）
+function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
+  const tiles: { key: string; label: string; value: string; sub?: string; color?: string; icon: 'feels' | 'humid' | 'aqi' }[] = []
   if (stats.feelsLike != null) tiles.push({ key: 'feels', label: '体感', value: `${stats.feelsLike.toFixed(1)}°`, icon: 'feels' })
   if (stats.humidity != null) tiles.push({ key: 'humid', label: '湿度', value: `${stats.humidity}%`, icon: 'humid' })
-  if (stats.windDir || stats.windSpeed != null) {
+  if (avgAqi != null) {
     tiles.push({
-      key: 'wind', label: '风', icon: 'wind',
-      value: stats.windDir ?? '—',
-      sub: stats.windSpeed != null ? `${stats.windSpeed.toFixed(1)} km/h` : undefined,
+      key: 'aqi', label: '空气', icon: 'aqi',
+      value: aqiCategory(avgAqi),
+      sub: `AQI ${avgAqi}`,
+      color: aqiColor(avgAqi),
     })
   }
   if (tiles.length === 0) return null
@@ -445,8 +401,8 @@ function MetricTiles({ stats }: { stats: Stats }) {
     <div className="metric-tiles">
       {tiles.map((t) => (
         <div className="metric-tile" key={t.key}>
-          <div className="mt-head"><MetricIcon kind={t.icon} /><span className="mt-label">{t.label}</span></div>
-          <div className="mt-value">{t.value}</div>
+          <div className="mt-head"><MetricIcon kind={t.icon} color={t.color} /><span className="mt-label">{t.label}</span></div>
+          <div className="mt-value" style={t.color ? { color: t.color } : undefined}>{t.value}</div>
           {t.sub && <div className="mt-sub">{t.sub}</div>}
         </div>
       ))}
@@ -454,7 +410,7 @@ function MetricTiles({ stats }: { stats: Stats }) {
   )
 }
 
-function MetricIcon({ kind }: { kind: 'feels' | 'humid' | 'wind' }) {
+function MetricIcon({ kind, color }: { kind: 'feels' | 'humid' | 'aqi'; color?: string }) {
   const c = '#8b97a8'
   if (kind === 'feels') {
     return (
@@ -470,10 +426,11 @@ function MetricIcon({ kind }: { kind: 'feels' | 'humid' | 'wind' }) {
       </svg>
     )
   }
+  // aqi leaf icon
   return (
-    <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round">
-      <path d="M3 8h11a3 3 0 1 0-3-3" />
-      <path d="M3 16h15a3 3 0 1 1-3 3" />
+    <svg className="mt-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={color ?? c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 22 L11 13" />
+      <path d="M12 2 C12 2 20 4 20 12 C20 18 14 20 8 18 C4 16 2 10 4 6 C6 2 12 2 12 2 Z" />
     </svg>
   )
 }
