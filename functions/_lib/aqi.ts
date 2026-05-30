@@ -52,8 +52,8 @@ export async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
   const dom = items.length ? items.reduce((a, b) => (b.ratio > a.ratio ? b : a)) : undefined
   const pm = items.find((i) => i.name === 'PM2.5')
   const s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
-  // 观测时间：实时块「YYYY-MM-DD HH:MM (当地时间)」
-  const tm = s.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\s*\(当地时间\)/)
+  // 观测时间：站名后、AQI 数值前的「YYYY-MM-DD HH:MM」（当地/北京时）
+  const tm = s.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\s*AQI \(美国标准\)/)
   const observedAt = tm
     ? beijingToISO(+tm[1], +tm[2], +tm[3], +tm[4], +tm[5])
     : undefined
