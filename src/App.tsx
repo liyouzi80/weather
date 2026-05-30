@@ -488,5 +488,9 @@ function isForecastCurrent(content?: string, issued?: string): boolean {
 function formatTime(iso: string): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
-  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+  // 固定按北京时区渲染，避免设备/运行环境时区不同导致偏移
+  return d.toLocaleString('zh-CN', {
+    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+    timeZone: 'Asia/Shanghai',
+  })
 }
