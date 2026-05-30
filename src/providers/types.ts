@@ -12,6 +12,8 @@ export interface GeoLocation {
   tencent?: { province: string; city: string; county: string }
   /** 在意空气（air-quality.com）站点页路径，如「place/china/fanyudaxuecheng/3b401494」 */
   airMatters?: { path: string }
+  /** IQAir（iqair.cn）站点页路径，如「cn/china/guangdong/guangzhou/panyu-university-town」 */
+  iqair?: { path: string }
 }
 
 export interface CurrentWeather {

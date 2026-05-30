@@ -65,10 +65,10 @@ export default defineConfig({
         headers: { Referer: 'https://air-quality.com/', 'X-Requested-With': 'XMLHttpRequest' },
         rewrite: (p) => p.replace(/^\/proxy\/airquality/, ''),
       },
-      '/proxy/airvisual': {
-        target: 'https://api.airvisual.com',
+      '/proxy/iqaircn': {
+        target: 'https://www.iqair.cn',
         changeOrigin: true,
-        rewrite: (p) => p.replace(/^\/proxy\/airvisual/, ''),
+        rewrite: (p) => p.replace(/^\/proxy\/iqaircn/, ''),
       },
     },
   },

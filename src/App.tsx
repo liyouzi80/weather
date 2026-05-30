@@ -8,12 +8,14 @@ const CITIES: GeoLocation[] = [
     weatherCnCode: '101280102',
     tencent: { province: '广东省', city: '广州市', county: '番禺区' },
     airMatters: { path: 'place/china/fanyudaxuecheng/3b401494' }, // 番禺大学城
+    iqair: { path: 'cn/china/guangdong/guangzhou/panyu-university-town' }, // 番禺大学城
   },
   {
     name: '安福县', cityName: '安福', lat: 27.3954, lon: 114.6195,
     weatherCnCode: '101240612',
     tencent: { province: '江西省', city: '吉安市', county: '安福县' },
     airMatters: { path: 'place/china/anfuxianwenhuaguangchang/cd272b77' }, // 安福县文化广场
+    iqair: { path: 'cn/china/jiangxi/jian/anfu-county-environmental-protection-bureau' }, // 安福县环保局
   },
 ]
 

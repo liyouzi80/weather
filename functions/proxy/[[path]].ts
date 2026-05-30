@@ -10,8 +10,7 @@ const UPSTREAM: Record<string, string> = {
   weathercn: 'http://d1.weather.com.cn',
   tencent: 'https://wis.qq.com',
   airquality: 'https://air-quality.com',
-  waqi: 'https://api.waqi.info',
-  airvisual: 'https://api.airvisual.com',
+  iqaircn: 'https://www.iqair.cn',
 }
 
 // 部分上游需带特定请求头才返回数据
