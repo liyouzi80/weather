@@ -64,7 +64,8 @@ function Moon() {
 }
 
 export function WeatherIcon({ text, size = 24, className }: { text?: string; size?: number; className?: string }) {
-  const h = new Date().getHours()
+  // 昼夜按北京时（番禺/安福均在 UTC+8），不随设备时区
+  const h = new Date(Date.now() + 8 * 3600 * 1000).getUTCHours()
   const night = h < 6 || h >= 19
   const t = iconType(text, night)
 

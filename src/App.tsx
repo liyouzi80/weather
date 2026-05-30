@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, ProviderResult } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
+import { WeatherFX, fxKind, type FxKind } from './WeatherFX'
 
 const CITIES: GeoLocation[] = [
   {
@@ -78,15 +79,21 @@ export default function App() {
     [city],
   )
 
+  // 昼夜判断：统一按北京时（番禺/安福均在 UTC+8），不随设备时区
+  const night = useMemo(() => {
+    const h = new Date(Date.now() + 8 * 3600 * 1000).getUTCHours()
+    return h < 6 || h >= 19
+  }, [updatedAt])
   // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky
   useEffect(() => {
-    const h = new Date().getHours()
-    const night = h < 6 || h >= 19
     document.documentElement.dataset.sky = skyKey(stats?.text, night)
-  }, [stats, updatedAt])
+  }, [stats, night])
+  // 实时天气动效类型（全屏背景层）
+  const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
 
   return (
     <div className="app">
+      <WeatherFX kind={fx} />
       <header className="loc-header">
         <button
           className="icon-btn switch"

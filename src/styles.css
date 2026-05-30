@@ -127,6 +127,18 @@ html[data-sky='fog'] body::before {
   min-height: 100%;
 }
 
+/* 实时天气动效：全屏背景层，浮在天空渐变之上、内容之下 */
+.weather-fx {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+/* 内容浮在动效层之上 */
+.app > *:not(.weather-fx) { position: relative; z-index: 1; }
+
 /* ── 顶部：[切换] 居中城市名 [刷新] ── */
 .loc-header {
   display: flex;
