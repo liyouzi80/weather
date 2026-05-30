@@ -30,6 +30,7 @@ export const gzqxProvider: WeatherProvider = {
       observedAt: d.observedAt,
       forecast: d.forecast,
       forecastIssuedAt: d.forecastIssuedAt,
+      warnings: d.warnings,
     }
   },
 }

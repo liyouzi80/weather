@@ -18,12 +18,24 @@
 const ORIGIN = 'http://www.tqyb.com.cn'
 const GZ_DATA_URL = `${ORIGIN}/data/latestWeather/gz_latestWeather.js`
 const PY_FORECAST_URL = `${ORIGIN}/data/shorttime/GDPY_shorttime.js`
+// 番禺预警信号：服务端直接渲染在番禺主页 #panyuAlarmList 表格中，无独立 JSON 接口
+const PY_HOME_URL = `${ORIGIN}/gzpanyu/`
 
 const FETCH_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
   Referer: `${ORIGIN}/gzpanyu/`,
   'X-Requested-With': 'XMLHttpRequest',
+}
+
+/** 气象台预警信号 */
+export interface GzWarning {
+  /** 完整名称，如「雷雨大风黄色预警信号」 */
+  title: string
+  /** 类型，如「雷雨大风」「暴雨」 */
+  type: string
+  /** 等级，如「蓝色」「黄色」「橙色」「红色」 */
+  level: string
 }
 
 export interface GzRealtime {
@@ -40,13 +52,16 @@ export interface GzRealtime {
   forecast?: string
   /** 短时预报发布时间（原始字符串，如「2026年05月29日 17:00」） */
   forecastIssuedAt?: string
+  /** 番禺区当前生效的预警信号（无则缺省） */
+  warnings?: GzWarning[]
 }
 
 export async function scrapeGuangzhou(): Promise<GzRealtime> {
-  // 实况与番禺预报并行抓取；预报失败不影响实况返回。
-  const [rtRes, fcRes] = await Promise.allSettled([
+  // 实况、短时预报、预警(主页 HTML)并行抓取；预报/预警失败不影响实况返回。
+  const [rtRes, fcRes, wnRes] = await Promise.allSettled([
     fetchData(GZ_DATA_URL, 'gz_latestWeather'),
     fetchData(PY_FORECAST_URL, 'GDPY_shorttime'),
+    fetchText(PY_HOME_URL),
   ])
 
   if (rtRes.status === 'rejected') throw rtRes.reason
@@ -62,7 +77,39 @@ export async function scrapeGuangzhou(): Promise<GzRealtime> {
       out.forecastIssuedAt = issued
     }
   }
+
+  if (wnRes.status === 'fulfilled') {
+    const warnings = parseWarnings(wnRes.value)
+    if (warnings.length) out.warnings = warnings
+  }
+
   return out
+}
+
+/** 从番禺主页 HTML 的 #panyuAlarmList 表格解析生效预警信号。 */
+export function parseWarnings(html: string): GzWarning[] {
+  const ti = html.indexOf('panyuAlarmList')
+  if (ti < 0) return []
+  const end = html.indexOf('</table>', ti)
+  const tbl = end > ti ? html.slice(ti, end) : html.slice(ti, ti + 4000)
+  const text = tbl.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+  if (/无生效预警|暂无预警|无预警/.test(text)) return []
+
+  // 仅匹配已知的气象预警类型（中国气象局预警信号目录），避免误抓无关文字
+  const TYPES = '台风|暴雨|暴雪|寒潮|大风|沙尘暴|高温|干旱|雷电|冰雹|霜冻|大雾|霾|道路结冰|雷雨大风|森林火险|灰霾|寒冷'
+  const re = new RegExp(`(${TYPES})(蓝色|黄色|橙色|红色|白色)预警(?:信号)?`, 'g')
+  const warnings: GzWarning[] = []
+  const seen = new Set<string>()
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text)) !== null) {
+    const type = m[1]
+    const level = m[2]
+    const key = type + level
+    if (seen.has(key)) continue
+    seen.add(key)
+    warnings.push({ title: `${type}${level}预警信号`, type, level })
+  }
+  return warnings
 }
 
 /**
@@ -97,6 +144,13 @@ async function fetchData(url: string, varName: string): Promise<any> {
   const res = await fetch(`${url}?random=${Math.random()}`, { headers: FETCH_HEADERS })
   if (!res.ok) throw new Error(`数据接口请求失败 HTTP ${res.status}`)
   return extractObject(await res.text(), varName)
+}
+
+/** 抓取一个 HTML 页面文本。 */
+async function fetchText(url: string): Promise<string> {
+  const res = await fetch(`${url}?random=${Math.random()}`, { headers: FETCH_HEADERS })
+  if (!res.ok) throw new Error(`页面请求失败 HTTP ${res.status}`)
+  return res.text()
 }
 
 /** 映射成统一模型：取 gzObtInfo（番禺本地站 G1099），备用 baseObtInfo（广州基本站）。 */

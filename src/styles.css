@@ -175,6 +175,33 @@ html[data-sky='fog'] body::before {
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
 
+/* 气象台预警信号卡（置顶醒目展示） */
+.warn-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.warn-card {
+  display: flex;
+  align-items: center;
+  background: var(--glass);
+  border: 0.5px solid var(--glass-border);
+  border-left: 4px solid #ff9f0a;
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
+  animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+.warn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.warn-badge svg { flex: none; }
+
 /* 番禺区气象台短时预报卡（仅有提示时展示） */
 .notice-card {
   background: var(--glass);

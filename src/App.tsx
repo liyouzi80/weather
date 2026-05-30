@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
-import type { AqiResult, GeoLocation, ProviderResult } from './providers/types'
+import type { AqiResult, GeoLocation, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind } from './WeatherFX'
 
@@ -72,6 +72,11 @@ export default function App() {
     if (!f?.forecast || !isForecastCurrent(f.forecast, f.forecastIssuedAt)) return null
     return { text: f.forecast, issuedAt: f.forecastIssuedAt }
   }, [results])
+  // 气象台预警信号（当前生效的，置顶展示）
+  const warnings = useMemo(
+    () => results.find((r) => r.current?.warnings?.length)?.current?.warnings ?? [],
+    [results],
+  )
   const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
   const activeCount = useMemo(
@@ -128,6 +133,14 @@ export default function App() {
         </button>
       </header>
 
+      {warnings.length > 0 && (
+        <div className="warn-list" key={`warn-${cityIdx}`}>
+          {warnings.map((w, i) => (
+            <WarningCard w={w} key={i} />
+          ))}
+        </div>
+      )}
+
       {stats ? (
         <div className="hero" key={`hero-${cityIdx}`}>
           <div className="hero-temp">{stats.avg.toFixed(1)}°</div>
@@ -179,6 +192,32 @@ export default function App() {
       {air.length > 0 && <AqiSection air={air} key={`aqi-${cityIdx}`} />}
 
       {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
+    </div>
+  )
+}
+
+// 预警等级 → 颜色（中国气象预警信号配色：蓝/黄/橙/红）
+function warnColor(level: string): string {
+  if (level.includes('红')) return '#ff453a'
+  if (level.includes('橙')) return '#ff9f0a'
+  if (level.includes('黄')) return '#ffd60a'
+  if (level.includes('蓝')) return '#0a84ff'
+  return '#ff9f0a'
+}
+
+// 预警信号卡（置顶醒目展示，左侧色条按等级着色）
+function WarningCard({ w }: { w: WeatherWarning }) {
+  const col = warnColor(w.level)
+  return (
+    <div className="warn-card" style={{ borderLeftColor: col }}>
+      <span className="warn-badge" style={{ background: col, color: w.level.includes('黄') ? '#1a1a1a' : '#fff' }}>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+        {w.title}
+      </span>
     </div>
   )
 }

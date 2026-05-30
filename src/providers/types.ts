@@ -31,6 +31,18 @@ export interface CurrentWeather {
   forecast?: string
   /** 文字预报发布时间（原始字符串），可选 */
   forecastIssuedAt?: string
+  /** 气象台当前生效的预警信号，可选 */
+  warnings?: WeatherWarning[]
+}
+
+/** 气象台预警信号 */
+export interface WeatherWarning {
+  /** 完整名称，如「雷雨大风黄色预警信号」 */
+  title: string
+  /** 类型，如「雷雨大风」「暴雨」 */
+  type: string
+  /** 等级，如「蓝色」「黄色」「橙色」「红色」 */
+  level: string
 }
 
 /** 各信源拉取后的统一结果（成功或失败） */
