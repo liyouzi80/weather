@@ -488,9 +488,10 @@ function isForecastCurrent(content?: string, issued?: string): boolean {
 function formatTime(iso: string): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
-  // 固定按北京时区渲染，避免设备/运行环境时区不同导致偏移
+  // observedAt 里存的是各源报告的「北京墙上时间」（写入 ISO 的 UTC 字段），
+  // 这里用 UTC 渲染即原样显示，不随设备/运行环境时区偏移。
   return d.toLocaleString('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZone: 'Asia/Shanghai',
+    timeZone: 'UTC',
   })
 }

@@ -29,9 +29,9 @@ export interface AqiSource {
   error?: string
 }
 
-// 「YYYY-MM-DD HH:MM」（北京/当地时）→ ISO 字符串
+// 北京墙上时间 → ISO（把墙上时间原样写入 UTC 字段，前端按 UTC 渲染即原样显示）
 function beijingToISO(y: number, mo: number, d: number, h: number, mi: number): string {
-  return new Date(Date.UTC(y, mo - 1, d, h - 8, mi)).toISOString()
+  return new Date(Date.UTC(y, mo - 1, d, h, mi)).toISOString()
 }
 
 // 在意空气（air-quality.com）
