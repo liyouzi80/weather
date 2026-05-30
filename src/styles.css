@@ -441,9 +441,10 @@ body::after {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 12px 16px;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
+  animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
 .aqi-advice-cat { font-size: 15px; font-weight: 700; flex: none; white-space: nowrap; }
 .aqi-advice-text { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }

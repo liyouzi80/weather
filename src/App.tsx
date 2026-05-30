@@ -117,6 +117,8 @@ export default function App() {
         </div>
       )}
 
+      {avgAqi != null && <AqiAdvice aqi={avgAqi} key={`adv-${cityIdx}`} />}
+
       {forecast.length > 0 && <ForecastStrip days={forecast} key={`fc-${cityIdx}`} />}
 
       {stats && stats.count >= 2 && <TempRanking results={annotated} key={`rank-${cityIdx}`} />}
@@ -135,7 +137,7 @@ export default function App() {
         </div>
       )}
 
-      {air.length > 0 && <AqiSection air={air} avgAqi={avgAqi} key={`aqi-${cityIdx}`} />}
+      {air.length > 0 && <AqiSection air={air} key={`aqi-${cityIdx}`} />}
 
       {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
     </div>
@@ -204,16 +206,20 @@ function ForecastStrip({ days }: { days: ForecastDay[] }) {
   )
 }
 
-function AqiSection({ air, avgAqi }: { air: AqiResult[]; avgAqi: number | null }) {
+// 空气质量健康建议条（独立置于概览卡与预报条之间）
+function AqiAdvice({ aqi }: { aqi: number }) {
+  return (
+    <div className="aqi-advice" style={{ borderLeftColor: aqiColor(aqi) }}>
+      <span className="aqi-advice-cat" style={{ color: aqiColor(aqi) }}>{aqiCategory(aqi)} {aqi}</span>
+      <span className="aqi-advice-text">{aqiAdvice(aqi)}</span>
+    </div>
+  )
+}
+
+function AqiSection({ air }: { air: AqiResult[] }) {
   return (
     <div className="aqi-section">
       <div className="ranking-title">空气质量 · 美国 AQI</div>
-      {avgAqi != null && (
-        <div className="aqi-advice" style={{ borderLeftColor: aqiColor(avgAqi) }}>
-          <span className="aqi-advice-cat" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)} {avgAqi}</span>
-          <span className="aqi-advice-text">{aqiAdvice(avgAqi)}</span>
-        </div>
-      )}
       <div className="cards">
         {air.map((r) => {
           if (r.error || !r.air) {
