@@ -27,6 +27,23 @@ export interface AqiSource {
   pm25?: number
   forecast?: string
   error?: string
+  /** 每日预报（内部用于聚合，返回前会剥离） */
+  days?: ForecastDay[]
+}
+
+/** 每日预报项：日期标签 + 温度高低 + 当天 AQI（取当天高值/代表值） */
+export interface ForecastDay {
+  label: string
+  hi?: number
+  lo?: number
+  aqi: number
+}
+
+const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+function dayLabel(i: number, y: number, mo: number, d: number): string {
+  if (i === 0) return '今天'
+  if (i === 1) return '明天'
+  return WEEK[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()]
 }
 
 // 在意空气（air-quality.com）
@@ -47,16 +64,21 @@ export async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
   const dom = items.length ? items.reduce((a, b) => (b.ratio > a.ratio ? b : a)) : undefined
   const pm = items.find((i) => i.name === 'PM2.5')
   const s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
-  const days = [
-    ...s.matchAll(new RegExp(`\\d{4}-\\d{2}-\\d{2}[^0-9]*?\\d+°[^0-9]*?\\d+°[^0-9]*?\\d+°[^~]*?(\\d+)~(\\d+)\\s*(?:${AM_CATS})`, 'g')),
+  // 每日预报：日期 + 温度高/低(°C) + AQI 范围（取高值为当天代表）
+  const dm = [
+    ...s.matchAll(new RegExp(`(\\d{4})-(\\d{2})-(\\d{2})[^0-9]*?(\\d+)°\\s*/\\s*(\\d+)°[^~]*?(\\d+)~(\\d+)\\s*(?:${AM_CATS})`, 'g')),
   ]
-  const forecast = days.length
-    ? `今 ${days[0][1]}~${days[0][2]}` + (days[1] ? ` · 明 ${days[1][1]}~${days[1][2]}` : '')
+  const days: ForecastDay[] = dm.slice(0, 5).map((x, i) => ({
+    label: dayLabel(i, parseInt(x[1]), parseInt(x[2]), parseInt(x[3])),
+    hi: parseInt(x[4]), lo: parseInt(x[5]), aqi: parseInt(x[7]),
+  }))
+  const forecast = dm.length
+    ? `今 ${dm[0][6]}~${dm[0][7]}` + (dm[1] ? ` · 明 ${dm[1][6]}~${dm[1][7]}` : '')
     : undefined
   return {
     id: 'airmatters', name: '在意空气', color: '#f59e0b',
     aqi: parseInt(m[1]), dominant: dom ? POL[dom.name] ?? dom.name : undefined,
-    pm25: pm ? pm.value : undefined, forecast,
+    pm25: pm ? pm.value : undefined, forecast, days,
   }
 }
 
@@ -78,15 +100,21 @@ export async function fetchIQAirAqi(path: string): Promise<AqiSource> {
     if (!l) throw new Error('解析失败')
     aqi = parseInt(l[1])
   }
+  // 每日预报：标签 + AQI + 温度高/低
   const fi = s.indexOf('每日预报')
-  const seg = fi >= 0 ? s.slice(fi, fi + 280) : ''
-  const days = [...seg.matchAll(/(?:今天|明天|周[一二三四五六日])\s+(\d+)\s+\d+°/g)]
-  const forecast = days.length ? `今 ${days[0][1]}` + (days[1] ? ` · 明 ${days[1][1]}` : '') : undefined
-  return { id: 'iqair', name: 'IQAir', color: '#0ea5e9', aqi, dominant, pm25, forecast }
+  const seg = fi >= 0 ? s.slice(fi, fi + 460) : ''
+  const dm = [...seg.matchAll(/(今天|明天|周[一二三四五六日])\s+(\d+)\s+(\d+)°\s+(\d+)°/g)]
+  const days: ForecastDay[] = dm.slice(0, 4).map((m2) => ({
+    label: m2[1], aqi: parseInt(m2[2]), hi: parseInt(m2[3]), lo: parseInt(m2[4]),
+  }))
+  const forecast = days.length ? `今 ${days[0].aqi}` + (days[1] ? ` · 明 ${days[1].aqi}` : '') : undefined
+  return { id: 'iqair', name: 'IQAir', color: '#0ea5e9', aqi, dominant, pm25, forecast, days }
 }
 
-/** 聚合某城市的多源 AQI，返回平均值与逐源结果（含失败项） */
-export async function aggregateAqi(cityName: string): Promise<{ avg: number | null; sources: AqiSource[] }> {
+/** 聚合某城市的多源 AQI，返回平均值、逐源结果（含失败项）与统一每日预报 */
+export async function aggregateAqi(
+  cityName: string,
+): Promise<{ avg: number | null; sources: AqiSource[]; forecast: ForecastDay[] }> {
   const tasks: Promise<AqiSource>[] = []
   if (AM_PATH[cityName]) tasks.push(fetchAirMattersAqi(AM_PATH[cityName]))
   if (IQAIR_PATH[cityName]) tasks.push(fetchIQAirAqi(IQAIR_PATH[cityName]))
@@ -98,5 +126,12 @@ export async function aggregateAqi(cityName: string): Promise<{ avg: number | nu
   )
   const vals = sources.filter((a) => a.aqi != null).map((a) => a.aqi!)
   const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null
-  return { avg, sources }
+
+  // 每日预报：优先 IQAir（标签+温度+AQI 齐全），否则在意空气
+  const iqDays = sources.find((s) => s.id === 'iqair')?.days
+  const amDays = sources.find((s) => s.id === 'airmatters')?.days
+  const forecast = (iqDays?.length ? iqDays : amDays) ?? []
+  for (const s of sources) delete s.days // 逐源不外传 days，保持 JSON 精简
+
+  return { avg, sources, forecast }
 }

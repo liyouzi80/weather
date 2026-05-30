@@ -82,3 +82,11 @@ export interface AqiResult {
   air?: AirQuality
   error?: string
 }
+
+/** 每日预报项：日期标签 + 温度高低 + 当天 AQI */
+export interface ForecastDay {
+  label: string
+  hi?: number
+  lo?: number
+  aqi: number
+}

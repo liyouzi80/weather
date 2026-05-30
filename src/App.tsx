@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
-import type { AqiResult, GeoLocation, ProviderResult } from './providers/types'
+import type { AqiResult, ForecastDay, GeoLocation, ProviderResult } from './providers/types'
 
 const CITIES: GeoLocation[] = [
   {
@@ -24,6 +24,7 @@ export default function App() {
   const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
   const [air, setAir] = useState<AqiResult[]>([])
+  const [forecast, setForecast] = useState<ForecastDay[]>([])
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [initialLoad, setInitialLoad] = useState(true)
@@ -34,7 +35,8 @@ export default function App() {
     try {
       const [weather, aqi] = await Promise.all([fetchAll(loc), fetchAllAqi(loc)])
       setResults(weather)
-      setAir(aqi)
+      setAir(aqi.sources)
+      setForecast(aqi.forecast)
       setUpdatedAt(new Date())
     } finally {
       setLoading(false)
@@ -48,6 +50,7 @@ export default function App() {
     if (i === cityIdx) return
     setResults([])
     setAir([])
+    setForecast([])
     setUpdatedAt(null)
     setInitialLoad(true)
     setCityIdx(i)
@@ -114,6 +117,8 @@ export default function App() {
         </div>
       )}
 
+      {forecast.length > 0 && <ForecastStrip days={forecast} key={`fc-${cityIdx}`} />}
+
       {stats && stats.count >= 2 && <TempRanking results={annotated} key={`rank-${cityIdx}`} />}
 
       {loading && results.length === 0 ? (
@@ -130,7 +135,7 @@ export default function App() {
         </div>
       )}
 
-      {air.length > 0 && <AqiSection air={air} key={`aqi-${cityIdx}`} />}
+      {air.length > 0 && <AqiSection air={air} avgAqi={avgAqi} key={`aqi-${cityIdx}`} />}
 
       {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
     </div>
@@ -155,11 +160,60 @@ function aqiCategory(aqi: number): string {
   if (aqi <= 300) return '重度污染'
   return '严重污染'
 }
+// 美国 AQI 等级 → 健康建议
+function aqiAdvice(aqi: number): string {
+  if (aqi <= 50) return '空气质量令人满意，适合户外活动。'
+  if (aqi <= 100) return '空气质量可接受，敏感人群如长时间户外建议适当减少剧烈运动。'
+  if (aqi <= 150) return '敏感人群应减少户外活动，一般人群适当减少长时间剧烈运动。'
+  if (aqi <= 200) return '敏感人群避免户外，一般人群减少户外活动并适当防护。'
+  if (aqi <= 300) return '尽量留在室内、关好门窗，外出佩戴口罩。'
+  return '健康警报：避免户外活动，留在室内并使用空气净化。'
+}
 
-function AqiSection({ air }: { air: AqiResult[] }) {
+// 未来几天预报：日期 + 温度区间条 + 当天 AQI 等级
+function ForecastStrip({ days }: { days: ForecastDay[] }) {
+  const his = days.map((d) => d.hi).filter((x): x is number => x != null)
+  const los = days.map((d) => d.lo).filter((x): x is number => x != null)
+  const wMax = his.length ? Math.max(...his) : 0
+  const wMin = los.length ? Math.min(...los) : 0
+  const span = wMax - wMin || 1
+  return (
+    <div className="ranking forecast-card">
+      <div className="ranking-title">未来几天 · 温度 / AQI</div>
+      {days.map((d, i) => {
+        const col = aqiColor(d.aqi)
+        const hasT = d.hi != null && d.lo != null
+        const left = hasT ? ((d.lo! - wMin) / span) * 100 : 0
+        const width = hasT ? Math.max(((d.hi! - d.lo!) / span) * 100, 8) : 0
+        return (
+          <div className="fc-row" key={i}>
+            <span className="fc-label">{d.label}</span>
+            <span className="fc-lo">{d.lo != null ? `${d.lo}°` : ''}</span>
+            <span className="fc-bar">
+              {hasT && <span className="fc-bar-fill" style={{ marginLeft: `${left}%`, width: `${width}%` }} />}
+            </span>
+            <span className="fc-hi">{d.hi != null ? `${d.hi}°` : ''}</span>
+            <span className="fc-aqi" style={{ color: col }}>
+              <span className="fc-dot" style={{ background: col }} />
+              {aqiCategory(d.aqi)} {d.aqi}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function AqiSection({ air, avgAqi }: { air: AqiResult[]; avgAqi: number | null }) {
   return (
     <div className="aqi-section">
       <div className="ranking-title">空气质量 · 美国 AQI</div>
+      {avgAqi != null && (
+        <div className="aqi-advice" style={{ borderLeftColor: aqiColor(avgAqi) }}>
+          <span className="aqi-advice-cat" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)} {avgAqi}</span>
+          <span className="aqi-advice-text">{aqiAdvice(avgAqi)}</span>
+        </div>
+      )}
       <div className="cards">
         {air.map((r) => {
           if (r.error || !r.air) {
