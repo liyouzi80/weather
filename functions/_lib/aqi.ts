@@ -34,6 +34,11 @@ function beijingToISO(y: number, mo: number, d: number, h: number, mi: number): 
   return new Date(Date.UTC(y, mo - 1, d, h, mi)).toISOString()
 }
 
+// UTC 墙上时间 → ISO（+8h 转北京墙上时间后写入 UTC 字段，前端按 UTC 渲染即原样显示）
+function utcToBeijingISO(y: number, mo: number, d: number, h: number, mi: number): string {
+  return new Date(Date.UTC(y, mo - 1, d, h, mi) + 8 * 3600 * 1000).toISOString()
+}
+
 // 在意空气（air-quality.com）
 export async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
   const res = await fetch(`https://air-quality.com/${path}?lang=zh-Hans&standard=aqi_us`, {
@@ -52,10 +57,11 @@ export async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
   const dom = items.length ? items.reduce((a, b) => (b.ratio > a.ratio ? b : a)) : undefined
   const pm = items.find((i) => i.name === 'PM2.5')
   const s = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
-  // 观测时间：站名后、AQI 数值前的「YYYY-MM-DD HH:MM」（当地/北京时）
+  // 观测时间：站名后、AQI 数值前的「YYYY-MM-DD HH:MM」。
+  // 注意：air-quality.com 内嵌的是 UTC 时间（非北京时），需 +8h 换算。
   const tm = s.match(/(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2})\s*AQI \(美国标准\)/)
   const observedAt = tm
-    ? beijingToISO(+tm[1], +tm[2], +tm[3], +tm[4], +tm[5])
+    ? utcToBeijingISO(+tm[1], +tm[2], +tm[3], +tm[4], +tm[5])
     : undefined
   return {
     id: 'airmatters', name: '在意空气', color: '#f59e0b',
