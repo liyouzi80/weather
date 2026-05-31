@@ -87,6 +87,7 @@ export default function App() {
 
   const selectCity = useCallback((i: number) => {
     if (i === cityIdx) return
+    haptic(8) // 切城市轻触觉，与下拉刷新反馈保持一致
     setResults([])
     setAir([])
     setUpdatedAt(null)
@@ -315,7 +316,7 @@ export default function App() {
       </header>
 
       {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
-      <div
+      <main
         className={'swipe-wrap' + (dragging ? ' dragging' : '')}
         style={swipeX ? { transform: `translateX(${swipeX}px)` } : undefined}
       >
@@ -330,18 +331,23 @@ export default function App() {
         )}
 
         <div className={'hero' + (!stats ? ' hero-skeleton' : '')}>
-          <span className="hero-city">{city.name}</span>
+          <h1 className="hero-city">{city.name}</h1>
           {loading && results.length > 0
             ? <span className="hero-updated refreshing">数据更新中…</span>
             : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
           }
           {stats ? (
             <>
-              <div className="hero-temp">{Math.round(stats.avg)}°</div>
-              <div className="hero-cond">{stats.text}</div>
-              <div className="hero-hilo">
-                <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
-                <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
+              <div
+                className="hero-temp"
+                aria-label={`当前 ${Math.round(stats.avg)} 度，${stats.text}，最高 ${Math.round(stats.max)} 度，最低 ${Math.round(stats.min)} 度`}
+              >
+                {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
+              </div>
+              <div className="hero-cond" aria-hidden="true">{stats.text}</div>
+              <div className="hero-hilo" aria-hidden="true">
+                <span>最高 <b>{Math.round(stats.max)}°</b></span>
+                <span>最低 <b>{Math.round(stats.min)}°</b></span>
               </div>
             </>
           ) : (
@@ -384,7 +390,7 @@ export default function App() {
           </div>
         )}
       </div>
-      </div>
+      </main>
 
       {CITIES.length > 1 && (
         <div className="page-dots">
@@ -463,7 +469,7 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
         {air.map((r) => {
           if (r.error || !r.air) {
             return (
-              <div className="card err" key={r.providerId} style={{ borderLeftColor: 'rgba(120,120,128,0.4)' }}>
+              <div className="card err" key={r.providerId}>
                 <div className="head">
                   <span className="dot" style={{ background: r.color }} />
                   <span className="name">{r.providerName}</span>
@@ -479,7 +485,6 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
             <Tag
               className={'card' + (r.url ? ' card-link' : '')}
               key={r.providerId}
-              style={{ borderLeftColor: r.color }}
               {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
               <div className="head">
@@ -516,7 +521,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
 
   if (r.error) {
     return (
-      <div className="card err" style={{ borderLeftColor: 'rgba(120,120,128,0.4)' }}>
+      <div className="card err">
         <div className="head">
           <span className="dot" style={{ background: color }} />
           <span className="name">{r.providerName}</span>
@@ -529,7 +534,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   const c = r.current!
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
   return (
-    <div className={cls} style={{ borderLeftColor: color }}>
+    <div className={cls}>
       <div className="head">
         <span className="dot" style={{ background: color }} />
         <span className="name">{r.providerName}</span>
@@ -702,9 +707,9 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
   if (stats.humidity != null)
     cols.push({ key: 'humid', value: `${stats.humidity}%`, label: '湿度' })
   if (avgAqi != null)
-    cols.push({ key: 'aqi', value: aqiCategory(avgAqi), label: `空气 AQI${avgAqi}`, color: aqiColor(avgAqi) })
+    cols.push({ key: 'aqi', value: aqiCategory(avgAqi), label: `空气 · AQI ${avgAqi}`, color: aqiColor(avgAqi) })
   if (stats.uvIndex != null)
-    cols.push({ key: 'uv', value: uvLevel(stats.uvIndex), label: `紫外线 UV${Math.round(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
+    cols.push({ key: 'uv', value: uvLevel(stats.uvIndex), label: `紫外线 · UV ${Math.round(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
   if (cols.length === 0) return null
   return (
     <div className="metric-strip">

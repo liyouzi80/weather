@@ -130,11 +130,10 @@ html[data-sky='rain'] { background-color: #101b27; }
 html[data-sky='snow'] { background-color: #19212f; }
 html[data-sky='fog'] { background-color: #1a1c22; }
 
-/* 多云/雾：云层动效使玻璃底部偏亮，提升次要文字对比度 */
-html[data-sky='cloudy'], html[data-sky='fog'] {
-  --text-dim: #909096;
-  --glass: rgba(255, 255, 255, 0.06);
-  --glass-border: rgba(255, 255, 255, 0.09);
+/* 偏亮的天空主题（多云/雾/雪/阴）：上调次要文字色，保证 ≥AA 对比度 */
+html[data-sky='cloudy'], html[data-sky='fog'],
+html[data-sky='snow'], html[data-sky='overcast'] {
+  --text-dim: #9a9aa0;
 }
 
 html[data-sky='clear-day'] body::before {
@@ -479,7 +478,7 @@ html[data-sky='fog'] body::before {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  margin-bottom: 1px;
+  margin: 0 0 1px;
 }
 /* 更新时间：城市名下方弱色辅助文字；后台刷新中时轻微脉动 */
 .hero-updated {
@@ -496,12 +495,24 @@ html[data-sky='fog'] body::before {
   50%       { opacity: 0.75; }
 }
 .hero-temp {
+  position: relative;
   font-size: clamp(88px, 27vw, 124px);
   font-weight: 200;
   line-height: 0.86;
   letter-spacing: -0.04em;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
+}
+/* 度数符号绝对悬挂在数字右侧：不计入宽度，让数字本身保持光学居中（同苹果天气） */
+.hero-deg {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  font-weight: 200;
+}
+/* 非 iOS/macOS Safari 的系统字体多无 200 字重，回退会突变粗：用 300 兜底 */
+@supports not (-webkit-touch-callout: none) {
+  .hero-temp, .hero-deg { font-weight: 300; }
 }
 .hero-cond {
   font-size: 21px;
@@ -604,7 +615,6 @@ html[data-sky='fog'] body::before {
 .card {
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
-  border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 16px 18px;
   backdrop-filter: var(--mat-regular-blur);
@@ -687,20 +697,15 @@ a.card { text-decoration: none; color: inherit; display: block; }
   font-weight: 500;
 }
 
-.card.err {
-  border-left-color: rgba(120, 120, 128, 0.4);
-  opacity: 0.7;
-}
+.card.err { opacity: 0.7; }
 .card .err-msg { color: #ff6961; font-size: 13px; font-weight: 500; }
 
-/* Temperature highlight cards */
+/* 最高/最低温:用一抹暖/冷向的背景渐变标识(不再用彩色左边框) */
 .card.is-max {
-  background: linear-gradient(105deg, rgba(255, 69, 58, 0.1), var(--glass) 55%);
-  border-left-color: var(--hot);
+  background: linear-gradient(105deg, rgba(255, 69, 58, 0.12), var(--glass) 58%);
 }
 .card.is-min {
-  background: linear-gradient(105deg, rgba(64, 200, 224, 0.1), var(--glass) 55%);
-  border-left-color: var(--cold);
+  background: linear-gradient(105deg, rgba(64, 200, 224, 0.12), var(--glass) 58%);
 }
 
 /* Tags */
@@ -836,5 +841,10 @@ a.card { text-decoration: none; color: inherit; display: block; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+  /* 例外：刷新菊花是功能性活动指示器，减弱动态下仍需转动（同 iOS 行为） */
+  .spin {
+    animation-duration: 0.7s !important;
+    animation-iteration-count: infinite !important;
   }
 }
