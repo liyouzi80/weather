@@ -272,20 +272,31 @@ html[data-sky='fog'] body::before {
   z-index: 10;
   display: flex;
   align-items: center;
-  /* 负边距 + 等量内边距让毛玻璃条满铺到 .app 两侧边缘 */
+  /* 负边距 + 等量内边距让吸顶层满铺到 .app 两侧边缘 */
   margin: 0 -20px;
   padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
-  border-bottom: 0.5px solid transparent;
-  transition: background var(--transition-fast),
-    backdrop-filter var(--transition-fast), border-color var(--transition-fast);
 }
-/* 滚动后头部转为毛玻璃吸顶态（thin material：导航栏层级，最薄最透） */
-.loc-header.scrolled {
-  background: var(--mat-thin-bg);
-  backdrop-filter: var(--mat-thin-blur);
-  -webkit-backdrop-filter: var(--mat-thin-blur);
-  border-bottom-color: var(--mat-thin-border);
+/* 滚动后吸顶态：不再用硬边毛玻璃条，改为「向下淡出」的天空渐隐
+   —— 顶部轻微压暗 + 渐隐模糊（mask 让模糊与暗色都向下消失），
+   无边框、无硬边，融入天空，和去框的通透首屏统一。 */
+.loc-header::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(8, 12, 24, 0.55) 0%,
+    rgba(8, 12, 24, 0.26) 52%,
+    rgba(8, 12, 24, 0) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  -webkit-mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
+.loc-header.scrolled::before { opacity: 1; }
 .loc-center {
   flex: 1;
   min-width: 0;
