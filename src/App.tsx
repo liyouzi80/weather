@@ -202,65 +202,70 @@ export default function App() {
         </button>
       </header>
 
-      {warnings.length > 0 && (
-        <div className="warn-list" key={`warn-${cityIdx}`}>
-          {warnings.map((w, i) => (
-            <WarningCard w={w} key={i} />
-          ))}
-        </div>
-      )}
-
-      {stats ? (
-        <div className="hero" key={`hero-${cityIdx}`}>
-          <div className="hero-temp">{stats.avg.toFixed(1)}°</div>
-          <div className="hero-cond">{stats.text}</div>
-          <div className="hero-hilo">
-            <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
-            <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
+      {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
+      <div className="app-content" key={cityIdx}>
+        {warnings.length > 0 && (
+          <div className="warn-list">
+            {warnings.map((w, i) => (
+              <WarningCard w={w} key={i} />
+            ))}
           </div>
-        </div>
-      ) : (
-        <div className="hero hero-skeleton">
-          <div className="hskel hskel-temp" />
-          <div className="hskel hskel-cond" />
-          <div className="hskel hskel-hilo" />
-        </div>
-      )}
+        )}
 
-      {stats && <MetricTiles stats={stats} avgAqi={avgAqi} key={`mt-${cityIdx}`} />}
-
-      {panyuForecast && (
-        <div className="notice-card" key={`notice-${cityIdx}`}>
-          <div className="notice-head">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 11l18-5v12L3 14v-3z" />
-              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-            </svg>
-            <span>番禺区气象台{panyuForecast.issuedAt ? ` · ${panyuForecast.issuedAt}` : ''}</span>
+        {stats ? (
+          <div className="hero">
+            <div className="hero-temp">{stats.avg.toFixed(1)}°</div>
+            <div className="hero-cond">{stats.text}</div>
+            <div className="hero-hilo">
+              <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
+              <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
+            </div>
           </div>
-          <div className="notice-text">{panyuForecast.text}</div>
-        </div>
-      )}
+        ) : (
+          <div className="hero hero-skeleton">
+            <div className="hskel hskel-temp" />
+            <div className="hskel hskel-cond" />
+            <div className="hskel hskel-hilo" />
+          </div>
+        )}
 
-      {stats && stats.count >= 2 && <TempRanking results={annotated} key={`rank-${cityIdx}`} />}
+        {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
-      {loading && results.length === 0 ? (
-        <div className="cards">
-          {Array.from({ length: activeCount }, (_, i) => (
-            <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 0.08}s` }} />
-          ))}
-        </div>
-      ) : (
-        <div className="cards" key={cityIdx}>
-          {annotated.map((r) => (
-            <ProviderCard key={r.providerId} r={r} />
-          ))}
-        </div>
-      )}
+        {panyuForecast && (
+          <div className="notice-card">
+            <div className="notice-head">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 11l18-5v12L3 14v-3z" />
+                <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+              </svg>
+              <span>番禺区气象台{panyuForecast.issuedAt ? ` · ${panyuForecast.issuedAt}` : ''}</span>
+            </div>
+            <div className="notice-text">{panyuForecast.text}</div>
+          </div>
+        )}
 
-      {air.length > 0 && <AqiSection air={air} key={`aqi-${cityIdx}`} />}
+        {stats && stats.count >= 2 && <TempRanking results={annotated} />}
+      </div>
 
-      {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
+      <div className="app-content" key={`cards-${cityIdx}`}>
+        {loading && results.length === 0 ? (
+          <div className="cards">
+            {Array.from({ length: activeCount }, (_, i) => (
+              <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 0.08}s` }} />
+            ))}
+          </div>
+        ) : (
+          <div className="cards">
+            {annotated.map((r) => (
+              <ProviderCard key={r.providerId} r={r} />
+            ))}
+          </div>
+        )}
+
+        {air.length > 0 && <AqiSection air={air} />}
+
+        {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
+      </div>
     </div>
   )
 }

@@ -24,13 +24,26 @@
   --transition-fast: 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+  /* 消除 iOS/Android 点击高亮闪烁 */
+  -webkit-tap-highlight-color: transparent;
+  /* 按钮等交互元素消除 300ms 延迟 */
+  touch-action: manipulation;
+}
 
 :root { color-scheme: dark; }
 html, body, #root { height: 100%; margin: 0; }
-/* 根节点铺满整个滚动画布（含 iOS 安全区/回弹区），随天气主题切深蓝底色，避免顶部露黑 */
-html { background-color: #0b1426; }
-body { background: transparent; color: var(--text); }
+/* 根节点铺满整个滚动画布（含 iOS 安全区/回弹区） */
+html {
+  background-color: #0b1426;
+  /* 隐藏滚动条（Chrome/Safari 的滚动条实际挂在 html 上） */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  /* 禁止顶底橡皮筋回弹 & 浏览器原生下拉刷新 */
+  overscroll-behavior: none;
+}
+html::-webkit-scrollbar { display: none; }
 
 body {
   background: transparent;
@@ -41,10 +54,12 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
   overflow-x: hidden;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  /* 禁止文字选中（app 行为，防止拖动文字） */
+  user-select: none;
+  -webkit-user-select: none;
+  /* 禁止长按弹出系统菜单（图片另存为、复制链接等） */
+  -webkit-touch-callout: none;
 }
-body::-webkit-scrollbar { display: none; }
 
 /* Atmospheric background layers */
 body::before {
@@ -126,7 +141,8 @@ html[data-sky='fog'] body::before {
 .app {
   max-width: 560px;
   margin: 0 auto;
-  padding: env(safe-area-inset-top) 20px 60px;
+  /* 顶部：刘海/状态栏；底部：home 指示条 + 额外间距，避免内容被遮挡 */
+  padding: env(safe-area-inset-top) 20px max(60px, calc(32px + env(safe-area-inset-bottom)));
   min-height: 100%;
 }
 
@@ -618,7 +634,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 /* ── Responsive ── */
 @media (max-width: 400px) {
-  .app { padding: env(safe-area-inset-top) 12px 40px; }
+  .app { padding: env(safe-area-inset-top) 12px max(40px, calc(24px + env(safe-area-inset-bottom))); }
   .loc-header .city { font-size: 20px; }
   .hero-temp { font-size: 72px; }
   .hero-cond { font-size: 18px; }
@@ -662,6 +678,15 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .hero-temp,
 .card .temp,
 .rank-temp { transition: color var(--transition-fast); }
+
+/* 城市切换：整个内容区淡入，避免硬切 */
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.app-content {
+  animation: pageIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
 
 /* 尊重系统「减弱动态效果」 */
 @media (prefers-reduced-motion: reduce) {
