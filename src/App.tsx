@@ -281,7 +281,12 @@ export default function App() {
       {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
       <div
         className={'swipe-wrap' + (dragging ? ' dragging' : '')}
-        style={swipeX ? { transform: `translateX(${swipeX}px)` } : undefined}
+        style={(swipeX || pull > 0) ? {
+          transform: [
+            swipeX ? `translateX(${swipeX}px)` : '',
+            pull > 0 ? `translateY(${pull * 0.35}px)` : '',
+          ].filter(Boolean).join(' '),
+        } : undefined}
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
@@ -312,18 +317,7 @@ export default function App() {
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
-        {panyuForecast && (
-          <div className="notice-card">
-            <div className="notice-head">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M3 11l18-5v12L3 14v-3z" />
-                <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
-              </svg>
-              <span>番禺区气象台{panyuForecast.issuedAt ? ` · ${panyuForecast.issuedAt}` : ''}</span>
-            </div>
-            <div className="notice-text">{panyuForecast.text}</div>
-          </div>
-        )}
+        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
         {stats && stats.count >= 2 && <TempRanking results={annotated} />}
       </div>
@@ -706,6 +700,54 @@ function AqiAnim({ color }: { color: string }) {
       <circle cx="56" cy="54" r="49" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
     </svg>
   )
+}
+
+// 番禺区气象台短时预报卡：智能提取时间窗口 + 精简正文
+function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
+  const { timeLabel, body } = summarizeForecast(text)
+  const issued = fmtIssuedAt(issuedAt)
+  return (
+    <div className="notice-card">
+      <div className="notice-head">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M3 11l18-5v12L3 14v-3z" />
+          <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+        </svg>
+        <span className="notice-source">番禺气象台</span>
+        {timeLabel && <span className="notice-time">{timeLabel}</span>}
+        {issued && <span className="notice-issued">{issued}</span>}
+      </div>
+      <div className="notice-text">{body}</div>
+    </div>
+  )
+}
+
+// 从预报文字中提取时间窗口标签并精简正文
+function summarizeForecast(text: string): { timeLabel: string; body: string } {
+  let s = text.trim()
+  // 匹配 "今天17时到今天20时" / "今天17时到20时" / "17时到20时"
+  const tm = s.match(/^(今[天日]|明天|后天)?(\d{1,2})时到(今[天日]|明天|后天)?(\d{1,2})时[\s，,]*/)
+  let timeLabel = ''
+  if (tm) {
+    const fromDay = tm[1] ?? ''
+    const toDay = tm[3] ?? fromDay
+    timeLabel = toDay && toDay !== fromDay
+      ? `${fromDay}${tm[2]}—${toDay}${tm[4]}时`
+      : `${fromDay}${tm[2]}—${tm[4]}时`
+    s = s.slice(tm[0].length)
+  }
+  // 去掉正文头部区域名 "番禺区" "番禺"
+  s = s.replace(/^番禺[区县]?\s*[，,]?\s*/, '')
+  // 正文超 52 字符截断，避免在行尾留半句
+  if (s.length > 52) s = s.slice(0, 52).replace(/[，,。！？\s]*$/, '') + '…'
+  return { timeLabel, body: s }
+}
+
+// "2026年05月29日 17:00" → "05-29 17:00"；解析失败则返回空串
+function fmtIssuedAt(s?: string): string {
+  if (!s) return ''
+  const m = s.match(/\d{4}年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}:\d{2})/)
+  return m ? `${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')} ${m[3]}` : ''
 }
 
 // 番禺区气象台短时预报时效检测：按"预报窗口结束时间"（北京时）判断是否过期。

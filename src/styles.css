@@ -309,12 +309,32 @@ html[data-sky='fog'] body::before {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 600;
   color: #c89bf0;
-  margin-bottom: 5px;
+  margin-bottom: 6px;
 }
-.notice-text { font-size: 13.5px; color: var(--text-secondary); line-height: 1.55; }
+.notice-source { font-size: 12px; font-weight: 600; }
+/* 时间窗口胶囊（如「今天17—20时」）：紫色填充小标签 */
+.notice-time {
+  background: rgba(168, 85, 247, 0.18);
+  color: #c89bf0;
+  border-radius: 6px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+/* 发布时间（如「05-29 17:00」）：靠右弱色 */
+.notice-issued {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.notice-text { font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; }
 
 /* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */
 .metric-tiles {
