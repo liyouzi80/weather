@@ -275,18 +275,27 @@ function warnColor(level: string): string {
 }
 
 // 预警信号卡（置顶醒目展示，左侧色条按等级着色）
+// 徽章仅显示「类型 + 等级」；发布机构长名从 title 中去除，放到副文本展示
 function WarningCard({ w }: { w: WeatherWarning }) {
   const col = warnColor(w.level)
+  const badgeText = `${w.type}${w.level}预警`
+  // title 可能是完整描述，去掉「发布XXX预警信号」后剩下发布机构名
+  const sender = w.title
+    .replace(/发布.+预警(?:信号)?$/, '')
+    .replace(/^.+?(?=气象台|气象局|天气预报台)/, '')
+    .trim()
+  const textColor = w.level.includes('黄') ? '#1a1a1a' : '#fff'
   return (
     <div className="warn-card" style={{ borderLeftColor: col }}>
-      <span className="warn-badge" style={{ background: col, color: w.level.includes('黄') ? '#1a1a1a' : '#fff' }}>
+      <span className="warn-badge" style={{ background: col, color: textColor }}>
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
           <line x1="12" y1="9" x2="12" y2="13" />
           <line x1="12" y1="17" x2="12.01" y2="17" />
         </svg>
-        {w.title}
+        {badgeText}
       </span>
+      {sender && <span className="warn-sender">{sender}</span>}
     </div>
   )
 }

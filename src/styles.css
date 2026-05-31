@@ -213,8 +213,15 @@ html[data-sky='fog'] body::before {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .warn-badge svg { flex: none; }
+.warn-sender {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 10px;
+  font-weight: 500;
+}
 
 /* 番禺区气象台短时预报卡（仅有提示时展示） */
 .notice-card {
