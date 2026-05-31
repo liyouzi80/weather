@@ -52,14 +52,14 @@ export default function App() {
 
   useEffect(() => { refresh() }, [refresh])
 
-  const selectCity = (i: number) => {
+  const selectCity = useCallback((i: number) => {
     if (i === cityIdx) return
     setResults([])
     setAir([])
     setUpdatedAt(null)
     setInitialLoad(true)
     setCityIdx(i)
-  }
+  }, [cityIdx])
 
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
   // 用非被动原生监听，统一在一处判定主轴，避免纵向下拉与横向翻页冲突。
@@ -83,7 +83,7 @@ export default function App() {
   const SWIPE_TRIGGER = 45
   useEffect(() => { loadingRef.current = loading }, [loading])
   useEffect(() => { refreshRef.current = refresh }, [refresh])
-  useEffect(() => { selectCityRef.current = selectCity })
+  useEffect(() => { selectCityRef.current = selectCity }, [selectCity])
   useEffect(() => { cityIdxRef.current = cityIdx }, [cityIdx])
   useEffect(() => {
     const el = appRef.current
@@ -335,7 +335,12 @@ export default function App() {
 
         {air.length > 0 && <AqiSection air={air} />}
 
-        {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
+        {isEmpty && (
+          <div className="hint">
+            <p>所有信源获取失败</p>
+            <button type="button" className="retry-btn" onClick={refresh}>重新加载</button>
+          </div>
+        )}
       </div>
       </div>
 
@@ -497,7 +502,10 @@ function ProviderCard({ r }: { r: Annotated }) {
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike.toFixed(1)}°</b></span>}
         {c.humidity != null && <span>湿度 <b>{Math.round(c.humidity)}%</b></span>}
         {c.windDir && (
-          <span>{c.windDir}{c.windSpeed != null ? ` ${c.windSpeed.toFixed(1)}km/h` : ''}</span>
+          <span className="wx-wind">
+            <WindArrow dir={c.windDir} />
+            {c.windDir}{c.windSpeed != null ? ` ${c.windSpeed.toFixed(1)} km/h` : ''}
+          </span>
         )}
       </div>
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
@@ -771,11 +779,33 @@ function isForecastCurrent(content?: string, issued?: string): boolean {
   return now <= limitUTC + 30 * 60_000 // 给 30 分钟宽限
 }
 
+// 风向文字 → 来向角度（0=北，顺时针）；箭头指向来风方向（气象惯例）
+const WIND_DIR_DEG: Record<string, number> = {
+  北: 0, 东北: 45, 东: 90, 东南: 135, 南: 180, 西南: 225, 西: 270, 西北: 315,
+}
+function WindArrow({ dir }: { dir: string }) {
+  const deg = WIND_DIR_DEG[dir.replace('风', '')]
+  if (deg == null) return null
+  return (
+    <svg
+      width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"
+      style={{ transform: `rotate(${deg}deg)`, flex: 'none', opacity: 0.7 }}
+    >
+      {/* 上指箭头：顶点 + 两侧翼尖，指向来风方向 */}
+      <path d="M6 1 L9.5 10.5 L6 8 L2.5 10.5 Z" fill="currentColor" />
+    </svg>
+  )
+}
+
 function formatTime(iso: string): string {
   const d = new Date(iso)
   if (isNaN(d.getTime())) return iso
-  // observedAt 里存的是各源报告的「北京墙上时间」（写入 ISO 的 UTC 字段），
-  // 这里用 UTC 渲染即原样显示，不随设备/运行环境时区偏移。
+  // observedAt 存储的是「北京墙上时间」写入 UTC 字段，计算差值时需与同一表示对齐：
+  // Date.now() + 8h = 当前北京时（用 UTC 毫秒表达），与 d.getTime() 在同一坐标系下相减
+  const diffMin = Math.round((Date.now() + 8 * 3600_000 - d.getTime()) / 60_000)
+  if (diffMin < 2) return '刚刚'
+  if (diffMin < 60) return `${diffMin} 分钟前`
+  if (diffMin < 120) return `${Math.floor(diffMin / 60)} 小时前`
   return d.toLocaleString('zh-CN', {
     month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
     timeZone: 'UTC',
