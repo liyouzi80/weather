@@ -97,6 +97,13 @@ html[data-sky='rain'] { background-color: #101b27; }
 html[data-sky='snow'] { background-color: #19212f; }
 html[data-sky='fog'] { background-color: #1a1c22; }
 
+/* 多云/雾：云层动效使玻璃底部偏亮，提升次要文字对比度 */
+html[data-sky='cloudy'], html[data-sky='fog'] {
+  --text-dim: #909096;
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.09);
+}
+
 html[data-sky='clear-day'] body::before {
   background:
     radial-gradient(ellipse 60% 42% at 84% -6%, rgba(255, 184, 92, 0.30) 0%, transparent 48%),

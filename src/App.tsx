@@ -772,8 +772,10 @@ function parseForecast(raw: string) {
   // 去天气成因背景句（如「受副热带高压影响」）
   s = s.replace(/受[^，,。！？]{2,12}(?:影响|控制)[，,]?\s*/g, '')
 
-  // 分段
-  const segs = s.split(/[，,。！？\n]+/).map(x => x.trim()).filter(x => x.length > 1)
+  // 分段，同时去掉每段开头的「我区/本区出现」等行政自称
+  const segs = s.split(/[，,。！？\n]+/)
+    .map(x => x.trim().replace(/^(?:我|本)[区市](?:出现|今[天日]|已)?\s*/, ''))
+    .filter(x => x.length > 1)
 
   // 天气关键词
   const wxRe = /[晴阴云雨雷雪雾霾]|多云|阵雨|暴雨|转晴|大风/
