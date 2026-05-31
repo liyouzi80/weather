@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
-import { WeatherFX, fxKind, type FxKind } from './WeatherFX'
+import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
 
 const CITIES: GeoLocation[] = [
   {
@@ -224,11 +224,8 @@ export default function App() {
     [city],
   )
 
-  // 昼夜判断：统一按北京时（番禺/安福均在 UTC+8），不随设备时区
-  const night = useMemo(() => {
-    const h = new Date(Date.now() + 8 * 3600 * 1000).getUTCHours()
-    return h < 6 || h >= 19
-  }, [updatedAt])
+  // 昼夜 + 暮光染色：统一按北京时（番禺/安福均在 UTC+8），不随设备时区
+  const { night, tint } = useMemo(() => computeSky(Date.now()), [updatedAt])
   // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky，
   // 同时把状态栏配色（theme-color）调成对应天空色，PWA 更沉浸
   useEffect(() => {
@@ -241,7 +238,7 @@ export default function App() {
 
   return (
     <div className="app" ref={appRef}>
-      <WeatherFX kind={fx} />
+      <WeatherFX kind={fx} tint={tint} />
       <div
         className="pull-indicator"
         style={{
@@ -617,6 +614,23 @@ const SKY_THEME: Record<string, string> = {
   rain: '#172a3e',
   snow: '#293751',
   fog: '#2b2e36',
+}
+
+// 太阳时相：按北京时（番禺/安福均在 UTC+8）算昼夜 + 日出/日落暖色染色。
+// 暮光（日出/日落前后约 1.3h）给 warmth>0，云的受光面与晴空光晕据此染暖，
+// 实现「黄昏不突然变黑、云被朝/夕阳染色」的苹果天气式柔和过渡。
+const SUNRISE = 6.0, SUNSET = 18.5, TINT_WIN = 1.3
+function computeSky(now: number): { night: boolean; tint: CloudTint } {
+  const d = new Date(now + 8 * 3600 * 1000)
+  const h = d.getUTCHours() + d.getUTCMinutes() / 60
+  const night = h < SUNRISE - 0.6 || h >= SUNSET + 0.8
+  const wSr = Math.max(0, 1 - Math.abs(h - SUNRISE) / TINT_WIN)
+  const wSs = Math.max(0, 1 - Math.abs(h - SUNSET) / TINT_WIN)
+  // 日出偏玫瑰金、日落偏橙红；取较近的一段
+  const tint: CloudTint = wSs >= wSr
+    ? { r: 255, g: 150, b: 92, warmth: wSs }
+    : { r: 255, g: 196, b: 150, warmth: wSr }
+  return { night, tint }
 }
 
 // 天气文字 + 昼夜 → 背景主题 key（驱动 CSS 的动态天气背景）

@@ -533,24 +533,31 @@ html[data-sky='fog'] body::before {
 .icon-btn.spin { animation: spin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 
 /* ── Hero：浮在天空背景上，无玻璃卡 ── */
+/* Hero（温度总揽）：与吸顶头部一起约占首屏上半部，配合全屏天气动效更大气。
+   min-height 用 dvh 适配移动端动态视口（地址栏伸缩不跳动），垂直居中。 */
 .hero {
   text-align: center;
-  padding: 8px 0 52px;
+  min-height: 40vh;
+  min-height: 40dvh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 12px 0 48px;
   animation: riseIn 0.55s var(--spring) both;
 }
 .hero-temp {
-  font-size: clamp(72px, 22vw, 96px);
+  font-size: clamp(88px, 27vw, 124px);
   font-weight: 200;
-  line-height: 0.88;
+  line-height: 0.86;
   letter-spacing: -0.04em;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
 }
 .hero-cond {
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.72);
-  margin-top: 10px;
+  margin-top: 14px;
 }
 .hero-hilo {
   display: flex;
@@ -559,7 +566,7 @@ html[data-sky='fog'] body::before {
   font-size: 18px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.82);
-  margin-top: 5px;
+  margin-top: 7px;
 }
 .hero-hilo b { font-weight: 600; color: #fff; }
 
@@ -571,7 +578,7 @@ html[data-sky='fog'] body::before {
   margin: 0 auto;
   animation: shimmer 1.8s ease-in-out infinite;
 }
-.hskel-temp  { width: clamp(140px, 40vw, 190px); height: clamp(62px, 18vw, 84px); border-radius: 16px; }
+.hskel-temp  { width: clamp(160px, 46vw, 220px); height: clamp(76px, 23vw, 108px); border-radius: 18px; }
 .hskel-cond  { width: 80px;  height: 18px; margin-top: 14px; }
 .hskel-hilo  { width: 148px; height: 17px; margin-top: 7px; }
 
@@ -824,8 +831,8 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .app { padding: 0 12px max(64px, calc(36px + env(safe-area-inset-bottom))); }
   .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
   .loc-header .city { font-size: 20px; }
-  .hero-temp { font-size: 72px; }
-  .hero-cond { font-size: 18px; }
+  .hero-temp { font-size: 92px; }
+  .hero-cond { font-size: 19px; }
   .hero-hilo { font-size: 16px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }

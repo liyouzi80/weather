@@ -45,6 +45,19 @@ interface Cloud {
 
 type CloudPalette = 'cloudy' | 'cloudy-night' | 'overcast' | 'overcast-night'
 
+// Sunrise/sunset warm tint. warmth 0 = no tint (day/night), 1 = peak twilight.
+export interface CloudTint { r: number; g: number; b: number; warmth: number }
+
+// Blend a #rrggbb hex toward an rgb triplet by amount (0..1) → #rrggbb.
+function mixHex(hex: string, r: number, g: number, b: number, amt: number): string {
+  const hr = parseInt(hex.slice(1, 3), 16)
+  const hg = parseInt(hex.slice(3, 5), 16)
+  const hb = parseInt(hex.slice(5, 7), 16)
+  const to = (a: number, c: number) => Math.round(a + (c - a) * amt)
+  const hx = (n: number) => n.toString(16).padStart(2, '0')
+  return `#${hx(to(hr, r))}${hx(to(hg, g))}${hx(to(hb, b))}`
+}
+
 // Per-palette volume colors: lit top → mid → shadowed bottom, plus overall opacity.
 // `fb` is the flat fill used by the canvas fallback (per depth layer).
 const CLOUD_PAL: Record<CloudPalette, {
@@ -97,8 +110,10 @@ function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: numb
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function WeatherFX({ kind }: { kind: FxKind }) {
+export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  // Stable dep so the effect only rebuilds when the tint meaningfully changes
+  const tintKey = tint ? `${tint.r},${tint.g},${tint.b},${tint.warmth.toFixed(2)}` : ''
 
   useEffect(() => {
     const canvas = ref.current
@@ -170,6 +185,12 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       const P = CLOUD_PAL[palette]
       const blur = [6, 4, 3][Math.min(layer, 2)]
       const baseFreq = (0.009 + Math.random() * 0.006).toFixed(4)
+      // Twilight: blend the warm sun color into the lit faces (top strongest,
+      // bottom barely) so clouds glow with sunrise/sunset like Apple Weather.
+      const wa = tint ? tint.warmth : 0
+      const top = wa > 0 ? mixHex(P.top, tint!.r, tint!.g, tint!.b, 0.60 * wa) : P.top
+      const mid = wa > 0 ? mixHex(P.mid, tint!.r, tint!.g, tint!.b, 0.34 * wa) : P.mid
+      const bot = wa > 0 ? mixHex(P.bot, tint!.r, tint!.g, tint!.b, 0.12 * wa) : P.bot
       let shapes = ''
       for (const b of blobs) {
         const cx = (b.x - minX + pad).toFixed(1), cy = (b.y - minY + pad).toFixed(1)
@@ -184,9 +205,9 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
             `<feGaussianBlur stdDeviation="${blur}"/>` +
           `</filter>` +
           `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
-            `<stop offset="0" stop-color="${P.top}"/>` +
-            `<stop offset="0.5" stop-color="${P.mid}"/>` +
-            `<stop offset="1" stop-color="${P.bot}"/>` +
+            `<stop offset="0" stop-color="${top}"/>` +
+            `<stop offset="0.5" stop-color="${mid}"/>` +
+            `<stop offset="1" stop-color="${bot}"/>` +
           `</linearGradient>` +
         `</defs>` +
         `<g filter="url(#f)" fill="url(#g)" fill-opacity="${P.op}">${shapes}</g>` +
@@ -284,10 +305,13 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       W = Wn; H = Hn; W_prev = Wn; H_prev = Hn
 
       if (kind === 'clear-day') {
-        sunGrad = ctx.createRadialGradient(W * 0.78, -H * 0.05, 0, W * 0.78, -H * 0.05, H * 0.72)
-        sunGrad.addColorStop(0,    'rgba(255,215,100,0.28)')
-        sunGrad.addColorStop(0.4,  'rgba(255,185,65,0.12)')
-        sunGrad.addColorStop(0.75, 'rgba(255,150,40,0.04)')
+        // At twilight the sun glow drops lower, warms toward orange and intensifies
+        const wa = tint ? tint.warmth : 0
+        const sy = -H * 0.05 + wa * H * 0.18
+        sunGrad = ctx.createRadialGradient(W * 0.78, sy, 0, W * 0.78, sy, H * 0.72)
+        sunGrad.addColorStop(0,    `rgba(255,${Math.round(215 - 55 * wa)},${Math.round(100 - 30 * wa)},${(0.28 + 0.16 * wa).toFixed(2)})`)
+        sunGrad.addColorStop(0.4,  `rgba(255,${Math.round(185 - 45 * wa)},${Math.round(65 - 20 * wa)},${(0.12 + 0.10 * wa).toFixed(2)})`)
+        sunGrad.addColorStop(0.75, `rgba(255,${Math.round(150 - 40 * wa)},40,${(0.04 + 0.05 * wa).toFixed(2)})`)
         sunGrad.addColorStop(1,    'rgba(255,130,30,0)')
       }
       if (kind === 'clear-night' || kind === 'cloudy-night') {
@@ -649,7 +673,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('resize', resize)
     }
-  }, [kind])
+  }, [kind, tintKey])
 
   return <canvas ref={ref} className="weather-fx" aria-hidden="true" />
 }
