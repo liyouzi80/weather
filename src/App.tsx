@@ -85,10 +85,12 @@ export default function App() {
   const PULL_MAX = 90
   const PULL_TRIGGER = 64
   const SWIPE_TRIGGER = 45
-  useEffect(() => { loadingRef.current = loading }, [loading])
-  useEffect(() => { refreshRef.current = refresh }, [refresh])
-  useEffect(() => { selectCityRef.current = selectCity }, [selectCity])
-  useEffect(() => { cityIdxRef.current = cityIdx }, [cityIdx])
+  useEffect(() => {
+    loadingRef.current = loading
+    refreshRef.current = refresh
+    selectCityRef.current = selectCity
+    cityIdxRef.current = cityIdx
+  }, [loading, refresh, selectCity, cityIdx])
   useEffect(() => {
     const el = appRef.current
     if (!el) return

@@ -43,7 +43,6 @@ async function fetchNMC(cityName: string): Promise<ProviderResult> {
   const w = data?.data?.real?.weather
   if (!w) throw new Error('无实况数据')
 
-  const clean = (v: number) => (v === 9999 || v == null ? undefined : v)
   return {
     id: 'nmc', name: '中央气象台', color: '#ef4444',
     temp: w.temperature, text: w.info,

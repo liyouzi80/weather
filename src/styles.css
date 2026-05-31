@@ -397,7 +397,7 @@ html[data-sky='fog'] body::before {
 .notice-wx {
   font-size: 14px;
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--text);
 }
 .notice-detail {
   font-size: 13px;

@@ -1,5 +1,6 @@
 // SF Symbols 风格的天气图标（内联 SVG，彩色、统一）。替代 emoji。
 // 根据天气文字 + 昼夜选择图标。
+import { memo } from 'react'
 
 type IconType =
   | 'sun' | 'moon' | 'cloud' | 'partly-day' | 'partly-night'
@@ -63,7 +64,7 @@ function Moon() {
   return <path d="M30 8 a16 16 0 1 0 9 29 A12.5 12.5 0 1 1 30 8 Z" fill={COL.moon} />
 }
 
-export function WeatherIcon({ text, size = 24, className }: { text?: string; size?: number; className?: string }) {
+export const WeatherIcon = memo(function WeatherIcon({ text, size = 24, className }: { text?: string; size?: number; className?: string }) {
   // 昼夜按北京时（番禺/安福均在 UTC+8），不随设备时区
   const h = new Date(Date.now() + 8 * 3600 * 1000).getUTCHours()
   const night = h < 6 || h >= 19
@@ -146,4 +147,4 @@ export function WeatherIcon({ text, size = 24, className }: { text?: string; siz
       {body}
     </svg>
   )
-}
+})
