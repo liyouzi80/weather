@@ -61,27 +61,56 @@ export default function App() {
     setCityIdx(i)
   }
 
-  // 下拉刷新（移动端）：页面顶部下拉超过阈值即触发刷新
+  // 下拉刷新（移动端）：使用非被动原生事件监听器，允许 preventDefault 阻止 iOS 橡皮筋滚动
   const [pull, setPull] = useState(0)
+  const pullRef = useRef(0)
   const pullStart = useRef<number | null>(null)
+  const appRef = useRef<HTMLDivElement>(null)
+  const loadingRef = useRef(loading)
+  const refreshRef = useRef(refresh)
   const PULL_MAX = 90
   const PULL_TRIGGER = 64
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (window.scrollY <= 0 && !loading) pullStart.current = e.touches[0].clientY
-    else pullStart.current = null
-  }
-  const onTouchMove = (e: React.TouchEvent) => {
-    if (pullStart.current == null) return
-    const dy = e.touches[0].clientY - pullStart.current
-    if (dy > 0) setPull(Math.min(dy * 0.5, PULL_MAX))
-    else { pullStart.current = null; setPull(0) }
-  }
-  const onTouchEnd = () => {
-    if (pullStart.current == null) return
-    if (pull >= PULL_TRIGGER) refresh()
-    pullStart.current = null
-    setPull(0)
-  }
+  useEffect(() => { loadingRef.current = loading }, [loading])
+  useEffect(() => { refreshRef.current = refresh }, [refresh])
+  useEffect(() => {
+    const el = appRef.current
+    if (!el) return
+    const onStart = (e: TouchEvent) => {
+      if (window.scrollY <= 0 && !loadingRef.current) pullStart.current = e.touches[0].clientY
+      else pullStart.current = null
+    }
+    const onMove = (e: TouchEvent) => {
+      if (pullStart.current == null) return
+      const dy = e.touches[0].clientY - pullStart.current
+      if (dy > 0) {
+        e.preventDefault()
+        const p = Math.min(dy * 0.5, PULL_MAX)
+        pullRef.current = p
+        setPull(p)
+      } else {
+        pullStart.current = null
+        pullRef.current = 0
+        setPull(0)
+      }
+    }
+    const onEnd = () => {
+      if (pullStart.current == null) return
+      if (pullRef.current >= PULL_TRIGGER) refreshRef.current()
+      pullStart.current = null
+      pullRef.current = 0
+      setPull(0)
+    }
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('touchcancel', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+  }, [])
 
   const { annotated, stats } = useMemo(() => analyze(results), [results])
   const avgAqi = useMemo(() => {
@@ -119,7 +148,7 @@ export default function App() {
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
 
   return (
-    <div className="app" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+    <div className="app" ref={appRef}>
       <WeatherFX kind={fx} />
       <div
         className="pull-indicator"
@@ -470,11 +499,12 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 概览次要指标小卡：Apple Weather 风格 2 列网格 + 天气动效背景
+// 概览次要指标小卡：体感/湿度/AQI 一列三格等宽
 function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  if (stats.feelsLike == null && stats.humidity == null && avgAqi == null) return null
+  const tileCount = [stats.feelsLike != null, stats.humidity != null, avgAqi != null].filter(Boolean).length
+  if (tileCount === 0) return null
   return (
-    <div className="metric-tiles">
+    <div className="metric-tiles" style={{ gridTemplateColumns: `repeat(${tileCount}, 1fr)` }}>
       {stats.feelsLike != null && (
         <div className="metric-tile">
           <span className="mt-label">体感</span>
@@ -490,7 +520,7 @@ function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null })
         </div>
       )}
       {avgAqi != null && (
-        <div className="metric-tile tile-wide">
+        <div className="metric-tile">
           <span className="mt-label">空气质量</span>
           <span className="mt-value" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
           <span className="mt-sub">AQI {avgAqi}</span>
@@ -549,11 +579,11 @@ function HumidAnim({ pct }: { pct: number }) {
 // 空气质量：呼吸光环，颜色随 AQI 等级
 function AqiAnim({ color }: { color: string }) {
   return (
-    <svg className="tile-anim tile-anim-wide" viewBox="0 0 160 64" aria-hidden="true" overflow="visible">
-      <circle cx="122" cy="32" r="7" fill={color} opacity="0.75" className="aqi-core" />
-      <circle cx="122" cy="32" r="19" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
-      <circle cx="122" cy="32" r="32" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
-      <circle cx="122" cy="32" r="47" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
+    <svg className="tile-anim" viewBox="0 0 80 80" aria-hidden="true" overflow="visible">
+      <circle cx="56" cy="54" r="7" fill={color} opacity="0.75" className="aqi-core" />
+      <circle cx="56" cy="54" r="19" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
+      <circle cx="56" cy="54" r="33" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
+      <circle cx="56" cy="54" r="49" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
     </svg>
   )
 }

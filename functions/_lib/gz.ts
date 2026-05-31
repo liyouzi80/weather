@@ -28,6 +28,14 @@ const FETCH_HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 }
 
+// 抓取 HTML 主页时不发送 XHR 标识，否则部分服务器会返回 JSON 而非 HTML
+const PAGE_HEADERS = {
+  'User-Agent': FETCH_HEADERS['User-Agent'],
+  Referer: FETCH_HEADERS.Referer,
+  'Cache-Control': 'no-cache',
+  'Pragma': 'no-cache',
+}
+
 /** 气象台预警信号 */
 export interface GzWarning {
   /** 完整名称，如「雷雨大风黄色预警信号」 */
@@ -86,22 +94,52 @@ export async function scrapeGuangzhou(): Promise<GzRealtime> {
   return out
 }
 
-/** 从番禺主页 HTML 的 #panyuAlarmList 表格解析生效预警信号。 */
+/** 从番禺主页 HTML 解析生效预警信号。
+ *  优先从 #panyuAlarmList 区域提取，找不到则搜索全页；同时从 img alt/src 中提取信号图标。 */
 export function parseWarnings(html: string): GzWarning[] {
-  const ti = html.indexOf('panyuAlarmList')
-  if (ti < 0) return []
-  const end = html.indexOf('</table>', ti)
-  const tbl = end > ti ? html.slice(ti, end) : html.slice(ti, ti + 4000)
-  const text = tbl.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
-  if (/无生效预警|暂无预警|无预警/.test(text)) return []
+  // 去掉 script/style 块，避免误匹配 JS 代码里的字符串
+  const clean = html
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
 
-  // 仅匹配已知的气象预警类型（中国气象局预警信号目录），避免误抓无关文字
   const TYPES = '台风|暴雨|暴雪|寒潮|大风|沙尘暴|高温|干旱|雷电|冰雹|霜冻|大雾|霾|道路结冰|雷雨大风|森林火险|灰霾|寒冷'
-  const re = new RegExp(`(${TYPES})(蓝色|黄色|橙色|红色|白色)预警(?:信号)?`, 'g')
+  const LEVELS = '蓝色|黄色|橙色|红色|白色'
+
+  // 定位 panyuAlarmList 容器（table/div/ul 均兼容）
+  const ti = clean.indexOf('panyuAlarmList')
+  let searchArea: string
+  if (ti >= 0) {
+    // 找最近的闭合标签（多种容器类型）
+    const closers = ['</table>', '</div>', '</ul>', '</section>']
+    let endIdx = -1
+    for (const c of closers) {
+      const idx = clean.indexOf(c, ti)
+      if (idx > ti && (endIdx < 0 || idx < endIdx)) endIdx = idx
+    }
+    searchArea = endIdx > ti ? clean.slice(ti, endIdx + 20) : clean.slice(ti, ti + 12000)
+  } else {
+    // 找不到容器 ID，扩大到全页（去掉 head 节省匹配量）
+    const bodyStart = clean.indexOf('<body')
+    searchArea = bodyStart >= 0 ? clean.slice(bodyStart) : clean
+  }
+
+  // 提取纯文本 + img alt/title/src（预警图标文件名也携带类型信息）
+  const imgMeta = [...searchArea.matchAll(/(?:alt|title|src)="([^"]+)"/gi)].map((m) => m[1]).join(' ')
+  const plainText = searchArea
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#\d+;/g, ' ')
+    .replace(/&[a-z]+;/g, ' ')
+    .replace(/\s+/g, ' ')
+  const combined = `${plainText} ${imgMeta}`
+
+  if (/无生效预警|暂无预警|无预警/.test(plainText)) return []
+
+  const re = new RegExp(`(${TYPES})(${LEVELS})预警(?:信号)?`, 'g')
   const warnings: GzWarning[] = []
   const seen = new Set<string>()
   let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
+  while ((m = re.exec(combined)) !== null) {
     const type = m[1]
     const level = m[2]
     const key = type + level
@@ -146,9 +184,9 @@ async function fetchData(url: string, varName: string): Promise<any> {
   return extractObject(await res.text(), varName)
 }
 
-/** 抓取一个 HTML 页面文本。 */
+/** 抓取一个 HTML 页面文本（不带 XHR 标识，避免服务器返回非 HTML 内容）。 */
 async function fetchText(url: string): Promise<string> {
-  const res = await fetch(`${url}?random=${Math.random()}`, { headers: FETCH_HEADERS })
+  const res = await fetch(`${url}?t=${Date.now()}`, { headers: PAGE_HEADERS })
   if (!res.ok) throw new Error(`页面请求失败 HTTP ${res.status}`)
   return res.text()
 }

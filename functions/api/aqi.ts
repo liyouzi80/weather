@@ -11,7 +11,7 @@ export const onRequest = async (context: { request: Request }): Promise<Response
       headers: {
         'content-type': 'application/json; charset=utf-8',
         'access-control-allow-origin': '*',
-        'cache-control': 'public, max-age=300',
+        'cache-control': 'public, max-age=120',
       },
     })
   } catch (e) {
