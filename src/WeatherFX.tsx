@@ -2,7 +2,9 @@ import { useEffect, useRef } from 'react'
 
 export type FxKind =
   | 'rain' | 'thunder' | 'snow' | 'fog'
-  | 'clear-day' | 'clear-night' | 'cloudy' | 'cloudy-night'
+  | 'clear-day' | 'clear-night'
+  | 'cloudy' | 'cloudy-night'
+  | 'overcast' | 'overcast-night'
 
 export function fxKind(text: string | undefined, night: boolean): FxKind {
   if (text) {
@@ -10,10 +12,14 @@ export function fxKind(text: string | undefined, night: boolean): FxKind {
     if (/雨/.test(text)) return 'rain'
     if (/雪/.test(text)) return 'snow'
     if (/雾|霾|沙|尘/.test(text)) return 'fog'
-    if (/多云|间|阴/.test(text)) return night ? 'cloudy-night' : 'cloudy'
+    if (/阴/.test(text)) return night ? 'overcast-night' : 'overcast'
+    if (/多云|间/.test(text)) return night ? 'cloudy-night' : 'cloudy'
   }
   return night ? 'clear-night' : 'clear-day'
 }
+
+const isCloudKind = (k: FxKind) =>
+  k === 'cloudy' || k === 'cloudy-night' || k === 'overcast' || k === 'overcast-night'
 
 const TAU = Math.PI * 2
 const prefersReduced = () =>
@@ -30,26 +36,32 @@ interface Bolt      { pts: [number, number][]; branches: { pts: [number, number]
 
 // ── Cloud helpers ────────────────────────────────────────────────────────────
 
+type CloudPalette = 'cloudy' | 'cloudy-night' | 'overcast' | 'overcast-night'
+
 function drawCloudCluster(
   ctx: CanvasRenderingContext2D,
   blobs: CloudBlob[],
   layer: number,
-  night: boolean,
+  palette: CloudPalette,
 ): void {
-  // Merge-fill: all blobs in one beginPath → overlapping arcs form a single silhouette
-  const alpha = night
-    ? [0.30, 0.45, 0.60][Math.min(layer, 2)]
-    : [0.50, 0.65, 0.80][Math.min(layer, 2)]
-  const fill = night
-    ? `rgba(112,136,180,${alpha})`
-    : `rgba(200,212,228,${alpha})`
+  // Merge-fill: all blobs in one beginPath → overlapping arcs form a single silhouette.
+  // overcast = denser/grayer/more uniform (heavy overcast deck, no gaps);
+  // cloudy = lighter, airier, more depth contrast between layers.
+  const L = Math.min(layer, 2)
+  let alpha: number, rgb: string
+  switch (palette) {
+    case 'cloudy':         alpha = [0.50, 0.65, 0.80][L]; rgb = '200,212,228'; break
+    case 'cloudy-night':   alpha = [0.30, 0.45, 0.60][L]; rgb = '112,136,180'; break
+    case 'overcast':       alpha = [0.78, 0.86, 0.94][L]; rgb = '166,174,188'; break
+    default: /* overcast-night */ alpha = [0.55, 0.66, 0.78][L]; rgb = '78,86,104'; break
+  }
 
   ctx.beginPath()
   for (const b of blobs) {
     ctx.moveTo(b.x + b.r, b.y)
     ctx.arc(b.x, b.y, b.r, 0, TAU)
   }
-  ctx.fillStyle = fill
+  ctx.fillStyle = `rgba(${rgb},${alpha})`
   ctx.fill()
 }
 
@@ -180,29 +192,39 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       for (let i = 0; i < n; i++)
         stars.push({ x: rnd(0, W), y: rnd(0, H * 0.8), r: rnd(0.4, 2.2), ph: rnd(0, TAU), sp: rnd(0.6, 2.5), bright: Math.random() < 0.07 })
 
-    } else if (kind === 'cloudy' || kind === 'cloudy-night') {
-      // Sparse stars behind clouds (night only)
+    } else if (isCloudKind(kind)) {
+      const overcast = kind === 'overcast' || kind === 'overcast-night'
+
+      // Sparse stars behind clouds — only when gaps exist (cloudy night, not overcast)
       if (kind === 'cloudy-night') {
         const n = Math.round(Math.min(55, area / 20000))
         for (let i = 0; i < n; i++)
           stars.push({ x: rnd(0, W), y: rnd(0, H * 0.65), r: rnd(0.3, 1.4), ph: rnd(0, TAU), sp: rnd(0.5, 1.8), bright: false })
       }
 
-      // Three-layer cloud clusters
-      // layer 0 = far/back (high, slow, smaller),  layer 1 = mid,  layer 2 = near/front (lower, fast, larger)
-      const layerCfg = [
-        { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
-        { count: 4, yLo: 0.06, yHi: 0.40, sLo: 0.80, sHi: 1.30, vLo:  7, vHi: 14 },
-        { count: 3, yLo: 0.08, yHi: 0.38, sLo: 1.10, sHi: 1.85, vLo: 13, vHi: 24 },
-      ]
+      // Three-layer cloud clusters.
+      // layer 0 = far/back (high, slow, smaller), 1 = mid, 2 = near/front (lower, fast, larger).
+      // overcast = more clusters, wider span, lower & overlapping → fills the sky with no gaps.
+      const layerCfg = overcast
+        ? [
+            { count: 6, yLo: 0.00, yHi: 0.38, sLo: 0.80, sHi: 1.25, vLo: 2, vHi:  6 },
+            { count: 6, yLo: 0.04, yHi: 0.46, sLo: 1.10, sHi: 1.70, vLo: 4, vHi: 10 },
+            { count: 5, yLo: 0.08, yHi: 0.48, sLo: 1.45, sHi: 2.15, vLo: 8, vHi: 16 },
+          ]
+        : [
+            { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
+            { count: 4, yLo: 0.06, yHi: 0.40, sLo: 0.80, sHi: 1.30, vLo:  7, vHi: 14 },
+            { count: 3, yLo: 0.08, yHi: 0.38, sLo: 1.10, sHi: 1.85, vLo: 13, vHi: 24 },
+          ]
+      const spanLo = overcast ? 180 : 130, spanHi = overcast ? 320 : 260
       for (let li = 0; li < 3; li++) {
         const cfg = layerCfg[li]
         for (let i = 0; i < cfg.count; i++) {
           const s  = rnd(cfg.sLo, cfg.sHi)
-          const cx = rnd(-0.12, 1.18) * W
+          const cx = rnd(-0.15, 1.20) * W
           const cy = rnd(cfg.yLo, cfg.yHi) * H
-          const cw = rnd(130, 260) * s   // horizontal span
-          const ch = rnd(42, 80) * s     // vertical depth → drives blob radius
+          const cw = rnd(spanLo, spanHi) * s   // horizontal span
+          const ch = rnd(42, 80) * s           // vertical depth → drives blob radius
           const nb = 4 + Math.floor(Math.random() * 4)   // 4–7 blobs per cloud
           const blobs: CloudBlob[] = []
           for (let b = 0; b < nb; b++) {
@@ -219,8 +241,12 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       }
 
     } else if (kind === 'fog') {
+      // Horizontal drifting bands (existing) + slow volumetric blobs for depth
       for (let i = 0; i < 9; i++)
         fogBands.push({ y: rnd(0.06, 0.94) * H, ph: rnd(0, TAU), spd: rnd(0.3, 0.8), o: rnd(0.09, 0.19), h: rnd(60, 140) })
+      const nb = Math.round(Math.min(7, area / 70000))
+      for (let i = 0; i < nb; i++)
+        motes.push({ x: rnd(0, W), y: rnd(0.1, 0.9) * H, r: rnd(H * 0.10, H * 0.20), vx: rnd(5, 16) * (Math.random() < 0.5 ? -1 : 1), vy: rnd(-3, 3), o: rnd(0.05, 0.11) })
 
     } else {
       // clear-day: sun motes
@@ -251,7 +277,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     let dayT = 0
 
     const SLOW_MS = 1000 / 24
-    const isSlowFx = kind === 'clear-night' || kind === 'cloudy' || kind === 'cloudy-night' || kind === 'fog' || kind === 'clear-day'
+    const isSlowFx = kind === 'clear-night' || kind === 'fog' || kind === 'clear-day' || isCloudKind(kind)
     let raf = 0, last = 0
 
     const frame = (now: number) => {
@@ -391,6 +417,20 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
 
         // ── Fog ───────────────────────────────────────────────────────────────
         case 'fog': {
+          // Slow volumetric blobs (depth) drawn first, behind the bands
+          ctx.fillStyle = '#fff'
+          for (const m of motes) {
+            const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r)
+            g.addColorStop(0,   `rgba(214,219,228,${m.o})`)
+            g.addColorStop(0.6, `rgba(210,216,226,${m.o * 0.5})`)
+            g.addColorStop(1,   'rgba(208,214,224,0)')
+            ctx.fillStyle = g
+            ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill()
+            if (!reduced) {
+              m.x += m.vx * dt; m.y += m.vy * dt
+              if (m.x - m.r > W) m.x = -m.r; else if (m.x + m.r < 0) m.x = W + m.r
+            }
+          }
           for (const band of fogBands) {
             const cy = band.y + Math.sin(band.ph) * 16
             const bG = ctx.createLinearGradient(0, cy - band.h, 0, cy + band.h)
@@ -405,13 +445,16 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
 
-        // ── Cloudy (day) / Cloudy Night ───────────────────────────────────────
+        // ── Cloudy / Overcast (day & night) ───────────────────────────────────
         case 'cloudy':
-        case 'cloudy-night': {
-          const night = kind === 'cloudy-night'
+        case 'cloudy-night':
+        case 'overcast':
+        case 'overcast-night': {
+          const palette = kind as CloudPalette
+          const showMoon = kind === 'cloudy-night'   // overcast deck hides the moon
 
-          // 1. Stars (dim, behind all clouds)
-          if (night && stars.length) {
+          // 1. Stars (dim, behind all clouds — cloudy night only)
+          if (kind === 'cloudy-night' && stars.length) {
             ctx.fillStyle = '#fff'
             for (const s of stars) {
               ctx.globalAlpha = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(s.ph))
@@ -424,16 +467,16 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           // 2. Far-layer clouds (behind moon)
           for (let ci = 0; ci < clouds.length; ci++) {
             if (cloudLayer[ci] !== 0) continue
-            drawCloudCluster(ctx, clouds[ci], 0, night)
+            drawCloudCluster(ctx, clouds[ci], 0, palette)
           }
 
           // 3. Moon (between far and near cloud layers)
-          if (night) drawMoon(ctx, moonX, moonY, moonR)
+          if (showMoon) drawMoon(ctx, moonX, moonY, moonR)
 
           // 4. Mid + near clouds (in front of moon)
           for (let ci = 0; ci < clouds.length; ci++) {
             if (cloudLayer[ci] === 0) continue
-            drawCloudCluster(ctx, clouds[ci], cloudLayer[ci], night)
+            drawCloudCluster(ctx, clouds[ci], cloudLayer[ci], palette)
           }
 
           // Update positions
