@@ -117,8 +117,8 @@ export default function App() {
   const refreshRef = useRef(refresh)
   const selectCityRef = useRef(selectCity)
   const cityIdxRef = useRef(cityIdx)
-  const PULL_MAX = 90
-  const PULL_TRIGGER = 64
+  const PULL_MAX = 64
+  const PULL_TRIGGER = 46
   const SWIPE_TRIGGER = 45
   useEffect(() => {
     loadingRef.current = loading
@@ -157,7 +157,8 @@ export default function App() {
       } else if (gesture.current === 'pull') {
         if (dy > 0) {
           e.preventDefault()
-          const p = Math.min(dy * 0.5, PULL_MAX)
+          // 0.62 阻尼：手指行程更短即可触发，回应更跟手
+          const p = Math.min(dy * 0.62, PULL_MAX)
           pullRef.current = p
           setPull(p)
           if (p >= PULL_TRIGGER && !pullReadyRef.current) {
@@ -502,8 +503,15 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
               </div>
               {(a.dominant || a.pm25 != null) && (
                 <div className="row">
-                  {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
-                  {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
+                  {a.dominant === 'PM2.5' && a.pm25 != null ? (
+                    // 主要污染物就是 PM2.5 时合并成一条，避免「主要污染物 PM2.5」与「PM2.5 9」重复
+                    <span>主要污染物 <b>PM2.5</b> · {a.pm25} μg/m³</span>
+                  ) : (
+                    <>
+                      {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
+                      {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
+                    </>
+                  )}
                 </div>
               )}
               {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
