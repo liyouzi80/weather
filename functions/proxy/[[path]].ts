@@ -6,7 +6,6 @@ const UPSTREAM: Record<string, string> = {
   qweather: 'https://devapi.qweather.com',
   caiyun: 'https://api.caiyunapp.com',
   nmc: 'http://www.nmc.cn',
-  weatherapi: 'https://api.weatherapi.com',
   weathercn: 'http://d1.weather.com.cn',
   tencent: 'https://wis.qq.com',
 }
