@@ -28,6 +28,7 @@ export default function App() {
   const [air, setAir] = useState<AqiResult[]>([])
   const [loading, setLoading] = useState(false)
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
+  const [updatedAgo, setUpdatedAgo] = useState('')
   const [initialLoad, setInitialLoad] = useState(true)
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
@@ -186,6 +187,20 @@ export default function App() {
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
+  // 头部刷新时间：相对格式，每 30 秒重算一次
+  useEffect(() => {
+    const calc = () => {
+      if (!updatedAt) { setUpdatedAgo(''); return }
+      const m = Math.round((Date.now() - updatedAt.getTime()) / 60_000)
+      if (m < 1) setUpdatedAgo('刚刚')
+      else if (m < 60) setUpdatedAgo(`${m} 分钟前`)
+      else setUpdatedAgo(`${Math.floor(m / 60)} 小时前`)
+    }
+    calc()
+    const t = setInterval(calc, 30_000)
+    return () => clearInterval(t)
+  }, [updatedAt])
+
   const { annotated, stats } = useMemo(() => analyze(results), [results])
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
@@ -261,9 +276,7 @@ export default function App() {
         </button>
         <div className="loc-center">
           <span className="city">{city.name}</span>
-          {updatedAt && (
-            <span className="updated">{updatedAt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
-          )}
+          {updatedAgo && <span className="updated">{updatedAgo}</span>}
         </div>
         <button
           className={'icon-btn' + (loading ? ' spin' : '')}
@@ -296,7 +309,7 @@ export default function App() {
 
         {stats ? (
           <div className="hero">
-            <div className="hero-temp">{stats.avg.toFixed(1)}°</div>
+            <div className="hero-temp">{Math.round(stats.avg)}°</div>
             <div className="hero-cond">{stats.text}</div>
             <div className="hero-hilo">
               <span>最高 <b>{stats.max.toFixed(1)}°</b></span>

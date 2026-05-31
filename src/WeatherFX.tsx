@@ -245,8 +245,20 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     // reduced：只画一帧静态；否则启动循环
     raf = requestAnimationFrame(frame)
 
+    // 切后台时暂停循环，回前台时恢复，节省电量
+    const onVis = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(raf)
+        raf = 0
+      } else if (!reduced && raf === 0) {
+        raf = requestAnimationFrame(frame)
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+
     return () => {
       cancelAnimationFrame(raf)
+      document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('resize', resize)
     }
   }, [kind])
