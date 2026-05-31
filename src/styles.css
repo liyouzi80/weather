@@ -1,10 +1,24 @@
 :root {
   --bg-deep: #03050b;
   --bg-base: #0a0d16;
-  --glass: rgba(255, 255, 255, 0.045);
-  --glass-hover: rgba(255, 255, 255, 0.07);
-  --glass-border: rgba(255, 255, 255, 0.07);
-  --glass-border-hover: rgba(255, 255, 255, 0.12);
+
+  /* ── Materials 层次（对齐 SwiftUI .thin/.regular/.thick）──
+     每级 = 底色透明度 + 边框 + 模糊半径，越上层越薄越透 */
+  --mat-thin-bg: rgba(255, 255, 255, 0.03);
+  --mat-thin-border: rgba(255, 255, 255, 0.06);
+  --mat-thin-blur: blur(24px) saturate(170%);
+  --mat-regular-bg: rgba(255, 255, 255, 0.05);
+  --mat-regular-border: rgba(255, 255, 255, 0.08);
+  --mat-regular-blur: blur(40px) saturate(180%);
+  --mat-thick-bg: rgba(255, 255, 255, 0.08);
+  --mat-thick-border: rgba(255, 255, 255, 0.11);
+  --mat-thick-blur: blur(50px) saturate(190%);
+
+  /* 兼容旧引用：glass = regular material */
+  --glass: var(--mat-regular-bg);
+  --glass-hover: rgba(255, 255, 255, 0.08);
+  --glass-border: var(--mat-regular-border);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
   --fill: rgba(120, 120, 128, 0.24);
   --fill-2: rgba(120, 120, 128, 0.14);
   --text: #f5f5f7;
@@ -20,8 +34,29 @@
   --radius-sm: 12px;
   --radius: 22px;
   --radius-lg: 28px;
-  --transition: 0.35s cubic-bezier(0.22, 0.61, 0.36, 1);
-  --transition-fast: 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  /* ── 动画曲线 ──
+     spring：SwiftUI 默认弹簧 (response 0.55, damping 0.825) 的 CSS 等效，
+     收尾干脆、极轻微回弹；emphasized 用于较大位移的过渡 */
+  --spring: cubic-bezier(0.32, 0.72, 0, 1);
+  --transition: 0.4s var(--spring);
+  --transition-fast: 0.22s var(--spring);
+}
+
+/* 连续圆角（squircle）：支持的浏览器用超椭圆，其余回退普通圆角 */
+@supports (corner-shape: superellipse(2)) {
+  .notice-card, .warn-card, .metric-tile, .ranking, .card, .icon-btn, .page-dots {
+    corner-shape: superellipse(2.2);
+  }
+}
+
+/* Vibrancy（振动）：玻璃卡上的次要文字用 plus-lighter 与底色叠加，
+   透出背景亮度，避免在不同天空配色下灰字「消失」。深色界面下只提亮不压暗。 */
+@supports (mix-blend-mode: plus-lighter) {
+  .mt-label, .mt-sub, .ranking-title, .notice-issued,
+  .notice-detail, .notice-note {
+    mix-blend-mode: plus-lighter;
+  }
 }
 
 * {
@@ -155,7 +190,7 @@ html[data-sky='fog'] body::before {
 
 /* 左右滑动切城市：内容容器随手指平移，松手平滑回弹 */
 .swipe-wrap {
-  transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: transform 0.32s var(--spring);
   /* pan-y：浏览器只接管垂直滚动，JS 可拦截水平滑动并调用 preventDefault() */
   touch-action: pan-y;
 }
@@ -184,6 +219,7 @@ html[data-sky='fog'] body::before {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
 }
 .page-dot {
+  position: relative;
   width: 7px;
   height: 7px;
   padding: 0;
@@ -193,6 +229,16 @@ html[data-sky='fog'] body::before {
   cursor: pointer;
   transition: background var(--transition-fast), width var(--transition-fast),
     border-radius var(--transition-fast);
+}
+/* 视觉 7px，点击热区扩到 44pt（HIG 最小触控目标） */
+.page-dot::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
 }
 .page-dot.active { width: 20px; border-radius: 4px; background: #fff; }
 
@@ -233,12 +279,12 @@ html[data-sky='fog'] body::before {
   transition: background var(--transition-fast),
     backdrop-filter var(--transition-fast), border-color var(--transition-fast);
 }
-/* 滚动后头部转为毛玻璃吸顶态 */
+/* 滚动后头部转为毛玻璃吸顶态（thin material：导航栏层级，最薄最透） */
 .loc-header.scrolled {
-  background: rgba(10, 14, 24, 0.55);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-bottom-color: var(--glass-border);
+  background: var(--mat-thin-bg);
+  backdrop-filter: var(--mat-thin-blur);
+  -webkit-backdrop-filter: var(--mat-thin-blur);
+  border-bottom-color: var(--mat-thin-border);
 }
 .loc-center {
   flex: 1;
@@ -280,10 +326,10 @@ html[data-sky='fog'] body::before {
   border-left: 4px solid #ff9f0a;
   border-radius: var(--radius);
   padding: 14px 16px;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
-  animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: riseIn 0.5s var(--spring) both;
 }
 .warn-badge {
   display: inline-flex;
@@ -312,10 +358,10 @@ html[data-sky='fog'] body::before {
   border-radius: var(--radius);
   padding: 16px 18px;
   margin-bottom: 20px;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
-  animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: riseIn 0.5s var(--spring) both;
 }
 .notice-head {
   display: flex;
@@ -385,10 +431,10 @@ html[data-sky='fog'] body::before {
   padding: 18px 18px 16px;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
-  animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: riseIn 0.5s var(--spring) both;
 }
 
 .mt-label {
@@ -468,7 +514,8 @@ html[data-sky='fog'] body::before {
   background: var(--fill);
   border: 0.5px solid var(--glass-border);
   color: var(--text);
-  width: 40px; height: 40px;
+  /* 44pt 最小触控目标（HIG） */
+  width: 44px; height: 44px;
   border-radius: 50%;
   font-size: 18px;
   cursor: pointer;
@@ -489,7 +536,7 @@ html[data-sky='fog'] body::before {
 .hero {
   text-align: center;
   padding: 8px 0 52px;
-  animation: riseIn 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: riseIn 0.55s var(--spring) both;
 }
 .hero-temp {
   font-size: clamp(72px, 22vw, 96px);
@@ -535,8 +582,8 @@ html[data-sky='fog'] body::before {
   border-radius: var(--radius);
   padding: 20px 22px 14px;
   margin-bottom: 20px;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.3),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
@@ -581,7 +628,7 @@ html[data-sky='fog'] body::before {
   display: block;
   height: 100%;
   border-radius: 3px;
-  transition: width 0.6s cubic-bezier(0.22, 0.61, 0.36, 1);
+  transition: width 0.6s var(--spring);
 }
 .rank-temp {
   font-size: 17px;
@@ -603,14 +650,14 @@ html[data-sky='fog'] body::before {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius);
   padding: 16px 18px;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow:
     0 4px 20px rgba(0, 0, 0, 0.25),
     inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast),
     border-color var(--transition-fast);
-  animation: cardIn 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: cardIn 0.55s var(--spring) both;
 }
 .card:hover {
   transform: translateY(-2px);
@@ -763,8 +810,8 @@ a.card { text-decoration: none; color: inherit; display: block; }
   border-radius: var(--radius);
   padding: 16px 18px;
   height: 90px;
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
   animation: shimmer 2s ease-in-out infinite;
 }
 @keyframes shimmer {
@@ -796,8 +843,8 @@ a.card { text-decoration: none; color: inherit; display: block; }
 }
 
 .loc-header { animation: fadeIn 0.45s ease both; }
-.loc-header .city { animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
-.ranking { animation: riseIn 0.5s 0.06s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+.loc-header .city { animation: riseIn 0.5s var(--spring) both; }
+.ranking { animation: riseIn 0.5s 0.06s var(--spring) both; }
 
 /* 排行行依次入场 */
 .rank-row { animation: riseIn 0.45s both; }
@@ -826,7 +873,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   to   { opacity: 1; transform: none; }
 }
 .app-content {
-  animation: pageIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation: pageIn 0.32s var(--spring) both;
 }
 
 /* 尊重系统「减弱动态效果」 */
