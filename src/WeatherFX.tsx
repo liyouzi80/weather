@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 
 export type FxKind =
   | 'rain' | 'thunder' | 'snow' | 'fog'
-  | 'clear-day' | 'clear-night' | 'cloudy'
+  | 'clear-day' | 'clear-night' | 'cloudy' | 'cloudy-night'
 
 export function fxKind(text: string | undefined, night: boolean): FxKind {
   if (text) {
@@ -10,7 +10,7 @@ export function fxKind(text: string | undefined, night: boolean): FxKind {
     if (/雨/.test(text)) return 'rain'
     if (/雪/.test(text)) return 'snow'
     if (/雾|霾|沙|尘/.test(text)) return 'fog'
-    if (/多云|间|阴/.test(text)) return 'cloudy'
+    if (/多云|间|阴/.test(text)) return night ? 'cloudy-night' : 'cloudy'
   }
   return night ? 'clear-night' : 'clear-day'
 }
@@ -19,14 +19,67 @@ const TAU = Math.PI * 2
 const prefersReduced = () =>
   typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
-interface Drop { x: number; y: number; len: number; vy: number; vx: number }
+interface Drop  { x: number; y: number; len: number; vy: number; vx: number }
 interface Flake { x: number; y: number; r: number; vy: number; vx: number; sway: number; ph: number; layer: number }
-interface Star { x: number; y: number; r: number; ph: number; sp: number; bright: boolean }
+interface Star  { x: number; y: number; r: number; ph: number; sp: number; bright: boolean }
 interface Shoot { x: number; y: number; vx: number; vy: number; life: number }
 interface CloudBlob { x: number; y: number; r: number; ph: number }
-interface FogBand { y: number; ph: number; spd: number; o: number; h: number }
-interface Mote { x: number; y: number; r: number; vx: number; vy: number; o: number }
-interface Bolt { pts: [number, number][]; branches: { pts: [number, number][] }[] }
+interface FogBand   { y: number; ph: number; spd: number; o: number; h: number }
+interface Mote      { x: number; y: number; r: number; vx: number; vy: number; o: number }
+interface Bolt      { pts: [number, number][]; branches: { pts: [number, number][] }[] }
+
+// ── Cloud helpers ────────────────────────────────────────────────────────────
+
+function drawCloudCluster(
+  ctx: CanvasRenderingContext2D,
+  blobs: CloudBlob[],
+  layer: number,
+  night: boolean,
+): void {
+  // Merge-fill: all blobs in one beginPath → overlapping arcs form a single silhouette
+  const alpha = night
+    ? [0.30, 0.45, 0.60][Math.min(layer, 2)]
+    : [0.50, 0.65, 0.80][Math.min(layer, 2)]
+  const fill = night
+    ? `rgba(112,136,180,${alpha})`
+    : `rgba(200,212,228,${alpha})`
+
+  ctx.beginPath()
+  for (const b of blobs) {
+    ctx.moveTo(b.x + b.r, b.y)
+    ctx.arc(b.x, b.y, b.r, 0, TAU)
+  }
+  ctx.fillStyle = fill
+  ctx.fill()
+}
+
+function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: number): void {
+  // Wide atmospheric scatter glow
+  const glow = ctx.createRadialGradient(mx, my, r * 0.8, mx, my, r * 6)
+  glow.addColorStop(0,   'rgba(215,232,255,0.18)')
+  glow.addColorStop(0.4, 'rgba(200,222,255,0.07)')
+  glow.addColorStop(1,   'rgba(185,210,255,0)')
+  ctx.fillStyle = glow
+  ctx.beginPath(); ctx.arc(mx, my, r * 6, 0, TAU); ctx.fill()
+
+  // Tight halo ring (just outside disk edge)
+  const halo = ctx.createRadialGradient(mx, my, r, mx, my, r * 2.2)
+  halo.addColorStop(0,   'rgba(230,242,255,0.22)')
+  halo.addColorStop(0.6, 'rgba(210,228,255,0.06)')
+  halo.addColorStop(1,   'rgba(195,218,255,0)')
+  ctx.fillStyle = halo
+  ctx.beginPath(); ctx.arc(mx, my, r * 2.2, 0, TAU); ctx.fill()
+
+  // Moon disk — lit from upper-left
+  const disk = ctx.createRadialGradient(mx - r * 0.3, my - r * 0.3, 0, mx, my, r)
+  disk.addColorStop(0,   'rgba(255,255,248,0.97)')
+  disk.addColorStop(0.65,'rgba(238,246,255,0.92)')
+  disk.addColorStop(1,   'rgba(210,228,255,0.85)')
+  ctx.fillStyle = disk
+  ctx.beginPath(); ctx.arc(mx, my, r, 0, TAU); ctx.fill()
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 export function WeatherFX({ kind }: { kind: FxKind }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -40,12 +93,15 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     let W = 0, H = 0, dpr = 1, W_prev = 0, H_prev = 0
     let sunGrad: CanvasGradient | null = null
     let moonGrad: CanvasGradient | null = null
+    // moon position (clear-night & cloudy-night)
+    let moonX = 0, moonY = 0, moonR = 0
 
     const rainL: Drop[][] = [[], [], []]
     const flakes: Flake[] = []
     const stars: Star[] = []
     const clouds: CloudBlob[][] = []
     const cloudVx: number[] = []
+    const cloudLayer: number[] = []     // 0=far  1=mid  2=near
     const fogBands: FogBand[] = []
     const motes: Mote[] = []
 
@@ -54,32 +110,37 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     const resize = () => {
       const Wn = window.innerWidth, Hn = window.innerHeight
       dpr = Math.min(window.devicePixelRatio || 1, 2)
-      canvas.width = Wn * dpr; canvas.height = Hn * dpr
-      canvas.style.width = Wn + 'px'; canvas.style.height = Hn + 'px'
+      canvas.width  = Wn * dpr; canvas.height = Hn * dpr
+      canvas.style.width  = Wn + 'px'; canvas.style.height = Hn + 'px'
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       if (W_prev > 0) {
         const sx = Wn / W_prev, sy = Hn / H_prev
         for (const l of rainL) for (const d of l) { d.x *= sx; d.y *= sy }
         for (const f of flakes) { f.x *= sx; f.y *= sy }
-        for (const s of stars) { s.x *= sx; s.y *= sy }
+        for (const s of stars)  { s.x *= sx; s.y *= sy }
         for (const c of clouds) for (const b of c) { b.x *= sx; b.y *= sy }
         for (const b of fogBands) { b.y *= sy; b.h *= sy }
-        for (const m of motes) { m.x *= sx; m.y *= sy }
+        for (const m of motes)  { m.x *= sx; m.y *= sy }
       }
       W = Wn; H = Hn; W_prev = Wn; H_prev = Hn
+
       if (kind === 'clear-day') {
         sunGrad = ctx.createRadialGradient(W * 0.78, -H * 0.05, 0, W * 0.78, -H * 0.05, H * 0.72)
-        sunGrad.addColorStop(0, 'rgba(255,215,100,0.28)')
-        sunGrad.addColorStop(0.4, 'rgba(255,185,65,0.12)')
+        sunGrad.addColorStop(0,    'rgba(255,215,100,0.28)')
+        sunGrad.addColorStop(0.4,  'rgba(255,185,65,0.12)')
         sunGrad.addColorStop(0.75, 'rgba(255,150,40,0.04)')
-        sunGrad.addColorStop(1, 'rgba(255,130,30,0)')
+        sunGrad.addColorStop(1,    'rgba(255,130,30,0)')
       }
-      if (kind === 'clear-night') {
-        const mx = W * 0.82, my = H * 0.12
-        moonGrad = ctx.createRadialGradient(mx, my, 0, mx, my, H * 0.28)
-        moonGrad.addColorStop(0, 'rgba(255,248,220,0.14)')
-        moonGrad.addColorStop(0.45, 'rgba(220,230,255,0.06)')
-        moonGrad.addColorStop(1, 'rgba(180,200,255,0)')
+      if (kind === 'clear-night' || kind === 'cloudy-night') {
+        moonX = kind === 'clear-night' ? W * 0.80 : W * 0.26
+        moonY = kind === 'clear-night' ? H * 0.11 : H * 0.14
+        moonR = H * 0.042
+        if (kind === 'clear-night') {
+          moonGrad = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, H * 0.30)
+          moonGrad.addColorStop(0,   'rgba(240,248,255,0.12)')
+          moonGrad.addColorStop(0.5, 'rgba(210,230,255,0.04)')
+          moonGrad.addColorStop(1,   'rgba(180,205,255,0)')
+        }
       }
     }
 
@@ -91,9 +152,9 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
 
     if (kind === 'rain' || kind === 'thunder') {
       const cfg = [
-        { n: Math.min(90, area / 6000),  lenMin: 8,  lenMax: 18, vyMin: 200, vyMax: 380 },
-        { n: Math.min(130, area / 4200), lenMin: 16, lenMax: 28, vyMin: 380, vyMax: 580 },
-        { n: Math.min(55, area / 10000), lenMin: 28, lenMax: 48, vyMin: 580, vyMax: 800 },
+        { n: Math.min(90,  area / 6000),  lenMin: 8,  lenMax: 18, vyMin: 200, vyMax: 380 },
+        { n: Math.min(130, area / 4200),  lenMin: 16, lenMax: 28, vyMin: 380, vyMax: 580 },
+        { n: Math.min(55,  area / 10000), lenMin: 28, lenMax: 48, vyMin: 580, vyMax: 800 },
       ]
       for (let li = 0; li < 3; li++) {
         const c = cfg[li]
@@ -102,6 +163,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           rainL[li].push({ x: rnd(0, W), y: rnd(0, H), len: rnd(c.lenMin, c.lenMax), vy, vx: -vy * 0.28 })
         }
       }
+
     } else if (kind === 'snow') {
       const n = Math.round(Math.min(220, area / 5500))
       for (let i = 0; i < n; i++) {
@@ -112,23 +174,56 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           : [3.6, 5.5, 55, 88, 2]
         flakes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(rMin, rMax), vy: rnd(vyMin, vyMax), vx: rnd(-8, 8), sway: rnd(8, 30), ph: rnd(0, TAU), layer })
       }
+
     } else if (kind === 'clear-night') {
       const n = Math.round(Math.min(160, area / 7500))
       for (let i = 0; i < n; i++)
         stars.push({ x: rnd(0, W), y: rnd(0, H * 0.8), r: rnd(0.4, 2.2), ph: rnd(0, TAU), sp: rnd(0.6, 2.5), bright: Math.random() < 0.07 })
-    } else if (kind === 'cloudy') {
-      for (let i = 0; i < 7; i++) {
-        const cx = rnd(-0.2, 1.1) * W, cy = rnd(0.02, 0.50) * H, s = rnd(0.8, 1.9)
-        const blobs: CloudBlob[] = []
-        for (let b = 0; b < 3 + Math.floor(Math.random() * 3); b++)
-          blobs.push({ x: cx + rnd(-80, 80) * s, y: cy + rnd(-35, 35) * s, r: rnd(85, 175) * s, ph: rnd(0, TAU) })
-        clouds.push(blobs)
-        cloudVx.push(rnd(6, 18))
+
+    } else if (kind === 'cloudy' || kind === 'cloudy-night') {
+      // Sparse stars behind clouds (night only)
+      if (kind === 'cloudy-night') {
+        const n = Math.round(Math.min(55, area / 20000))
+        for (let i = 0; i < n; i++)
+          stars.push({ x: rnd(0, W), y: rnd(0, H * 0.65), r: rnd(0.3, 1.4), ph: rnd(0, TAU), sp: rnd(0.5, 1.8), bright: false })
       }
+
+      // Three-layer cloud clusters
+      // layer 0 = far/back (high, slow, smaller),  layer 1 = mid,  layer 2 = near/front (lower, fast, larger)
+      const layerCfg = [
+        { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
+        { count: 4, yLo: 0.06, yHi: 0.40, sLo: 0.80, sHi: 1.30, vLo:  7, vHi: 14 },
+        { count: 3, yLo: 0.08, yHi: 0.38, sLo: 1.10, sHi: 1.85, vLo: 13, vHi: 24 },
+      ]
+      for (let li = 0; li < 3; li++) {
+        const cfg = layerCfg[li]
+        for (let i = 0; i < cfg.count; i++) {
+          const s  = rnd(cfg.sLo, cfg.sHi)
+          const cx = rnd(-0.12, 1.18) * W
+          const cy = rnd(cfg.yLo, cfg.yHi) * H
+          const cw = rnd(130, 260) * s   // horizontal span
+          const ch = rnd(42, 80) * s     // vertical depth → drives blob radius
+          const nb = 4 + Math.floor(Math.random() * 4)   // 4–7 blobs per cloud
+          const blobs: CloudBlob[] = []
+          for (let b = 0; b < nb; b++) {
+            const t  = b / Math.max(nb - 1, 1)
+            const bx = cx - cw / 2 + t * cw + rnd(-18, 18) * s
+            const by = cy + rnd(-0.25, 0.25) * ch
+            const br = rnd(0.38, 0.68) * ch + rnd(-8, 8) * s
+            blobs.push({ x: bx, y: by, r: Math.max(18, br), ph: rnd(0, TAU) })
+          }
+          clouds.push(blobs)
+          cloudVx.push(rnd(cfg.vLo, cfg.vHi))
+          cloudLayer.push(li)
+        }
+      }
+
     } else if (kind === 'fog') {
       for (let i = 0; i < 9; i++)
         fogBands.push({ y: rnd(0.06, 0.94) * H, ph: rnd(0, TAU), spd: rnd(0.3, 0.8), o: rnd(0.09, 0.19), h: rnd(60, 140) })
+
     } else {
+      // clear-day: sun motes
       const n = Math.round(Math.min(80, area / 14000))
       for (let i = 0; i < n; i++)
         motes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.8, 2.8), vx: rnd(-5, 5), vy: rnd(-18, -5), o: rnd(0.12, 0.35) })
@@ -156,7 +251,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     let dayT = 0
 
     const SLOW_MS = 1000 / 24
-    const isSlowFx = kind === 'clear-night' || kind === 'cloudy' || kind === 'fog' || kind === 'clear-day'
+    const isSlowFx = kind === 'clear-night' || kind === 'cloudy' || kind === 'cloudy-night' || kind === 'fog' || kind === 'clear-day'
     let raf = 0, last = 0
 
     const frame = (now: number) => {
@@ -167,6 +262,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       ctx.clearRect(0, 0, W, H)
 
       switch (kind) {
+        // ── Rain / Thunder ───────────────────────────────────────────────────
         case 'rain':
         case 'thunder': {
           const styles: [string, number][] = [
@@ -217,6 +313,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
 
+        // ── Snow ─────────────────────────────────────────────────────────────
         case 'snow': {
           ctx.fillStyle = '#fff'
           for (let li = 0; li < 3; li++) {
@@ -239,8 +336,12 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
 
+        // ── Clear Night ───────────────────────────────────────────────────────
         case 'clear-night': {
+          // Diffuse background glow from moonlight
           if (moonGrad) { ctx.fillStyle = moonGrad; ctx.fillRect(0, 0, W, H) }
+
+          // Stars
           ctx.fillStyle = '#fff'
           for (const s of stars) {
             const a = 0.3 + 0.65 * (0.5 + 0.5 * Math.sin(s.ph))
@@ -261,6 +362,11 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
             if (!reduced) s.ph += dt * s.sp
           }
           ctx.globalAlpha = 1
+
+          // Moon disk
+          drawMoon(ctx, moonX, moonY, moonR)
+
+          // Shooting star
           if (!reduced) {
             nextShoot -= dt
             if (nextShoot <= 0 && !shoot) {
@@ -283,14 +389,15 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
 
+        // ── Fog ───────────────────────────────────────────────────────────────
         case 'fog': {
           for (const band of fogBands) {
             const cy = band.y + Math.sin(band.ph) * 16
             const bG = ctx.createLinearGradient(0, cy - band.h, 0, cy + band.h)
-            bG.addColorStop(0, 'rgba(215,220,230,0)')
+            bG.addColorStop(0,    'rgba(215,220,230,0)')
             bG.addColorStop(0.38, `rgba(215,220,230,${band.o})`)
             bG.addColorStop(0.62, `rgba(215,220,230,${band.o})`)
-            bG.addColorStop(1, 'rgba(215,220,230,0)')
+            bG.addColorStop(1,    'rgba(215,220,230,0)')
             ctx.fillStyle = bG
             ctx.fillRect(0, cy - band.h, W, band.h * 2)
             if (!reduced) band.ph += dt * band.spd * 0.6
@@ -298,27 +405,51 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
 
-        case 'cloudy': {
-          for (let ci = 0; ci < clouds.length; ci++) {
-            const clump = clouds[ci]
-            for (const b of clump) {
-              const g = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, b.r)
-              g.addColorStop(0, 'rgba(195,208,225,0.22)')
-              g.addColorStop(0.5, 'rgba(195,208,225,0.10)')
-              g.addColorStop(1, 'rgba(195,208,225,0)')
-              ctx.fillStyle = g; ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill()
+        // ── Cloudy (day) / Cloudy Night ───────────────────────────────────────
+        case 'cloudy':
+        case 'cloudy-night': {
+          const night = kind === 'cloudy-night'
+
+          // 1. Stars (dim, behind all clouds)
+          if (night && stars.length) {
+            ctx.fillStyle = '#fff'
+            for (const s of stars) {
+              ctx.globalAlpha = 0.18 + 0.22 * (0.5 + 0.5 * Math.sin(s.ph))
+              ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill()
+              if (!reduced) s.ph += dt * s.sp
             }
-            if (!reduced) {
+            ctx.globalAlpha = 1
+          }
+
+          // 2. Far-layer clouds (behind moon)
+          for (let ci = 0; ci < clouds.length; ci++) {
+            if (cloudLayer[ci] !== 0) continue
+            drawCloudCluster(ctx, clouds[ci], 0, night)
+          }
+
+          // 3. Moon (between far and near cloud layers)
+          if (night) drawMoon(ctx, moonX, moonY, moonR)
+
+          // 4. Mid + near clouds (in front of moon)
+          for (let ci = 0; ci < clouds.length; ci++) {
+            if (cloudLayer[ci] === 0) continue
+            drawCloudCluster(ctx, clouds[ci], cloudLayer[ci], night)
+          }
+
+          // Update positions
+          if (!reduced) {
+            for (let ci = 0; ci < clouds.length; ci++) {
+              const clump = clouds[ci]
               const drift = cloudVx[ci] * dt
               let minX = Infinity
               for (const b of clump) {
-                b.x += drift; b.ph += dt * 0.18
-                b.y += Math.sin(b.ph) * 0.25
+                b.x += drift; b.ph += dt * 0.14
+                b.y += Math.sin(b.ph) * 0.18
                 if (b.x - b.r < minX) minX = b.x - b.r
               }
-              if (minX > W) {
+              if (minX > W + 60) {
                 const maxX = Math.max(...clump.map(b => b.x + b.r))
-                const delta = -(maxX + rnd(20, 80))
+                const delta = -(maxX + rnd(30, 100))
                 for (const b of clump) b.x += delta
               }
             }
@@ -326,6 +457,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
 
+        // ── Clear Day ─────────────────────────────────────────────────────────
         default: {
           if (sunGrad) { ctx.fillStyle = sunGrad; ctx.fillRect(0, 0, W, H) }
           if (!reduced) {
@@ -339,9 +471,9 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
               const x1 = ox + Math.cos(base - hw) * len, y1 = oy + Math.sin(base - hw) * len
               const x2 = ox + Math.cos(base + hw) * len, y2 = oy + Math.sin(base + hw) * len
               const rG = ctx.createLinearGradient(ox, oy, (x1 + x2) / 2, (y1 + y2) / 2)
-              rG.addColorStop(0, `rgba(255,220,100,${a * 3})`)
+              rG.addColorStop(0,   `rgba(255,220,100,${a * 3})`)
               rG.addColorStop(0.5, `rgba(255,200,80,${a * 1.2})`)
-              rG.addColorStop(1, 'rgba(255,180,60,0)')
+              rG.addColorStop(1,   'rgba(255,180,60,0)')
               ctx.fillStyle = rG
               ctx.beginPath(); ctx.moveTo(ox, oy); ctx.lineTo(x1, y1); ctx.lineTo(x2, y2); ctx.closePath(); ctx.fill()
             }
