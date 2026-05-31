@@ -50,6 +50,7 @@ export const qweatherProvider: WeatherProvider = {
       humidity: Number(now.humidity),
       windSpeed: Number(now.windSpeed),
       windDir: now.windDir,
+      uvIndex: now.uvIndex != null ? Number(now.uvIndex) : undefined,
       // obsTime 形如「2024-06-06T16:00+08:00」；取北京墙上时间 16:00 写入 UTC 字段，前端按 UTC 原样显示
       observedAt: now.obsTime ? `${now.obsTime.slice(0, 16)}:00Z` : undefined,
       ...(warnings.length > 0 && { warnings }),

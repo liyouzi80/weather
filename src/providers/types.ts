@@ -31,6 +31,8 @@ export interface CurrentWeather {
   forecast?: string
   /** 文字预报发布时间（原始字符串），可选 */
   forecastIssuedAt?: string
+  /** 紫外线指数（标准 0–11+ 量表），可选 */
+  uvIndex?: number
   /** 气象台当前生效的预警信号，可选 */
   warnings?: WeatherWarning[]
 }

@@ -450,6 +450,19 @@ html[data-sky='fog'] body::before {
   50%       { transform: scale(1.1); }
 }
 
+/* 紫外线太阳动效 */
+.uv-core { transform-box: fill-box; transform-origin: center; animation: uvPulse 3s ease-in-out infinite; }
+.uv-glow { transform-box: fill-box; transform-origin: center; animation: uvPulse 3s ease-in-out 0.4s infinite; }
+.uv-ray  { transform-box: fill-box; transform-origin: 0 0; animation: uvRay 3s ease-in-out infinite; }
+@keyframes uvPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(1.12); }
+}
+@keyframes uvRay {
+  0%, 100% { opacity: 0.55; }
+  50%       { opacity: 0.9; }
+}
+
 /* Refresh button */
 .icon-btn {
   background: var(--fill);

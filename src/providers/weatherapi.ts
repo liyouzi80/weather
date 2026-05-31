@@ -37,6 +37,7 @@ export const weatherapiProvider: WeatherProvider = {
       humidity: c.humidity,
       windSpeed: c.wind_kph,
       windDir: CARDINAL[c.wind_dir] ?? c.wind_dir,
+      uvIndex: c.uv != null ? Number(c.uv) : undefined,
       observedAt: c.last_updated,
     }
   },

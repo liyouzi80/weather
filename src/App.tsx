@@ -559,7 +559,7 @@ function TempRanking({ results }: { results: Annotated[] }) {
 
 interface Stats {
   avg: number; min: number; max: number; count: number; text: string
-  feelsLike?: number; humidity?: number
+  feelsLike?: number; humidity?: number; uvIndex?: number
 }
 
 function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
@@ -585,6 +585,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
   const feels = ok.map((r) => r.current!.feelsLike).filter((n): n is number => n != null)
   const hums = ok.map((r) => r.current!.humidity).filter((n): n is number => n != null)
   const humAvg = avgOf(hums)
+  const uvs = ok.map((r) => r.current!.uvIndex).filter((n): n is number => n != null)
 
   const annotated: Annotated[] = results.map((r) => {
     if (!r.current) return r
@@ -602,6 +603,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
       avg, min, max, count: temps.length, text: majorityText,
       feelsLike: r1(avgOf(feels)),
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
+      uvIndex: r1(avgOf(uvs)),
     },
   }
 }
@@ -629,12 +631,33 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 概览次要指标小卡：体感/湿度/AQI 一列三格等宽
+function uvLevel(uv: number): string {
+  if (uv <= 2) return '弱'
+  if (uv <= 4) return '中等'
+  if (uv <= 6) return '较强'
+  if (uv <= 9) return '强'
+  return '极强'
+}
+function uvColor(uv: number): string {
+  if (uv <= 2) return '#34c759'
+  if (uv <= 4) return '#ffd60a'
+  if (uv <= 6) return '#ff9f0a'
+  if (uv <= 9) return '#ff453a'
+  return '#bf5af2'
+}
+
+// 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
 function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const tileCount = [stats.feelsLike != null, stats.humidity != null, avgAqi != null].filter(Boolean).length
-  if (tileCount === 0) return null
+  const tiles = [
+    stats.feelsLike != null,
+    stats.humidity != null,
+    avgAqi != null,
+    stats.uvIndex != null,
+  ].filter(Boolean).length
+  if (tiles === 0) return null
+  const cols = tiles === 4 ? 2 : tiles
   return (
-    <div className="metric-tiles" style={{ gridTemplateColumns: `repeat(${tileCount}, 1fr)` }}>
+    <div className="metric-tiles" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {stats.feelsLike != null && (
         <div className="metric-tile">
           <span className="mt-label">体感</span>
@@ -655,6 +678,14 @@ function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null })
           <span className="mt-value" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
           <span className="mt-sub">AQI {avgAqi}</span>
           <AqiAnim color={aqiColor(avgAqi)} />
+        </div>
+      )}
+      {stats.uvIndex != null && (
+        <div className="metric-tile">
+          <span className="mt-label">紫外线</span>
+          <span className="mt-value" style={{ color: uvColor(stats.uvIndex) }}>{uvLevel(stats.uvIndex)}</span>
+          <span className="mt-sub">UV {Math.round(stats.uvIndex)}</span>
+          <UvAnim uv={stats.uvIndex} />
         </div>
       )}
     </div>
@@ -714,6 +745,26 @@ function AqiAnim({ color }: { color: string }) {
       <circle cx="56" cy="54" r="19" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
       <circle cx="56" cy="54" r="33" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
       <circle cx="56" cy="54" r="49" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
+    </svg>
+  )
+}
+
+function UvAnim({ uv }: { uv: number }) {
+  const col = uvColor(uv)
+  return (
+    <svg className="tile-anim" viewBox="0 0 80 80" aria-hidden="true" overflow="visible">
+      <g transform="translate(56,52)">
+        <circle r="10" fill={col} opacity="0.55" className="uv-core" />
+        <circle r="17" fill={col} opacity="0.18" className="uv-glow" />
+        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
+          <line key={deg}
+            x1="0" y1="21" x2="0" y2="28"
+            stroke={col} strokeWidth="2.2" strokeLinecap="round" strokeOpacity="0.55"
+            transform={`rotate(${deg})`}
+            className="uv-ray"
+          />
+        ))}
+      </g>
     </svg>
   )
 }

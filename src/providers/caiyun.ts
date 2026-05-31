@@ -53,6 +53,10 @@ export const caiyunProvider: WeatherProvider = {
       humidity: Math.round(r.humidity * 100),
       windSpeed: r.wind?.speed,
       windDir: degToDir(r.wind?.direction),
+      // 彩云 UV 为 0–5 序数（极弱/弱/中等/强/很强/极强），映射到标准 0–11 量表
+      uvIndex: r.life_index?.ultraviolet?.index != null
+        ? [0, 1, 3, 5, 8, 11][Math.min(5, Math.round(r.life_index.ultraviolet.index))]
+        : undefined,
       // server_time 为 UTC 时间戳；+8h 转北京墙上时间后写入 UTC 字段，前端按 UTC 原样显示
       observedAt: data.server_time ? new Date((data.server_time + 8 * 3600) * 1000).toISOString() : undefined,
     }
