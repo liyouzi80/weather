@@ -293,7 +293,7 @@ export default function App() {
     <div className="app" ref={appRef}>
       <WeatherFX kind={fx} tint={tint} />
       <div
-        className={'pull-indicator' + (pullReady ? ' ready' : '')}
+        className={'pull-indicator' + (loading || pull > 6 ? ' active' : '') + (pullReady ? ' ready' : '')}
         style={{
           height: loading ? 46 : pull,
           opacity: loading || pull > 6 ? 1 : 0,
