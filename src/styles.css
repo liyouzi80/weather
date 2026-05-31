@@ -2,11 +2,8 @@
   --bg-deep: #03050b;
   --bg-base: #0a0d16;
 
-  /* ── Materials 层次（对齐 SwiftUI .thin/.regular/.thick）──
+  /* ── Materials 层次（对齐 SwiftUI .regular/.thick）──
      每级 = 底色透明度 + 边框 + 模糊半径，越上层越薄越透 */
-  --mat-thin-bg: rgba(255, 255, 255, 0.03);
-  --mat-thin-border: rgba(255, 255, 255, 0.06);
-  --mat-thin-blur: blur(24px) saturate(170%);
   --mat-regular-bg: rgba(255, 255, 255, 0.05);
   --mat-regular-border: rgba(255, 255, 255, 0.08);
   --mat-regular-blur: blur(40px) saturate(180%);
@@ -503,28 +500,8 @@ html[data-sky='fog'] body::before {
   50%       { opacity: 0.9; }
 }
 
-/* Refresh button */
-.icon-btn {
-  background: var(--fill);
-  border: 0.5px solid var(--glass-border);
-  color: var(--text);
-  /* 44pt 最小触控目标（HIG） */
-  width: 44px; height: 44px;
-  border-radius: 50%;
-  font-size: 18px;
-  cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: transform var(--transition-fast), background var(--transition-fast),
-    box-shadow var(--transition-fast);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-.icon-btn:hover {
-  background: rgba(120, 120, 128, 0.36);
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.04);
-}
-.icon-btn:active { transform: scale(0.9); }
-.icon-btn.spin { animation: spin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+/* 下拉刷新指示器加载中旋转 */
+.spin { animation: spin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 
 /* ── Hero：浮在天空背景上，无玻璃卡 ── */
 /* Hero（温度总揽）：城市名居顶、大温度居中，与吸顶栏合计约占首屏上半。
@@ -878,9 +855,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 /* 触摸反馈 */
 .card:active { transform: scale(0.985); }
-.icon-btn svg { transition: transform var(--transition-fast); }
-.icon-btn.switch:hover svg { transform: rotate(180deg); }
-.icon-btn.switch:active svg { transform: rotate(180deg) scale(0.9); }
 
 /* 数值 / 进度条平滑过渡 */
 .hero-temp,

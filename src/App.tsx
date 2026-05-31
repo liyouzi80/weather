@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
@@ -60,6 +60,9 @@ export default function App() {
     setUpdatedAt(null)
     setInitialLoad(true)
     setCityIdx(i)
+    // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
+    window.scrollTo(0, 0)
+    setScrolled(false)
   }, [cityIdx])
 
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
@@ -398,7 +401,8 @@ function aqiCategory(aqi: number): string {
   if (aqi <= 300) return '重度污染'
   return '严重污染'
 }
-function AqiSection({ air }: { air: AqiResult[] }) {
+// memo：拖动/下拉手势会每帧更新 App 状态，记忆化避免数据未变时整列重渲染
+const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
   return (
     <div className="aqi-section">
       <div className="ranking-title">空气质量 · 美国 AQI</div>
@@ -451,9 +455,9 @@ function AqiSection({ air }: { air: AqiResult[] }) {
       </div>
     </div>
   )
-}
+})
 
-function ProviderCard({ r }: { r: Annotated }) {
+const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
@@ -497,9 +501,9 @@ function ProviderCard({ r }: { r: Annotated }) {
       {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
     </div>
   )
-}
+})
 
-function TempRanking({ results }: { results: Annotated[] }) {
+const TempRanking = memo(function TempRanking({ results }: { results: Annotated[] }) {
   const ranked = results
     .filter((r) => r.current)
     .sort((a, b) => b.current!.temp - a.current!.temp)
@@ -528,7 +532,7 @@ function TempRanking({ results }: { results: Annotated[] }) {
       })}
     </div>
   )
-}
+})
 
 interface Stats {
   avg: number; min: number; max: number; count: number; text: string
@@ -638,7 +642,7 @@ function uvColor(uv: number): string {
 
 // 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
 // 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
-function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
+const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
   const cols: { key: string; icon: JSX.Element; value: string; label: string; color?: string }[] = []
   if (stats.feelsLike != null)
     cols.push({ key: 'feels', icon: <FeelsAnim temp={stats.feelsLike} />, value: `${stats.feelsLike.toFixed(1)}°`, label: '体感' })
@@ -660,7 +664,7 @@ function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null })
       ))}
     </div>
   )
-}
+})
 
 // 体感：温度计 + 汞柱随温度变化（居中方形图标）
 function FeelsAnim({ temp }: { temp: number }) {

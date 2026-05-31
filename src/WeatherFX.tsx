@@ -281,7 +281,13 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
           // Async-load the higher-quality SVG sprite; swaps in over the fallback.
           const svg = buildCloudSVG(blobs, li, palette, minX, minY, pad, w, h, scale, Math.floor(Math.random() * 1000))
           const img = new Image()
-          img.onload = () => { if (!cancelled) cloud.img = img }
+          img.onload = () => {
+            if (cancelled) return
+            cloud.img = img
+            // 减弱动效时整段动画只画一帧；SVG 异步载入后需补画一次，
+            // 否则云会永远停在模糊的回退贴图上。
+            if (reduced) requestAnimationFrame(frame)
+          }
           img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
         }
       }
@@ -548,7 +554,6 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
 
         // ── Fog ───────────────────────────────────────────────────────────────
         case 'fog': {
-          ctx.fillStyle = '#fff'
           for (const m of motes) {
             const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r)
             g.addColorStop(0,   `rgba(214,219,228,${m.o})`)
