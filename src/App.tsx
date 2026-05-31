@@ -661,119 +661,97 @@ function uvColor(uv: number): string {
 }
 
 // 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
+// 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
 function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const tiles = [
-    stats.feelsLike != null,
-    stats.humidity != null,
-    avgAqi != null,
-    stats.uvIndex != null,
-  ].filter(Boolean).length
-  if (tiles === 0) return null
-  const cols = tiles === 4 ? 2 : tiles
+  const cols: { key: string; icon: JSX.Element; value: string; label: string; color?: string }[] = []
+  if (stats.feelsLike != null)
+    cols.push({ key: 'feels', icon: <FeelsAnim temp={stats.feelsLike} />, value: `${stats.feelsLike.toFixed(1)}°`, label: '体感' })
+  if (stats.humidity != null)
+    cols.push({ key: 'humid', icon: <HumidAnim pct={stats.humidity} />, value: `${stats.humidity}%`, label: '湿度' })
+  if (avgAqi != null)
+    cols.push({ key: 'aqi', icon: <AqiAnim color={aqiColor(avgAqi)} />, value: aqiCategory(avgAqi), label: `空气 AQI${avgAqi}`, color: aqiColor(avgAqi) })
+  if (stats.uvIndex != null)
+    cols.push({ key: 'uv', icon: <UvAnim uv={stats.uvIndex} />, value: uvLevel(stats.uvIndex), label: `紫外线 UV${Math.round(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
+  if (cols.length === 0) return null
   return (
-    <div className="metric-tiles" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-      {stats.feelsLike != null && (
-        <div className="metric-tile">
-          <span className="mt-label">体感</span>
-          <span className="mt-value">{stats.feelsLike.toFixed(1)}°</span>
-          <FeelsAnim temp={stats.feelsLike} />
+    <div className="metric-strip">
+      {cols.map((c, i) => (
+        <div className="metric-col" key={c.key} style={{ animationDelay: `${i * 0.06}s` }}>
+          {c.icon}
+          <span className="mc-value" style={c.color ? { color: c.color } : undefined}>{c.value}</span>
+          <span className="mc-label">{c.label}</span>
         </div>
-      )}
-      {stats.humidity != null && (
-        <div className="metric-tile">
-          <span className="mt-label">湿度</span>
-          <span className="mt-value">{stats.humidity}%</span>
-          <HumidAnim pct={stats.humidity} />
-        </div>
-      )}
-      {avgAqi != null && (
-        <div className="metric-tile">
-          <span className="mt-label">空气质量</span>
-          <span className="mt-value" style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
-          <span className="mt-sub">AQI {avgAqi}</span>
-          <AqiAnim color={aqiColor(avgAqi)} />
-        </div>
-      )}
-      {stats.uvIndex != null && (
-        <div className="metric-tile">
-          <span className="mt-label">紫外线</span>
-          <span className="mt-value" style={{ color: uvColor(stats.uvIndex) }}>{uvLevel(stats.uvIndex)}</span>
-          <span className="mt-sub">UV {Math.round(stats.uvIndex)}</span>
-          <UvAnim uv={stats.uvIndex} />
-        </div>
-      )}
+      ))}
     </div>
   )
 }
 
-// 体感：温度计 + 汞柱随温度变化
+// 体感：温度计 + 汞柱随温度变化（居中方形图标）
 function FeelsAnim({ temp }: { temp: number }) {
   const pct = Math.min(100, Math.max(0, ((temp - 5) / 35) * 100))
-  const mercH = Math.max(3, pct * 0.33)
-  const mercY = 39 - mercH
+  const mercH = Math.max(4, (pct / 100) * 22)
+  const mercY = 30 - mercH
   const col = temp < 16 ? '#40c8e0' : temp < 28 ? '#ffd60a' : '#ff6b3d'
   return (
-    <svg className="tile-anim" viewBox="0 0 36 76" aria-hidden="true" overflow="visible">
-      <rect x="14" y="6" width="8" height="36" rx="4"
-        fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.14)" strokeWidth="1" />
-      <rect x="16" y={mercY} width="4" height={mercH} rx="2" fill={col} className="therm-mercury" />
-      {[12, 19, 26, 33].map((y) => (
-        <line key={y} x1="22" y1={y} x2="26" y2={y}
-          stroke="rgba(255,255,255,0.15)" strokeWidth="0.8" />
+    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
+      <rect x="17" y="5" width="6" height="25" rx="3"
+        fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
+      <rect x="18.5" y={mercY} width="3" height={mercH} rx="1.5" fill={col} className="therm-mercury" />
+      {[9, 14, 19].map((y) => (
+        <line key={y} x1="23" y1={y} x2="26" y2={y} stroke="rgba(255,255,255,0.18)" strokeWidth="0.8" />
       ))}
-      <circle cx="18" cy="54" r="9" fill={col} />
-      <circle cx="18" cy="54" r="14" fill={col} opacity="0.15" className="therm-glow" />
+      <circle cx="20" cy="30" r="6.5" fill={col} />
+      <circle cx="20" cy="30" r="10" fill={col} opacity="0.15" className="therm-glow" />
     </svg>
   )
 }
 
-// 湿度：水滴 + 水面波纹随湿度升降
+// 湿度：水滴 + 水面波纹随湿度升降（居中方形图标）
 function HumidAnim({ pct }: { pct: number }) {
-  const fillY = 46 - (pct / 100) * 38
+  const fillY = 33 - (pct / 100) * 26
   return (
-    <svg className="tile-anim" viewBox="0 0 44 58" aria-hidden="true" overflow="visible">
+    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
       <defs>
-        <clipPath id="tile-drop-clip">
-          <path d="M22 6 C22 6 6 24 6 35 a16 16 0 0 0 32 0 C38 24 22 6 22 6Z" />
+        <clipPath id="mc-drop-clip">
+          <path d="M20 4 C20 4 7 20 7 28 a13 13 0 0 0 26 0 C33 20 20 4 20 4Z" />
         </clipPath>
       </defs>
-      <path d="M22 6 C22 6 6 24 6 35 a16 16 0 0 0 32 0 C38 24 22 6 22 6Z"
-        fill="rgba(96,190,255,0.07)" stroke="rgba(96,190,255,0.22)" strokeWidth="1.2" />
-      <g clipPath="url(#tile-drop-clip)">
-        <rect x="-5" y={fillY} width="54" height="60" fill="rgba(64,200,224,0.28)" />
-        <path
-          className="wave-svg"
-          d={`M-22 ${fillY} q11-3.5 22 0 t22 0 t22 0 t22 0 V58 H-22Z`}
-          fill="rgba(64,200,224,0.42)"
-        />
+      <path d="M20 4 C20 4 7 20 7 28 a13 13 0 0 0 26 0 C33 20 20 4 20 4Z"
+        fill="rgba(96,190,255,0.07)" stroke="rgba(96,190,255,0.24)" strokeWidth="1.2" />
+      <g clipPath="url(#mc-drop-clip)">
+        <rect x="-6" y={fillY} width="52" height="44" fill="rgba(64,200,224,0.28)" />
+        <path className="wave-svg"
+          d={`M-22 ${fillY} q11-3 22 0 t22 0 t22 0 t22 0 V44 H-22Z`}
+          fill="rgba(64,200,224,0.42)" />
       </g>
     </svg>
   )
 }
 
-// 空气质量：呼吸光环，颜色随 AQI 等级
+// 空气质量：呼吸光环，颜色随 AQI 等级（居中方形图标）
 function AqiAnim({ color }: { color: string }) {
   return (
-    <svg className="tile-anim" viewBox="0 0 80 80" aria-hidden="true" overflow="visible">
-      <circle cx="56" cy="54" r="7" fill={color} opacity="0.75" className="aqi-core" />
-      <circle cx="56" cy="54" r="19" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
-      <circle cx="56" cy="54" r="33" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
-      <circle cx="56" cy="54" r="49" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
+    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
+      <circle cx="20" cy="20" r="5.5" fill={color} opacity="0.75" className="aqi-core" />
+      <circle cx="20" cy="20" r="11" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
+      <circle cx="20" cy="20" r="16.5" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
+      <circle cx="20" cy="20" r="22" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
     </svg>
   )
 }
 
+// 紫外线：脉动太阳 + 光芒（居中方形图标）
 function UvAnim({ uv }: { uv: number }) {
   const col = uvColor(uv)
   return (
-    <svg className="tile-anim" viewBox="0 0 80 80" aria-hidden="true" overflow="visible">
-      <g transform="translate(56,52)">
-        <circle r="10" fill={col} opacity="0.55" className="uv-core" />
-        <circle r="17" fill={col} opacity="0.18" className="uv-glow" />
+    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
+      <g transform="translate(20,20)">
+        <circle r="8" fill={col} opacity="0.55" className="uv-core" />
+        <circle r="13" fill={col} opacity="0.18" className="uv-glow" />
         {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
           <line key={deg}
-            x1="0" y1="21" x2="0" y2="28"
-            stroke={col} strokeWidth="2.2" strokeLinecap="round" strokeOpacity="0.55"
+            x1="0" y1="15" x2="0" y2="19"
+            stroke={col} strokeWidth="2" strokeLinecap="round" strokeOpacity="0.55"
             transform={`rotate(${deg})`}
             className="uv-ray"
           />

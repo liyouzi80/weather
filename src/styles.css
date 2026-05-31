@@ -45,7 +45,7 @@
 
 /* 连续圆角（squircle）：支持的浏览器用超椭圆，其余回退普通圆角 */
 @supports (corner-shape: superellipse(2)) {
-  .notice-card, .warn-card, .metric-tile, .ranking, .card, .icon-btn, .page-dots {
+  .notice-card, .warn-card, .ranking, .card, .icon-btn, .page-dots {
     corner-shape: superellipse(2.2);
   }
 }
@@ -53,7 +53,7 @@
 /* Vibrancy（振动）：玻璃卡上的次要文字用 plus-lighter 与底色叠加，
    透出背景亮度，避免在不同天空配色下灰字「消失」。深色界面下只提亮不压暗。 */
 @supports (mix-blend-mode: plus-lighter) {
-  .mt-label, .mt-sub, .ranking-title, .notice-issued,
+  .mc-label, .ranking-title, .notice-issued,
   .notice-detail, .notice-note {
     mix-blend-mode: plus-lighter;
   }
@@ -416,51 +416,46 @@ html[data-sky='fog'] body::before {
 }
 
 /* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */
-.metric-tiles {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 22px;
+/* 关键指标条：hero 正下方一排，去卡片框，「图标 + 数值 + 标签」竖排，
+   直接浮于天气动效之上（方案 B：通透融入，呼应苹果天气）。 */
+.metric-strip {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 30px;
+  padding: 0 2px;
 }
-.metric-tile {
-  position: relative;
-  overflow: hidden;
-  min-height: 118px;
-  background: var(--glass);
-  border: 0.5px solid var(--glass-border);
-  border-radius: var(--radius);
-  padding: 18px 18px 16px;
+.metric-col {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  backdrop-filter: var(--mat-regular-blur);
-  -webkit-backdrop-filter: var(--mat-regular-blur);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
+  align-items: center;
+  gap: 9px;
+  text-align: center;
   animation: riseIn 0.5s var(--spring) both;
 }
-
-.mt-label {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-dim);
-  margin-bottom: 6px;
+.mc-anim {
+  width: 42px;
+  height: 42px;
+  display: block;
+  overflow: visible;
+  pointer-events: none;
+  /* 轻微落影，让图标在动效背景上更立体 */
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
 }
-.mt-value {
-  font-size: 28px;
+.mc-value {
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.03em;
 }
-.mt-sub { font-size: 12px; color: var(--text-dim); margin-top: 5px; }
-
-/* 动效 SVG：绝对定位在卡片右下角，纯装饰 */
-.tile-anim {
-  position: absolute;
-  right: -4px;
-  bottom: -4px;
-  width: 80px;
-  height: 80px;
-  pointer-events: none;
+.mc-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-dim);
 }
 
 /* 温度计 */
