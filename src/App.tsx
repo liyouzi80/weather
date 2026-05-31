@@ -120,6 +120,7 @@ export default function App() {
           pullRef.current = p
           setPull(p)
         } else {
+          e.preventDefault()
           pullRef.current = 0
           setPull(0)
         }
@@ -281,12 +282,7 @@ export default function App() {
       {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
       <div
         className={'swipe-wrap' + (dragging ? ' dragging' : '')}
-        style={(swipeX || pull > 0) ? {
-          transform: [
-            swipeX ? `translateX(${swipeX}px)` : '',
-            pull > 0 ? `translateY(${pull * 0.35}px)` : '',
-          ].filter(Boolean).join(' '),
-        } : undefined}
+        style={swipeX ? { transform: `translateX(${swipeX}px)` } : undefined}
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
@@ -348,6 +344,7 @@ export default function App() {
           {CITIES.map((c, i) => (
             <button
               key={c.name}
+              type="button"
               className={'page-dot' + (i === cityIdx ? ' active' : '')}
               onClick={() => selectCity(i)}
               aria-label={c.name}
@@ -373,11 +370,9 @@ function warnColor(level: string): string {
 function WarningCard({ w }: { w: WeatherWarning }) {
   const col = warnColor(w.level)
   const badgeText = `${w.type}${w.level}预警`
-  // title 可能是完整描述，去掉「发布XXX预警信号」后剩下发布机构名
-  const sender = w.title
-    .replace(/发布.+预警(?:信号)?$/, '')
-    .replace(/^.+?(?=气象台|气象局|天气预报台)/, '')
-    .trim()
+  // 从 title 中提取发布机构（含地区前缀的完整名称，如「番禺区气象台」）
+  const m = w.title.match(/([一-龥]{2,8}(?:气象台|气象局|天气预报台))/)
+  const sender = m ? m[1] : ''
   const textColor = w.level.includes('黄') ? '#1a1a1a' : '#fff'
   return (
     <div className="warn-card" style={{ borderLeftColor: col }}>

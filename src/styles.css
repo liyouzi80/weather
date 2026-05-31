@@ -149,9 +149,14 @@ html[data-sky='fog'] body::before {
 /* 左右滑动切城市：内容容器随手指平移，松手平滑回弹 */
 .swipe-wrap {
   transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* pan-y：浏览器只接管垂直滚动，JS 可拦截水平滑动并调用 preventDefault() */
+  touch-action: pan-y;
+}
+.swipe-wrap.dragging {
+  transition: none;
+  /* 仅拖动期间提升 GPU 合成层，空闲时不占显存 */
   will-change: transform;
 }
-.swipe-wrap.dragging { transition: none; }
 
 /* 底部页面圆点指示（固定居中悬浮，活动页拉伸为胶囊） */
 .page-dots {
