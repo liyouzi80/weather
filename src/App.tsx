@@ -22,6 +22,28 @@ interface Annotated extends ProviderResult {
   isMin?: boolean
 }
 
+// ── 短触觉反馈（iOS Safari / Android Chrome 均支持 navigator.vibrate）──
+function haptic(pattern: number | number[]) {
+  try { navigator.vibrate?.(pattern) } catch {}
+}
+
+// ── 本地缓存（stale-while-revalidate：上次数据即时展示，后台刷新替换）──
+const CACHE_VER = 'pw1'
+function cacheKey(idx: number) { return `${CACHE_VER}_${idx}` }
+function writeCache(idx: number, results: ProviderResult[], air: AqiResult[]) {
+  try {
+    localStorage.setItem(cacheKey(idx), JSON.stringify({ results, air, at: Date.now() }))
+  } catch {}
+}
+function readCache(idx: number): { results: ProviderResult[]; air: AqiResult[]; at: number } | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(idx))
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    return Array.isArray(d?.results) && Array.isArray(d?.air) ? d : null
+  } catch { return null }
+}
+
 export default function App() {
   const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
@@ -43,6 +65,11 @@ export default function App() {
       setResults(weather)
       setAir(aqi.sources)
       setUpdatedAt(new Date())
+      writeCache(cityIdx, weather, aqi.sources)
+      // 刷新完成 toast（1.8s 后自动消失）
+      clearTimeout(toastTimerRef.current)
+      setToast(true)
+      toastTimerRef.current = setTimeout(() => setToast(false), 1800)
     } finally {
       if (id === refreshIdRef.current) {
         setLoading(false)
@@ -51,7 +78,16 @@ export default function App() {
     }
   }, [cityIdx])
 
-  useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    const cached = readCache(cityIdxRef.current)
+    if (cached) {
+      setResults(cached.results)
+      setAir(cached.air)
+      setUpdatedAt(new Date(cached.at))
+      setInitialLoad(false)
+    }
+    refresh()
+  }, [refresh])
 
   const selectCity = useCallback((i: number) => {
     if (i === cityIdx) return
@@ -68,10 +104,14 @@ export default function App() {
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
   // 用非被动原生监听，统一在一处判定主轴，避免纵向下拉与横向翻页冲突。
   const [pull, setPull] = useState(0)
+  const [pullReady, setPullReady] = useState(false)
   const [swipeX, setSwipeX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [toast, setToast] = useState(false)
   const pullRef = useRef(0)
+  const pullReadyRef = useRef(false)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const swipeXRef = useRef(0)
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
@@ -125,10 +165,19 @@ export default function App() {
           const p = Math.min(dy * 0.5, PULL_MAX)
           pullRef.current = p
           setPull(p)
+          if (p >= PULL_TRIGGER && !pullReadyRef.current) {
+            pullReadyRef.current = true
+            setPullReady(true)
+            haptic(8)
+          } else if (p < PULL_TRIGGER && pullReadyRef.current) {
+            pullReadyRef.current = false
+            setPullReady(false)
+          }
         } else {
           e.preventDefault()
           pullRef.current = 0
           setPull(0)
+          if (pullReadyRef.current) { pullReadyRef.current = false; setPullReady(false) }
         }
       }
     }
@@ -144,9 +193,14 @@ export default function App() {
         swipeXRef.current = 0
         setSwipeX(0)
       } else if (gesture.current === 'pull') {
-        if (pullRef.current >= PULL_TRIGGER) refreshRef.current()
+        if (pullRef.current >= PULL_TRIGGER) {
+          haptic([12, 60, 8])
+          refreshRef.current()
+        }
         pullRef.current = 0
         setPull(0)
+        pullReadyRef.current = false
+        setPullReady(false)
       }
       startX.current = null
       startY.current = null
@@ -245,7 +299,7 @@ export default function App() {
     <div className="app" ref={appRef}>
       <WeatherFX kind={fx} tint={tint} />
       <div
-        className="pull-indicator"
+        className={'pull-indicator' + (pullReady ? ' ready' : '')}
         style={{
           height: pull,
           opacity: pull > 6 ? 1 : 0,
@@ -262,6 +316,14 @@ export default function App() {
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
         </svg>
       </div>
+      {toast && (
+        <div className="refresh-toast">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          已刷新
+        </div>
+      )}
       <header className={'loc-header' + (scrolled ? ' scrolled' : '')} aria-hidden="true">
         <span className="loc-sticky-name">{city.name}</span>
       </header>
@@ -283,7 +345,10 @@ export default function App() {
 
         <div className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <span className="hero-city">{city.name}</span>
-          {updatedAgo && <span className="hero-updated">{updatedAgo}</span>}
+          {loading && results.length > 0
+            ? <span className="hero-updated refreshing">数据更新中…</span>
+            : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
+          }
           {stats ? (
             <>
               <div className="hero-temp">{Math.round(stats.avg)}°</div>
@@ -645,21 +710,20 @@ function uvColor(uv: number): string {
 // 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
 // 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
 const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const cols: { key: string; icon: JSX.Element; value: string; label: string; color?: string }[] = []
+  const cols: { key: string; value: string; label: string; color?: string }[] = []
   if (stats.feelsLike != null)
-    cols.push({ key: 'feels', icon: <FeelsAnim temp={stats.feelsLike} />, value: `${stats.feelsLike.toFixed(1)}°`, label: '体感' })
+    cols.push({ key: 'feels', value: `${stats.feelsLike.toFixed(1)}°`, label: '体感' })
   if (stats.humidity != null)
-    cols.push({ key: 'humid', icon: <HumidAnim pct={stats.humidity} />, value: `${stats.humidity}%`, label: '湿度' })
+    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: '湿度' })
   if (avgAqi != null)
-    cols.push({ key: 'aqi', icon: <AqiAnim color={aqiColor(avgAqi)} />, value: aqiCategory(avgAqi), label: `空气 AQI${avgAqi}`, color: aqiColor(avgAqi) })
+    cols.push({ key: 'aqi', value: aqiCategory(avgAqi), label: `空气 AQI${avgAqi}`, color: aqiColor(avgAqi) })
   if (stats.uvIndex != null)
-    cols.push({ key: 'uv', icon: <UvAnim uv={stats.uvIndex} />, value: uvLevel(stats.uvIndex), label: `紫外线 UV${Math.round(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
+    cols.push({ key: 'uv', value: uvLevel(stats.uvIndex), label: `紫外线 UV${Math.round(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
   if (cols.length === 0) return null
   return (
     <div className="metric-strip">
       {cols.map((c, i) => (
         <div className="metric-col" key={c.key} style={{ animationDelay: `${i * 0.06}s` }}>
-          {c.icon}
           <span className="mc-value" style={c.color ? { color: c.color } : undefined}>{c.value}</span>
           <span className="mc-label">{c.label}</span>
         </div>
@@ -667,81 +731,6 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
     </div>
   )
 })
-
-// 体感：温度计 + 汞柱随温度变化（居中方形图标）
-function FeelsAnim({ temp }: { temp: number }) {
-  const pct = Math.min(100, Math.max(0, ((temp - 5) / 35) * 100))
-  const mercH = Math.max(4, (pct / 100) * 22)
-  const mercY = 30 - mercH
-  const col = temp < 16 ? '#40c8e0' : temp < 28 ? '#ffd60a' : '#ff6b3d'
-  return (
-    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
-      <rect x="17" y="5" width="6" height="25" rx="3"
-        fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.16)" strokeWidth="1" />
-      <rect x="18.5" y={mercY} width="3" height={mercH} rx="1.5" fill={col} className="therm-mercury" />
-      {[9, 14, 19].map((y) => (
-        <line key={y} x1="23" y1={y} x2="26" y2={y} stroke="rgba(255,255,255,0.18)" strokeWidth="0.8" />
-      ))}
-      <circle cx="20" cy="30" r="6.5" fill={col} />
-      <circle cx="20" cy="30" r="10" fill={col} opacity="0.15" className="therm-glow" />
-    </svg>
-  )
-}
-
-// 湿度：水滴 + 水面波纹随湿度升降（居中方形图标）
-function HumidAnim({ pct }: { pct: number }) {
-  const fillY = 33 - (pct / 100) * 26
-  return (
-    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
-      <defs>
-        <clipPath id="mc-drop-clip">
-          <path d="M20 4 C20 4 7 20 7 28 a13 13 0 0 0 26 0 C33 20 20 4 20 4Z" />
-        </clipPath>
-      </defs>
-      <path d="M20 4 C20 4 7 20 7 28 a13 13 0 0 0 26 0 C33 20 20 4 20 4Z"
-        fill="rgba(96,190,255,0.07)" stroke="rgba(96,190,255,0.24)" strokeWidth="1.2" />
-      <g clipPath="url(#mc-drop-clip)">
-        <rect x="-6" y={fillY} width="52" height="44" fill="rgba(64,200,224,0.28)" />
-        <path className="wave-svg"
-          d={`M-22 ${fillY} q11-3 22 0 t22 0 t22 0 t22 0 V44 H-22Z`}
-          fill="rgba(64,200,224,0.42)" />
-      </g>
-    </svg>
-  )
-}
-
-// 空气质量：呼吸光环，颜色随 AQI 等级（居中方形图标）
-function AqiAnim({ color }: { color: string }) {
-  return (
-    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
-      <circle cx="20" cy="20" r="5.5" fill={color} opacity="0.75" className="aqi-core" />
-      <circle cx="20" cy="20" r="11" fill="none" stroke={color} strokeWidth="1.5" opacity="0.38" className="aqi-r1" />
-      <circle cx="20" cy="20" r="16.5" fill="none" stroke={color} strokeWidth="1" opacity="0.18" className="aqi-r2" />
-      <circle cx="20" cy="20" r="22" fill="none" stroke={color} strokeWidth="0.6" opacity="0.08" className="aqi-r3" />
-    </svg>
-  )
-}
-
-// 紫外线：脉动太阳 + 光芒（居中方形图标）
-function UvAnim({ uv }: { uv: number }) {
-  const col = uvColor(uv)
-  return (
-    <svg className="mc-anim" viewBox="0 0 40 40" aria-hidden="true" overflow="visible">
-      <g transform="translate(20,20)">
-        <circle r="8" fill={col} opacity="0.55" className="uv-core" />
-        <circle r="13" fill={col} opacity="0.18" className="uv-glow" />
-        {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => (
-          <line key={deg}
-            x1="0" y1="15" x2="0" y2="19"
-            stroke={col} strokeWidth="2" strokeLinecap="round" strokeOpacity="0.55"
-            transform={`rotate(${deg})`}
-            className="uv-ray"
-          />
-        ))}
-      </g>
-    </svg>
-  )
-}
 
 // 番禺区气象台短时预报卡：智能提取时间窗口 + 精简正文
 function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {

@@ -42,7 +42,7 @@
 
 /* 连续圆角（squircle）：支持的浏览器用超椭圆，其余回退普通圆角 */
 @supports (corner-shape: superellipse(2)) {
-  .notice-card, .warn-card, .ranking, .card, .icon-btn, .page-dots {
+  .notice-card, .warn-card, .ranking, .card, .page-dots {
     corner-shape: superellipse(2.2);
   }
 }
@@ -246,9 +246,41 @@ html[data-sky='fog'] body::before {
   justify-content: center;
   overflow: hidden;
   color: var(--text-secondary);
-  transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease, color 0.2s ease;
 }
 .pull-indicator svg { transition: transform 0.1s linear; }
+/* 超过触发阈值时变绿，提示"松手即刷新" */
+.pull-indicator.ready { color: #34c759; }
+
+/* 刷新完成 toast */
+.refresh-toast {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 54px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: rgba(30, 30, 32, 0.82);
+  border: 0.5px solid rgba(52, 199, 89, 0.4);
+  color: #34c759;
+  font-size: 13px;
+  font-weight: 600;
+  pointer-events: none;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  animation: toastPop 0.28s var(--spring) both, toastFade 0.3s ease 1.5s both;
+}
+@keyframes toastPop {
+  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.9); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes toastFade {
+  to { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.95); }
+}
 
 /* 实时天气动效：全屏背景层，浮在天空渐变之上、内容之下 */
 .weather-fx {
@@ -428,21 +460,12 @@ html[data-sky='fog'] body::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 9px;
+  gap: 5px;
   text-align: center;
   animation: riseIn 0.5s var(--spring) both;
 }
-.mc-anim {
-  width: 42px;
-  height: 42px;
-  display: block;
-  overflow: visible;
-  pointer-events: none;
-  /* 轻微落影，让图标在动效背景上更立体 */
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.28));
-}
 .mc-value {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1;
   letter-spacing: -0.03em;
@@ -452,52 +475,6 @@ html[data-sky='fog'] body::before {
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text-dim);
-}
-
-/* 温度计 */
-.therm-mercury { animation: thermBreath 3.2s ease-in-out infinite; }
-.therm-glow    { animation: thermGlow  3.2s ease-in-out infinite; }
-@keyframes thermBreath {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.6; }
-}
-@keyframes thermGlow {
-  0%, 100% { opacity: 0.15; }
-  50%       { opacity: 0.04; }
-}
-
-/* 湿度水波 */
-.wave-svg { animation: waveFlow 3s linear infinite; }
-@keyframes waveFlow {
-  from { transform: translateX(0); }
-  to   { transform: translateX(22px); }
-}
-
-/* AQI 呼吸光环 */
-.aqi-core { transform-box: fill-box; transform-origin: center; animation: aqiCore  2.8s ease-in-out infinite; }
-.aqi-r1   { transform-box: fill-box; transform-origin: center; animation: aqiRing  2.8s ease-in-out infinite; }
-.aqi-r2   { transform-box: fill-box; transform-origin: center; animation: aqiRing  2.8s ease-in-out 0.55s infinite; }
-.aqi-r3   { transform-box: fill-box; transform-origin: center; animation: aqiRing  2.8s ease-in-out 1.1s  infinite; }
-@keyframes aqiCore {
-  0%, 100% { transform: scale(1);    opacity: 0.75; }
-  50%       { transform: scale(1.22); opacity: 0.5; }
-}
-@keyframes aqiRing {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.1); }
-}
-
-/* 紫外线太阳动效 */
-.uv-core { transform-box: fill-box; transform-origin: center; animation: uvPulse 3s ease-in-out infinite; }
-.uv-glow { transform-box: fill-box; transform-origin: center; animation: uvPulse 3s ease-in-out 0.4s infinite; }
-.uv-ray  { transform-box: fill-box; transform-origin: 0 0; animation: uvRay 3s ease-in-out infinite; }
-@keyframes uvPulse {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50%       { opacity: 0.85; transform: scale(1.12); }
-}
-@keyframes uvRay {
-  0%, 100% { opacity: 0.55; }
-  50%       { opacity: 0.9; }
 }
 
 /* 下拉刷新指示器加载中旋转 */
@@ -528,12 +505,19 @@ html[data-sky='fog'] body::before {
   background-clip: text;
   margin-bottom: 1px;
 }
-/* 更新时间：城市名下方弱色辅助文字 */
+/* 更新时间：城市名下方弱色辅助文字；后台刷新中时轻微脉动 */
 .hero-updated {
   font-size: 12px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.45);
   margin-bottom: 16px;
+}
+.hero-updated.refreshing {
+  animation: heroUpdPulse 1.1s ease-in-out infinite;
+}
+@keyframes heroUpdPulse {
+  0%, 100% { opacity: 0.45; }
+  50%       { opacity: 0.75; }
 }
 .hero-temp {
   font-size: clamp(88px, 27vw, 124px);
@@ -597,14 +581,14 @@ html[data-sky='fog'] body::before {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 0;
-  transition: background var(--transition-fast);
+  padding: 8px 6px;
   border-radius: 10px;
   margin: 0 -6px;
-  padding-left: 6px;
-  padding-right: 6px;
 }
-.rank-row:hover { background: var(--glass-hover); }
+/* 仅鼠标悬停时显示高亮，触屏点击不残留选中态 */
+@media (hover: hover) {
+  .rank-row:hover { background: var(--glass-hover); }
+}
 .rank-no {
   width: 18px;
   text-align: center;
@@ -814,6 +798,18 @@ a.card { text-decoration: none; color: inherit; display: block; }
 @keyframes shimmer {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.6; }
+}
+
+/* ── 移动端性能：触屏设备减小 backdrop-filter 模糊半径，降低 GPU 合成压力 ── */
+@media (hover: none) {
+  .card, .warn-card, .notice-card, .ranking, .skeleton-card {
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
+  }
+  .page-dots {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 }
 
 /* ── Responsive ── */

@@ -417,13 +417,16 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
     let nextShoot = rnd(8, 22)
     let dayT = 0
 
-    const SLOW_MS = 1000 / 24
+    // 帧率节流：慢动效（云/雾/晴空）20fps，动态效果（雨雪雷）30fps，省电同时保持流畅
+    const SLOW_MS = 1000 / 20
+    const FAST_MS = 1000 / 30
     const isSlowFx = kind === 'clear-night' || kind === 'fog' || kind === 'clear-day' || isCloudKind(kind)
+    const FRAME_MS = isSlowFx ? SLOW_MS : FAST_MS
     let raf = 0, last = 0
 
     const frame = (now: number) => {
       const elapsed = now - last
-      if (isSlowFx && elapsed < SLOW_MS) { raf = requestAnimationFrame(frame); return }
+      if (elapsed < FRAME_MS) { raf = requestAnimationFrame(frame); return }
       const dt = Math.min(0.05, elapsed / 1000)
       last = now
       ctx.clearRect(0, 0, W, H)
