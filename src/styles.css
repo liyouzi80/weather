@@ -41,7 +41,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
   overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
+body::-webkit-scrollbar { display: none; }
 
 /* Atmospheric background layers */
 body::before {
@@ -210,8 +213,15 @@ html[data-sky='fog'] body::before {
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 .warn-badge svg { flex: none; }
+.warn-sender {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-left: 10px;
+  font-weight: 500;
+}
 
 /* 番禺区气象台短时预报卡（仅有提示时展示） */
 .notice-card {
@@ -237,17 +247,16 @@ html[data-sky='fog'] body::before {
 }
 .notice-text { font-size: 13.5px; color: var(--text-secondary); line-height: 1.55; }
 
-/* 概览次要指标小卡：Apple Weather 风格 2 列网格 */
+/* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */
 .metric-tiles {
   display: grid;
-  grid-template-columns: 1fr 1fr;
   gap: 10px;
   margin-bottom: 16px;
 }
 .metric-tile {
   position: relative;
   overflow: hidden;
-  min-height: 112px;
+  min-height: 108px;
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
   border-radius: var(--radius);
@@ -259,7 +268,6 @@ html[data-sky='fog'] body::before {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   animation: riseIn 0.5s cubic-bezier(0.22, 0.61, 0.36, 1) both;
 }
-.tile-wide { grid-column: span 2; min-height: 80px; }
 
 .mt-label {
   font-size: 11px;
@@ -285,12 +293,6 @@ html[data-sky='fog'] body::before {
   width: 80px;
   height: 80px;
   pointer-events: none;
-}
-.tile-anim-wide {
-  width: 160px;
-  height: 64px;
-  right: 0;
-  bottom: 0;
 }
 
 /* 温度计 */

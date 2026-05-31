@@ -82,7 +82,13 @@ export async function fetchAirMattersAqi(path: string): Promise<AqiSource> {
 
 // IQAir（iqair.cn）
 export async function fetchIQAirAqi(path: string): Promise<AqiSource> {
-  const res = await fetch(`https://www.iqair.cn/${path}`, { headers: { 'User-Agent': UA } })
+  const res = await fetch(`https://www.iqair.cn/${path}?t=${Date.now()}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+      'Cache-Control': 'no-cache, no-store',
+      'Pragma': 'no-cache',
+    },
+  })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const s = (await res.text()).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')
   const m = s.match(new RegExp(`(\\d+)\\s*美国 AQI⁺?\\s*(?:${IQAIR_CATS})\\s*主要污染物[：:]\\s*(\\S+)\\s*([\\d.]+)\\s*µg`))

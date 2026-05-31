@@ -29,6 +29,7 @@ interface Flake { x: number; y: number; r: number; vy: number; vx: number; sway:
 interface Star { x: number; y: number; r: number; ph: number; sp: number }
 interface Cloud { x: number; y: number; s: number; vx: number; o: number }
 interface Mote { x: number; y: number; r: number; vx: number; vy: number; o: number }
+interface Bolt { pts: [number, number][] }
 
 export function WeatherFX({ kind }: { kind: FxKind }) {
   const ref = useRef<HTMLCanvasElement>(null)
@@ -66,40 +67,53 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     const motes: Mote[] = []
 
     if (kind === 'rain' || kind === 'thunder') {
-      const n = Math.round(Math.min(160, area / 9000))
+      const n = Math.round(Math.min(300, area / 4500))
       for (let i = 0; i < n; i++)
-        drops.push({ x: rnd(0, W), y: rnd(0, H), len: rnd(12, 26), vy: rnd(420, 680), w: rnd(0.6, 1.3) })
+        drops.push({ x: rnd(0, W), y: rnd(0, H), len: rnd(14, 32), vy: rnd(460, 720), w: rnd(0.7, 1.6) })
     } else if (kind === 'snow') {
-      const n = Math.round(Math.min(110, area / 14000))
+      const n = Math.round(Math.min(180, area / 7000))
       for (let i = 0; i < n; i++)
-        flakes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.2, 3.2), vy: rnd(20, 55), vx: rnd(-8, 8), sway: rnd(8, 24), ph: rnd(0, TAU) })
+        flakes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(1.4, 3.8), vy: rnd(22, 60), vx: rnd(-10, 10), sway: rnd(10, 28), ph: rnd(0, TAU) })
     } else if (kind === 'clear-night') {
-      const n = Math.round(Math.min(90, area / 16000))
+      const n = Math.round(Math.min(140, area / 9000))
       for (let i = 0; i < n; i++)
-        stars.push({ x: rnd(0, W), y: rnd(0, H * 0.7), r: rnd(0.5, 1.6), ph: rnd(0, TAU), sp: rnd(0.6, 1.8) })
+        stars.push({ x: rnd(0, W), y: rnd(0, H * 0.75), r: rnd(0.5, 2.0), ph: rnd(0, TAU), sp: rnd(0.8, 2.2) })
     } else if (kind === 'cloudy' || kind === 'fog') {
-      const n = kind === 'fog' ? 5 : 4
+      const n = kind === 'fog' ? 8 : 6
       for (let i = 0; i < n; i++)
-        clouds.push({ x: rnd(-0.2, 1) * W, y: rnd(0.04, 0.5) * H, s: rnd(0.7, 1.5), vx: rnd(6, 16) * (kind === 'fog' ? 0.5 : 1), o: rnd(0.05, 0.13) })
+        clouds.push({ x: rnd(-0.3, 1) * W, y: rnd(0.02, 0.55) * H, s: rnd(0.9, 1.8), vx: rnd(6, 18) * (kind === 'fog' ? 0.6 : 1), o: rnd(0.12, 0.26) })
     } else {
-      // clear-day：少量缓慢上浮的光尘
-      const n = Math.round(Math.min(40, area / 36000))
+      // clear-day：缓慢上浮的光尘
+      const n = Math.round(Math.min(70, area / 18000))
       for (let i = 0; i < n; i++)
-        motes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.8, 2.2), vx: rnd(-6, 6), vy: rnd(-14, -4), o: rnd(0.05, 0.18) })
+        motes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.8, 2.4), vx: rnd(-6, 6), vy: rnd(-16, -4), o: rnd(0.10, 0.30) })
     }
 
     // 闪电状态
     let flash = 0
-    let nextBolt = rnd(1.5, 4)
+    let nextBolt = rnd(1.0, 3.0)
+    let bolt: Bolt | null = null
+    const makeBolt = (): Bolt => {
+      const pts: [number, number][] = [[rnd(W * 0.2, W * 0.8), 0]]
+      const segs = 6 + Math.floor(Math.random() * 4)
+      for (let i = 1; i <= segs; i++) {
+        const px = pts[i - 1][0] + rnd(-40, 40)
+        const py = (H * 0.65 * i) / segs
+        pts.push([px, py])
+      }
+      return { pts }
+    }
 
     const drawClouds = () => {
       for (const c of clouds) {
-        const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, 140 * c.s)
-        g.addColorStop(0, `rgba(200,210,225,${c.o})`)
-        g.addColorStop(1, 'rgba(200,210,225,0)')
+        const r = 180 * c.s
+        const g = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r)
+        g.addColorStop(0, `rgba(200,212,228,${c.o})`)
+        g.addColorStop(0.5, `rgba(200,212,228,${c.o * 0.5})`)
+        g.addColorStop(1, 'rgba(200,212,228,0)')
         ctx.fillStyle = g
         ctx.beginPath()
-        ctx.arc(c.x, c.y, 140 * c.s, 0, TAU)
+        ctx.arc(c.x, c.y, r, 0, TAU)
         ctx.fill()
       }
     }
@@ -115,41 +129,58 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       switch (kind) {
         case 'rain':
         case 'thunder': {
-          ctx.strokeStyle = 'rgba(170,200,230,0.38)'
+          ctx.strokeStyle = 'rgba(174,208,240,0.62)'
           ctx.lineCap = 'round'
           for (const d of drops) {
             ctx.lineWidth = d.w
             ctx.beginPath()
             ctx.moveTo(d.x, d.y)
-            ctx.lineTo(d.x - d.len * 0.22, d.y + d.len) // 略微倾斜
+            ctx.lineTo(d.x - d.len * 0.24, d.y + d.len)
             ctx.stroke()
             if (!reduced) {
               d.y += d.vy * dt
-              d.x -= d.vy * 0.22 * dt
+              d.x -= d.vy * 0.24 * dt
               if (d.y > H + d.len) { d.y = -d.len; d.x = rnd(0, W) }
             }
           }
           if (kind === 'thunder' && !reduced) {
             nextBolt -= dt
-            if (nextBolt <= 0) { flash = 1; nextBolt = rnd(2.5, 7) }
+            if (nextBolt <= 0) {
+              flash = 1
+              nextBolt = rnd(1.2, 4.5)
+              bolt = makeBolt()
+            }
             if (flash > 0) {
-              ctx.fillStyle = `rgba(220,230,255,${flash * 0.5})`
+              ctx.fillStyle = `rgba(225,235,255,${flash * 0.62})`
               ctx.fillRect(0, 0, W, H)
-              flash -= dt * 3.2
+              // 闪电主干
+              if (bolt && flash > 0.3) {
+                ctx.save()
+                ctx.strokeStyle = `rgba(255,255,255,${flash * 0.95})`
+                ctx.lineWidth = 1.8
+                ctx.shadowColor = 'rgba(180,200,255,0.9)'
+                ctx.shadowBlur = 12
+                ctx.beginPath()
+                ctx.moveTo(bolt.pts[0][0], bolt.pts[0][1])
+                for (let i = 1; i < bolt.pts.length; i++) ctx.lineTo(bolt.pts[i][0], bolt.pts[i][1])
+                ctx.stroke()
+                ctx.restore()
+              }
+              flash -= dt * 2.8
               if (flash < 0) flash = 0
             }
           }
           break
         }
         case 'snow': {
-          ctx.fillStyle = 'rgba(255,255,255,0.85)'
+          ctx.fillStyle = 'rgba(255,255,255,0.92)'
           for (const f of flakes) {
-            ctx.globalAlpha = 0.55 + 0.4 * Math.sin(f.ph)
+            ctx.globalAlpha = 0.65 + 0.32 * Math.sin(f.ph)
             ctx.beginPath()
             ctx.arc(f.x, f.y, f.r, 0, TAU)
             ctx.fill()
             if (!reduced) {
-              f.ph += dt * 1.5
+              f.ph += dt * 1.6
               f.y += f.vy * dt
               f.x += (f.vx + Math.sin(f.ph) * f.sway) * dt
               if (f.y > H + f.r) { f.y = -f.r; f.x = rnd(0, W) }
@@ -163,7 +194,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
         case 'clear-night': {
           ctx.fillStyle = '#fff'
           for (const s of stars) {
-            const tw = 0.35 + 0.45 * (0.5 + 0.5 * Math.sin(s.ph))
+            const tw = 0.4 + 0.58 * (0.5 + 0.5 * Math.sin(s.ph))
             ctx.globalAlpha = tw
             ctx.beginPath()
             ctx.arc(s.x, s.y, s.r, 0, TAU)
@@ -183,8 +214,14 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           break
         }
         default: {
-          // clear-day：极淡光尘缓升 + 一处暖色光晕（已由 CSS 背景提供，这里仅点缀）
-          ctx.fillStyle = '#fff6dc'
+          // clear-day：暖色光尘缓升 + 顶部阳光晕圈
+          const sunG = ctx.createRadialGradient(W * 0.78, -H * 0.05, 0, W * 0.78, -H * 0.05, H * 0.65)
+          sunG.addColorStop(0, 'rgba(255,210,90,0.18)')
+          sunG.addColorStop(0.45, 'rgba(255,180,60,0.08)')
+          sunG.addColorStop(1, 'rgba(255,140,40,0)')
+          ctx.fillStyle = sunG
+          ctx.fillRect(0, 0, W, H)
+          ctx.fillStyle = '#fff8e0'
           for (const m of motes) {
             ctx.globalAlpha = m.o
             ctx.beginPath()
