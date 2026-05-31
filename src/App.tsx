@@ -66,10 +66,6 @@ export default function App() {
       setAir(aqi.sources)
       setUpdatedAt(new Date())
       writeCache(cityIdx, weather, aqi.sources)
-      // 刷新完成 toast（1.8s 后自动消失）
-      clearTimeout(toastTimerRef.current)
-      setToast(true)
-      toastTimerRef.current = setTimeout(() => setToast(false), 1800)
     } finally {
       if (id === refreshIdRef.current) {
         setLoading(false)
@@ -108,10 +104,8 @@ export default function App() {
   const [swipeX, setSwipeX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const [toast, setToast] = useState(false)
   const pullRef = useRef(0)
   const pullReadyRef = useRef(false)
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout>>()
   const swipeXRef = useRef(0)
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
@@ -301,8 +295,8 @@ export default function App() {
       <div
         className={'pull-indicator' + (pullReady ? ' ready' : '')}
         style={{
-          height: pull,
-          opacity: pull > 6 ? 1 : 0,
+          height: loading ? 46 : pull,
+          opacity: loading || pull > 6 ? 1 : 0,
         }}
       >
         <svg
@@ -316,14 +310,6 @@ export default function App() {
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
         </svg>
       </div>
-      {toast && (
-        <div className="refresh-toast">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          已刷新
-        </div>
-      )}
       <header className={'loc-header' + (scrolled ? ' scrolled' : '')} aria-hidden="true">
         <span className="loc-sticky-name">{city.name}</span>
       </header>

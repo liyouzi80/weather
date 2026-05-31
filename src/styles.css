@@ -2,14 +2,15 @@
   --bg-deep: #03050b;
   --bg-base: #0a0d16;
 
-  /* ── Materials 层次（对齐 SwiftUI .regular/.thick）──
-     每级 = 底色透明度 + 边框 + 模糊半径，越上层越薄越透 */
-  --mat-regular-bg: rgba(255, 255, 255, 0.05);
-  --mat-regular-border: rgba(255, 255, 255, 0.08);
-  --mat-regular-blur: blur(40px) saturate(180%);
-  --mat-thick-bg: rgba(255, 255, 255, 0.08);
-  --mat-thick-border: rgba(255, 255, 255, 0.11);
-  --mat-thick-blur: blur(50px) saturate(190%);
+  /* ── Materials 层次 ──
+     扁平半透明深色填充（不用 backdrop-filter 高斯模糊）：在近乎纯色的天空渐变上
+     视觉与 .ultraThinMaterial 几乎一致，却免去移动端 GPU 合成开销 */
+  --mat-regular-bg: rgba(20, 23, 35, 0.52);
+  --mat-regular-border: rgba(255, 255, 255, 0.1);
+  --mat-regular-blur: none;
+  --mat-thick-bg: rgba(26, 29, 43, 0.64);
+  --mat-thick-border: rgba(255, 255, 255, 0.13);
+  --mat-thick-blur: none;
 
   /* 兼容旧引用：glass = regular material */
   --glass: var(--mat-regular-bg);
@@ -209,10 +210,8 @@ html[data-sky='fog'] body::before {
   gap: 8px;
   padding: 8px 12px;
   border-radius: 999px;
-  background: rgba(10, 14, 24, 0.5);
+  background: rgba(10, 14, 24, 0.78);
   border: 0.5px solid var(--glass-border);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
 }
 .page-dot {
@@ -252,36 +251,6 @@ html[data-sky='fog'] body::before {
 /* 超过触发阈值时变绿，提示"松手即刷新" */
 .pull-indicator.ready { color: #34c759; }
 
-/* 刷新完成 toast */
-.refresh-toast {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0px) + 54px);
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 18px;
-  border-radius: 999px;
-  background: rgba(30, 30, 32, 0.82);
-  border: 0.5px solid rgba(52, 199, 89, 0.4);
-  color: #34c759;
-  font-size: 13px;
-  font-weight: 600;
-  pointer-events: none;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  animation: toastPop 0.28s var(--spring) both, toastFade 0.3s ease 1.5s both;
-}
-@keyframes toastPop {
-  from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.9); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-}
-@keyframes toastFade {
-  to { opacity: 0; transform: translateX(-50%) translateY(-6px) scale(0.95); }
-}
-
 /* 实时天气动效：全屏背景层，浮在天空渐变之上、内容之下 */
 .weather-fx {
   position: fixed;
@@ -318,8 +287,6 @@ html[data-sky='fog'] body::before {
     rgba(8, 12, 24, 0.55) 0%,
     rgba(8, 12, 24, 0.26) 52%,
     rgba(8, 12, 24, 0) 100%);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
   -webkit-mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
   mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
   opacity: 0;
@@ -449,32 +416,47 @@ html[data-sky='fog'] body::before {
 .metric-strip {
   display: flex;
   justify-content: space-around;
-  align-items: flex-start;
-  gap: 6px;
-  margin: 2px 0 30px;
-  padding: 0 2px;
+  align-items: stretch;
+  gap: 0;
+  margin: 4px 0 32px;
+  padding: 2px;
 }
 .metric-col {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  justify-content: center;
+  gap: 7px;
+  padding: 4px 6px;
   text-align: center;
   animation: riseIn 0.5s var(--spring) both;
 }
+/* 列间细分隔线（0.5px hairline，呼应苹果天气详情分隔） */
+.metric-col + .metric-col::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.5px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.13);
+}
 .mc-value {
-  font-size: 26px;
-  font-weight: 700;
+  font-size: 25px;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 .mc-label {
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.01em;
-  color: var(--text-dim);
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
 }
 
 /* 下拉刷新指示器加载中旋转 */
@@ -774,7 +756,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
   font-weight: 600;
   cursor: pointer;
   transition: background var(--transition-fast), transform var(--transition-fast);
-  backdrop-filter: blur(10px);
 }
 .retry-btn:hover { background: rgba(120,120,128,0.36); }
 .retry-btn:active { transform: scale(0.95); }
@@ -798,18 +779,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
 @keyframes shimmer {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.6; }
-}
-
-/* ── 移动端性能：触屏设备减小 backdrop-filter 模糊半径，降低 GPU 合成压力 ── */
-@media (hover: none) {
-  .card, .warn-card, .notice-card, .ranking, .skeleton-card {
-    backdrop-filter: blur(20px) saturate(150%);
-    -webkit-backdrop-filter: blur(20px) saturate(150%);
-  }
-  .page-dots {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
 }
 
 /* ── Responsive ── */
