@@ -720,7 +720,7 @@ function AqiAnim({ color }: { color: string }) {
 
 // 番禺区气象台短时预报卡：智能提取时间窗口 + 精简正文
 function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
-  const { timeLabel, body } = summarizeForecast(text)
+  const { timeLabel, weather, wind, temp, note } = parseForecast(text)
   const issued = fmtIssuedAt(issuedAt)
   return (
     <div className="notice-card">
@@ -733,30 +733,77 @@ function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
         {timeLabel && <span className="notice-time">{timeLabel}</span>}
         {issued && <span className="notice-issued">{issued}</span>}
       </div>
-      <div className="notice-text">{body}</div>
+      <div className="notice-row">
+        {weather && <span className="notice-wx">{weather}</span>}
+        {wind && <span className="notice-detail">{wind}</span>}
+        {temp && <span className="notice-detail">{temp}</span>}
+      </div>
+      {note && <p className="notice-note">{note}</p>}
     </div>
   )
 }
 
-// 从预报文字中提取时间窗口标签并精简正文
-function summarizeForecast(text: string): { timeLabel: string; body: string } {
-  let s = text.trim()
-  // 匹配 "今天17时到今天20时" / "今天17时到20时" / "17时到20时"
-  const tm = s.match(/^(今[天日]|明天|后天)?(\d{1,2})时到(今[天日]|明天|后天)?(\d{1,2})时[\s，,]*/)
+// 把预报原文拆解为：时间窗口 / 天气现象 / 风向风力 / 温度 / 附加提示
+function parseForecast(raw: string) {
+  let s = raw.trim()
+
+  // 时间窗口：「今天17时到今天20时」→ timeLabel「今天17—20时」
   let timeLabel = ''
+  const tm = s.match(/^(今[天日]|明天|后天)?(\d{1,2})时到(今[天日]|明天|后天)?(\d{1,2})时[\s，,]*/)
   if (tm) {
-    const fromDay = tm[1] ?? ''
-    const toDay = tm[3] ?? fromDay
+    const fromDay = tm[1] ?? '', toDay = tm[3] ?? fromDay
     timeLabel = toDay && toDay !== fromDay
       ? `${fromDay}${tm[2]}—${toDay}${tm[4]}时`
       : `${fromDay}${tm[2]}—${tm[4]}时`
     s = s.slice(tm[0].length)
   }
-  // 去掉正文头部区域名 "番禺区" "番禺"
-  s = s.replace(/^番禺[区县]?\s*[，,]?\s*/, '')
-  // 正文超 52 字符截断，避免在行尾留半句
-  if (s.length > 52) s = s.slice(0, 52).replace(/[，,。！？\s]*$/, '') + '…'
-  return { timeLabel, body: s }
+
+  // 去区域名
+  s = s.replace(/^(?:广州市?)?番禺[区县]?\s*[，,]?\s*/, '')
+
+  // 提取风向风力（如「偏南风2-3级」「东北风3级」）
+  let wind = ''
+  s = s.replace(/((?:偏[东南西北]|[东南西北]{1,2})风[\d—\-~～至]+级)/g, m => { wind = m; return '' })
+
+  // 提取温度（如「气温27-30℃」「最高气温33℃」）
+  let temp = ''
+  s = s.replace(/(?:最[高低])?气温([\d—\-~～至]+)\s*[℃°]?/g, (_, t) => { temp = t + '℃'; return '' })
+
+  // 去天气成因背景句（如「受副热带高压影响」）
+  s = s.replace(/受[^，,。！？]{2,12}(?:影响|控制)[，,]?\s*/g, '')
+
+  // 分段
+  const segs = s.split(/[，,。！？\n]+/).map(x => x.trim()).filter(x => x.length > 1)
+
+  // 天气关键词
+  const wxRe = /[晴阴云雨雷雪雾霾]|多云|阵雨|暴雨|转晴|大风/
+  const wxOrigSet = new Set<string>()
+  const wxParts: string[] = []
+  let wxLen = 0
+  for (const seg of segs) {
+    if (wxRe.test(seg) && !/^局部/.test(seg)) {
+      wxOrigSet.add(seg)
+      wxParts.push(seg.replace(/^有\s*/, ''))
+      wxLen += seg.length
+      if (wxParts.length >= 2 || wxLen >= 18) break
+    }
+  }
+  const weather = wxParts.join('，')
+
+  // 附加提示：含警示词或「局部XXX」的段落
+  const noteRe = /注意|防范|防御|局部|短时强|冰雹|建议/
+  const noteParts = segs.filter(x => noteRe.test(x) && !wxOrigSet.has(x))
+  let note = noteParts.join('，')
+  if (note.length > 36) note = note.slice(0, 36).replace(/[，,\s]+$/, '') + '…'
+
+  // 解析完全失败时兜底：截断原文展示
+  if (!weather && !wind && !temp) {
+    let fb = s.replace(/[，,。！？\s]+$/, '')
+    if (fb.length > 48) fb = fb.slice(0, 48) + '…'
+    return { timeLabel, weather: fb, wind: '', temp: '', note: '' }
+  }
+
+  return { timeLabel, weather, wind, temp, note }
 }
 
 // "2026年05月29日 17:00" → "05-29 17:00"；解析失败则返回空串

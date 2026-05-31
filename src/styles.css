@@ -339,7 +339,28 @@ html[data-sky='fog'] body::before {
   color: var(--text-dim);
   white-space: nowrap;
 }
-.notice-text { font-size: 13.5px; color: var(--text-secondary); line-height: 1.5; }
+.notice-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.notice-wx {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+.notice-detail {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+.notice-detail::before { content: ' · '; opacity: 0.45; }
+.notice-note {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
 
 /* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */
 .metric-tiles {
