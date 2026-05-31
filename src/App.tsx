@@ -61,44 +61,89 @@ export default function App() {
     setCityIdx(i)
   }
 
-  // 下拉刷新（移动端）：使用非被动原生事件监听器，允许 preventDefault 阻止 iOS 橡皮筋滚动
+  // 手势（移动端）：下拉刷新 + 左右滑动切城市。
+  // 用非被动原生监听，统一在一处判定主轴，避免纵向下拉与横向翻页冲突。
   const [pull, setPull] = useState(0)
+  const [swipeX, setSwipeX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const pullRef = useRef(0)
-  const pullStart = useRef<number | null>(null)
+  const swipeXRef = useRef(0)
+  const startX = useRef<number | null>(null)
+  const startY = useRef<number | null>(null)
+  const gesture = useRef<'pull' | 'swipe' | 'ignore' | null>(null)
+  const atTop = useRef(false)
   const appRef = useRef<HTMLDivElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
+  const selectCityRef = useRef(selectCity)
+  const cityIdxRef = useRef(cityIdx)
   const PULL_MAX = 90
   const PULL_TRIGGER = 64
+  const SWIPE_TRIGGER = 45
   useEffect(() => { loadingRef.current = loading }, [loading])
   useEffect(() => { refreshRef.current = refresh }, [refresh])
+  useEffect(() => { selectCityRef.current = selectCity })
+  useEffect(() => { cityIdxRef.current = cityIdx }, [cityIdx])
   useEffect(() => {
     const el = appRef.current
     if (!el) return
     const onStart = (e: TouchEvent) => {
-      if (window.scrollY <= 0 && !loadingRef.current) pullStart.current = e.touches[0].clientY
-      else pullStart.current = null
+      const t = e.touches[0]
+      startX.current = t.clientX
+      startY.current = t.clientY
+      gesture.current = null
+      atTop.current = window.scrollY <= 0 && !loadingRef.current
     }
     const onMove = (e: TouchEvent) => {
-      if (pullStart.current == null) return
-      const dy = e.touches[0].clientY - pullStart.current
-      if (dy > 0) {
+      if (startX.current == null || startY.current == null) return
+      const t = e.touches[0]
+      const dx = t.clientX - startX.current
+      const dy = t.clientY - startY.current
+      // 首次超过阈值时判定主轴：横向→翻页，顶部下拉→刷新，其余→交给原生滚动
+      if (gesture.current == null) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+        if (Math.abs(dx) > Math.abs(dy)) gesture.current = 'swipe'
+        else if (dy > 0 && atTop.current) gesture.current = 'pull'
+        else gesture.current = 'ignore'
+      }
+      if (gesture.current === 'swipe') {
         e.preventDefault()
-        const p = Math.min(dy * 0.5, PULL_MAX)
-        pullRef.current = p
-        setPull(p)
-      } else {
-        pullStart.current = null
-        pullRef.current = 0
-        setPull(0)
+        const clamped = Math.max(-70, Math.min(70, dx * 0.4))
+        swipeXRef.current = clamped
+        setSwipeX(clamped)
+        setDragging(true)
+      } else if (gesture.current === 'pull') {
+        if (dy > 0) {
+          e.preventDefault()
+          const p = Math.min(dy * 0.5, PULL_MAX)
+          pullRef.current = p
+          setPull(p)
+        } else {
+          pullRef.current = 0
+          setPull(0)
+        }
       }
     }
     const onEnd = () => {
-      if (pullStart.current == null) return
-      if (pullRef.current >= PULL_TRIGGER) refreshRef.current()
-      pullStart.current = null
-      pullRef.current = 0
-      setPull(0)
+      if (gesture.current === 'swipe') {
+        const dx = swipeXRef.current
+        setDragging(false)
+        if (Math.abs(dx) >= SWIPE_TRIGGER) {
+          const len = CITIES.length
+          const target = (cityIdxRef.current + (dx < 0 ? 1 : -1) + len) % len
+          selectCityRef.current(target)
+        }
+        swipeXRef.current = 0
+        setSwipeX(0)
+      } else if (gesture.current === 'pull') {
+        if (pullRef.current >= PULL_TRIGGER) refreshRef.current()
+        pullRef.current = 0
+        setPull(0)
+      }
+      startX.current = null
+      startY.current = null
+      gesture.current = null
     }
     el.addEventListener('touchstart', onStart, { passive: true })
     el.addEventListener('touchmove', onMove, { passive: false })
@@ -110,6 +155,34 @@ export default function App() {
       el.removeEventListener('touchend', onEnd)
       el.removeEventListener('touchcancel', onEnd)
     }
+  }, [])
+
+  // 自动刷新：切回前台且数据已超过 5 分钟时刷新；另每 10 分钟（仅前台）刷新一次
+  const lastUpdateRef = useRef(0)
+  useEffect(() => { if (updatedAt) lastUpdateRef.current = updatedAt.getTime() }, [updatedAt])
+  useEffect(() => {
+    const STALE_MS = 5 * 60 * 1000
+    const onVis = () => {
+      if (document.visibilityState === 'visible' && !loadingRef.current &&
+          Date.now() - lastUpdateRef.current > STALE_MS) {
+        refreshRef.current()
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    const timer = setInterval(() => {
+      if (document.visibilityState === 'visible' && !loadingRef.current) refreshRef.current()
+    }, 10 * 60 * 1000)
+    return () => {
+      document.removeEventListener('visibilitychange', onVis)
+      clearInterval(timer)
+    }
+  }, [])
+
+  // 滚动时头部切换为吸顶毛玻璃态
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
   }, [])
 
   const { annotated, stats } = useMemo(() => analyze(results), [results])
@@ -140,9 +213,12 @@ export default function App() {
     const h = new Date(Date.now() + 8 * 3600 * 1000).getUTCHours()
     return h < 6 || h >= 19
   }, [updatedAt])
-  // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky
+  // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky，
+  // 同时把状态栏配色（theme-color）调成对应天空色，PWA 更沉浸
   useEffect(() => {
-    document.documentElement.dataset.sky = skyKey(stats?.text, night)
+    const sky = skyKey(stats?.text, night)
+    document.documentElement.dataset.sky = sky
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', SKY_THEME[sky] ?? '#0b1426')
   }, [stats, night])
   // 实时天气动效类型（全屏背景层）
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
@@ -168,7 +244,7 @@ export default function App() {
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
         </svg>
       </div>
-      <header className="loc-header">
+      <header className={'loc-header' + (scrolled ? ' scrolled' : '')}>
         <button
           className="icon-btn switch"
           title="切换城市"
@@ -202,6 +278,11 @@ export default function App() {
         </button>
       </header>
 
+      {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
+      <div
+        className={'swipe-wrap' + (dragging ? ' dragging' : '')}
+        style={swipeX ? { transform: `translateX(${swipeX}px)` } : undefined}
+      >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
         {warnings.length > 0 && (
@@ -266,6 +347,20 @@ export default function App() {
 
         {isEmpty && <div className="hint">暂无数据，点右上角刷新重试</div>}
       </div>
+      </div>
+
+      {CITIES.length > 1 && (
+        <div className="page-dots">
+          {CITIES.map((c, i) => (
+            <button
+              key={c.name}
+              className={'page-dot' + (i === cityIdx ? ' active' : '')}
+              onClick={() => selectCity(i)}
+              aria-label={c.name}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -499,6 +594,17 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
     },
   }
+}
+
+// 各天空主题对应的状态栏配色（取该主题背景渐变顶端色，使状态栏与画面顶部融为一体）
+const SKY_THEME: Record<string, string> = {
+  'clear-day': '#163465',
+  'clear-night': '#0a1430',
+  cloudy: '#1d2842',
+  overcast: '#242b39',
+  rain: '#172a3e',
+  snow: '#293751',
+  fog: '#2b2e36',
 }
 
 // 天气文字 + 昼夜 → 背景主题 key（驱动 CSS 的动态天气背景）
