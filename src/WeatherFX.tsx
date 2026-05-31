@@ -29,40 +29,44 @@ interface Drop  { x: number; y: number; len: number; vy: number; vx: number }
 interface Flake { x: number; y: number; r: number; vy: number; vx: number; sway: number; ph: number; layer: number }
 interface Star  { x: number; y: number; r: number; ph: number; sp: number; bright: boolean }
 interface Shoot { x: number; y: number; vx: number; vy: number; life: number }
-interface CloudBlob { x: number; y: number; r: number; ph: number }
+interface CloudBlob { x: number; y: number; r: number }
 interface FogBand   { y: number; ph: number; spd: number; o: number; h: number }
 interface Mote      { x: number; y: number; r: number; vx: number; vy: number; o: number }
 interface Bolt      { pts: [number, number][]; branches: { pts: [number, number][] }[] }
-
-// ── Cloud helpers ────────────────────────────────────────────────────────────
+// A cloud cluster: a baked sprite (SVG turbulence preferred, canvas-blur fallback)
+// plus its world position / drift. `img` swaps in once the SVG decodes.
+interface Cloud {
+  fallback: HTMLCanvasElement
+  img: HTMLImageElement | null
+  w: number; h: number
+  x: number; y: number          // world top-left
+  vx: number; layer: number; ph: number
+}
 
 type CloudPalette = 'cloudy' | 'cloudy-night' | 'overcast' | 'overcast-night'
 
-function drawCloudCluster(
-  ctx: CanvasRenderingContext2D,
-  blobs: CloudBlob[],
-  layer: number,
-  palette: CloudPalette,
-): void {
-  // Merge-fill: all blobs in one beginPath → overlapping arcs form a single silhouette.
-  // overcast = denser/grayer/more uniform (heavy overcast deck, no gaps);
-  // cloudy = lighter, airier, more depth contrast between layers.
-  const L = Math.min(layer, 2)
-  let alpha: number, rgb: string
-  switch (palette) {
-    case 'cloudy':         alpha = [0.50, 0.65, 0.80][L]; rgb = '200,212,228'; break
-    case 'cloudy-night':   alpha = [0.30, 0.45, 0.60][L]; rgb = '112,136,180'; break
-    case 'overcast':       alpha = [0.78, 0.86, 0.94][L]; rgb = '166,174,188'; break
-    default: /* overcast-night */ alpha = [0.55, 0.66, 0.78][L]; rgb = '78,86,104'; break
-  }
-
-  ctx.beginPath()
-  for (const b of blobs) {
-    ctx.moveTo(b.x + b.r, b.y)
-    ctx.arc(b.x, b.y, b.r, 0, TAU)
-  }
-  ctx.fillStyle = `rgba(${rgb},${alpha})`
-  ctx.fill()
+// Per-palette volume colors: lit top → mid → shadowed bottom, plus overall opacity.
+// `fb` is the flat fill used by the canvas fallback (per depth layer).
+const CLOUD_PAL: Record<CloudPalette, {
+  top: string; mid: string; bot: string; op: number
+  fb: string; fbAlpha: [number, number, number]; fbTop: string; fbBot: string
+}> = {
+  'cloudy': {
+    top: '#eef4fc', mid: '#cdd9ea', bot: '#8d9fbc', op: 0.92,
+    fb: '210,220,234', fbAlpha: [0.55, 0.72, 0.88], fbTop: 'rgba(255,255,255,0.42)', fbBot: 'rgba(58,72,98,0.44)',
+  },
+  'cloudy-night': {
+    top: '#8196ba', mid: '#54688c', bot: '#26344e', op: 0.88,
+    fb: '92,112,148', fbAlpha: [0.44, 0.58, 0.72], fbTop: 'rgba(178,200,238,0.34)', fbBot: 'rgba(18,26,42,0.52)',
+  },
+  'overcast': {
+    top: '#c6ccd6', mid: '#a8afbb', bot: '#727a8a', op: 0.96,
+    fb: '150,158,172', fbAlpha: [0.82, 0.90, 0.97], fbTop: 'rgba(208,214,226,0.32)', fbBot: 'rgba(78,86,102,0.46)',
+  },
+  'overcast-night': {
+    top: '#5c6678', mid: '#3e4658', bot: '#1c2230', op: 0.90,
+    fb: '64,72,88', fbAlpha: [0.58, 0.70, 0.82], fbTop: 'rgba(108,120,142,0.30)', fbBot: 'rgba(10,14,24,0.56)',
+  },
 }
 
 function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: number): void {
@@ -111,13 +115,156 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     const rainL: Drop[][] = [[], [], []]
     const flakes: Flake[] = []
     const stars: Star[] = []
-    const clouds: CloudBlob[][] = []
-    const cloudVx: number[] = []
-    const cloudLayer: number[] = []     // 0=far  1=mid  2=near
     const fogBands: FogBand[] = []
     const motes: Mote[] = []
 
+    // Cloud scene: each cluster is a baked sprite + world position / drift.
+    const clouds: Cloud[] = []
+    let cancelled = false   // guards async SVG image loads against unmount
+
     const rnd = (a: number, b: number) => a + Math.random() * (b - a)
+
+    // Canvas fallback sprite: blurred merged-arc silhouette + clipped vertical
+    // volume gradient. Shown instantly while the SVG decodes (and if SVG fails).
+    const makeFallbackCanvas = (
+      blobs: CloudBlob[], layer: number, palette: CloudPalette,
+      minX: number, minY: number, pad: number, w: number, h: number,
+    ): HTMLCanvasElement => {
+      const off = document.createElement('canvas')
+      off.width = Math.max(1, Math.ceil(w * dpr)); off.height = Math.max(1, Math.ceil(h * dpr))
+      const o = off.getContext('2d')!
+      o.setTransform(dpr, 0, 0, dpr, 0, 0)
+      o.translate(pad - minX, pad - minY)
+      const P = CLOUD_PAL[palette]
+      const a = P.fbAlpha[Math.min(layer, 2)]
+      const blur = [12, 9, 6][Math.min(layer, 2)]
+      o.filter = `blur(${blur}px)`
+      o.beginPath()
+      for (const b of blobs) { o.moveTo(b.x + b.r, b.y); o.arc(b.x, b.y, b.r, 0, TAU) }
+      o.fillStyle = `rgba(${P.fb},${a})`
+      o.fill()
+      o.filter = 'none'
+      o.globalCompositeOperation = 'source-atop'
+      const g = o.createLinearGradient(0, minY, 0, maxYOf(blobs))
+      g.addColorStop(0, P.fbTop); g.addColorStop(0.55, 'rgba(0,0,0,0)'); g.addColorStop(1, P.fbBot)
+      o.fillStyle = g
+      o.fillRect(minX - pad, minY - pad, w, h)
+      o.globalCompositeOperation = 'source-over'
+      return off
+    }
+
+    const maxYOf = (blobs: CloudBlob[]) => {
+      let m = -Infinity
+      for (const b of blobs) if (b.y + b.r > m) m = b.y + b.r
+      return m
+    }
+
+    // SVG sprite: fractal-noise displacement warps the merged ellipses into wispy,
+    // irregular cloud lobes (feTurbulence + feDisplacementMap), a vertical gradient
+    // gives volume (lit top → shadowed bottom), feGaussianBlur feathers the edges.
+    const buildCloudSVG = (
+      blobs: CloudBlob[], layer: number, palette: CloudPalette,
+      minX: number, minY: number, pad: number, w: number, h: number,
+      scale: number, seed: number,
+    ): string => {
+      const P = CLOUD_PAL[palette]
+      const blur = [6, 4, 3][Math.min(layer, 2)]
+      const baseFreq = (0.009 + Math.random() * 0.006).toFixed(4)
+      let shapes = ''
+      for (const b of blobs) {
+        const cx = (b.x - minX + pad).toFixed(1), cy = (b.y - minY + pad).toFixed(1)
+        const rx = (b.r * 1.18).toFixed(1), ry = b.r.toFixed(1)
+        shapes += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>`
+      }
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="${(w * dpr).toFixed(0)}" height="${(h * dpr).toFixed(0)}" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}">` +
+        `<defs>` +
+          `<filter id="f" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">` +
+            `<feTurbulence type="fractalNoise" baseFrequency="${baseFreq}" numOctaves="4" seed="${seed}" result="n"/>` +
+            `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale.toFixed(0)}" xChannelSelector="R" yChannelSelector="G"/>` +
+            `<feGaussianBlur stdDeviation="${blur}"/>` +
+          `</filter>` +
+          `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
+            `<stop offset="0" stop-color="${P.top}"/>` +
+            `<stop offset="0.5" stop-color="${P.mid}"/>` +
+            `<stop offset="1" stop-color="${P.bot}"/>` +
+          `</linearGradient>` +
+        `</defs>` +
+        `<g filter="url(#f)" fill="url(#g)" fill-opacity="${P.op}">${shapes}</g>` +
+      `</svg>`
+    }
+
+    // (Re)build the whole cloud scene for current W/H/dpr.
+    const buildCloudScene = () => {
+      clouds.length = 0
+      const overcast = kind === 'overcast' || kind === 'overcast-night'
+      const palette = kind as CloudPalette
+
+      // layer 0 = far (high, slow, smaller), 1 = mid, 2 = near (lower, fast, larger).
+      // overcast = more clusters, wider spans, lower & overlapping → fills the sky.
+      const layerCfg = overcast
+        ? [
+            { count: 6, yLo: 0.00, yHi: 0.38, sLo: 0.80, sHi: 1.25, vLo: 2, vHi:  6 },
+            { count: 6, yLo: 0.04, yHi: 0.46, sLo: 1.10, sHi: 1.70, vLo: 4, vHi: 10 },
+            { count: 5, yLo: 0.08, yHi: 0.48, sLo: 1.45, sHi: 2.15, vLo: 8, vHi: 16 },
+          ]
+        : [
+            { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
+            { count: 4, yLo: 0.06, yHi: 0.40, sLo: 0.80, sHi: 1.30, vLo:  7, vHi: 14 },
+            { count: 3, yLo: 0.08, yHi: 0.38, sLo: 1.10, sHi: 1.85, vLo: 13, vHi: 24 },
+          ]
+      const spanLo = overcast ? 180 : 130, spanHi = overcast ? 320 : 250
+
+      for (let li = 0; li < 3; li++) {
+        const cfg = layerCfg[li]
+        for (let i = 0; i < cfg.count; i++) {
+          const s  = rnd(cfg.sLo, cfg.sHi)
+          const cx = rnd(-0.15, 1.20) * W
+          const cy = rnd(cfg.yLo, cfg.yHi) * H
+          const cw = rnd(spanLo, spanHi) * s
+          const ch = rnd(42, 80) * s
+          const nb = 5 + Math.floor(Math.random() * 4)   // 5–8 blobs
+          const baseY = cy
+          const blobs: CloudBlob[] = []
+          for (let b = 0; b < nb; b++) {
+            const t = b / Math.max(nb - 1, 1)
+            // cumulus dome: bigger blobs in the middle, smaller at the edges
+            const env = 0.42 + 0.58 * Math.sin(t * Math.PI)
+            const br = Math.max(16, 0.58 * ch * env * rnd(0.85, 1.15))
+            const bx = cx - cw / 2 + t * cw + rnd(-12, 12) * s
+            // flat-ish bottom: each blob's bottom sits near baseY
+            const by = baseY - br * rnd(0, 0.30)
+            blobs.push({ x: bx, y: by, r: br })
+          }
+
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxR = 0
+          for (const b of blobs) {
+            if (b.x - b.r < minX) minX = b.x - b.r
+            if (b.y - b.r < minY) minY = b.y - b.r
+            if (b.x + b.r > maxX) maxX = b.x + b.r
+            if (b.y + b.r > maxY) maxY = b.y + b.r
+            if (b.r > maxR) maxR = b.r
+          }
+          const scale = Math.min(72, maxR * 1.35)   // displacement amplitude (fluffiness)
+          const pad = Math.ceil(scale + 22)
+          const w = (maxX - minX) + pad * 2
+          const h = (maxY - minY) + pad * 2
+
+          const fallback = makeFallbackCanvas(blobs, li, palette, minX, minY, pad, w, h)
+          const cloud: Cloud = {
+            fallback, img: null, w, h,
+            x: minX - pad, y: minY - pad,
+            vx: rnd(cfg.vLo, cfg.vHi), layer: li, ph: rnd(0, TAU),
+          }
+          clouds.push(cloud)
+
+          // Async-load the higher-quality SVG sprite; swaps in over the fallback.
+          const svg = buildCloudSVG(blobs, li, palette, minX, minY, pad, w, h, scale, Math.floor(Math.random() * 1000))
+          const img = new Image()
+          img.onload = () => { if (!cancelled) cloud.img = img }
+          img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+        }
+      }
+    }
 
     const resize = () => {
       const Wn = window.innerWidth, Hn = window.innerHeight
@@ -125,12 +272,12 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
       canvas.width  = Wn * dpr; canvas.height = Hn * dpr
       canvas.style.width  = Wn + 'px'; canvas.style.height = Hn + 'px'
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-      if (W_prev > 0) {
+      const rescale = W_prev > 0
+      if (rescale) {
         const sx = Wn / W_prev, sy = Hn / H_prev
         for (const l of rainL) for (const d of l) { d.x *= sx; d.y *= sy }
         for (const f of flakes) { f.x *= sx; f.y *= sy }
         for (const s of stars)  { s.x *= sx; s.y *= sy }
-        for (const c of clouds) for (const b of c) { b.x *= sx; b.y *= sy }
         for (const b of fogBands) { b.y *= sy; b.h *= sy }
         for (const m of motes)  { m.x *= sx; m.y *= sy }
       }
@@ -154,6 +301,9 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           moonGrad.addColorStop(1,   'rgba(180,205,255,0)')
         }
       }
+
+      // Clouds: rebuild on real resize (sprites are dpr/size-baked)
+      if (rescale && isCloudKind(kind)) buildCloudScene()
     }
 
     resize()
@@ -193,55 +343,16 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
         stars.push({ x: rnd(0, W), y: rnd(0, H * 0.8), r: rnd(0.4, 2.2), ph: rnd(0, TAU), sp: rnd(0.6, 2.5), bright: Math.random() < 0.07 })
 
     } else if (isCloudKind(kind)) {
-      const overcast = kind === 'overcast' || kind === 'overcast-night'
-
       // Sparse stars behind clouds — only when gaps exist (cloudy night, not overcast)
       if (kind === 'cloudy-night') {
         const n = Math.round(Math.min(55, area / 20000))
         for (let i = 0; i < n; i++)
           stars.push({ x: rnd(0, W), y: rnd(0, H * 0.65), r: rnd(0.3, 1.4), ph: rnd(0, TAU), sp: rnd(0.5, 1.8), bright: false })
       }
-
-      // Three-layer cloud clusters.
-      // layer 0 = far/back (high, slow, smaller), 1 = mid, 2 = near/front (lower, fast, larger).
-      // overcast = more clusters, wider span, lower & overlapping → fills the sky with no gaps.
-      const layerCfg = overcast
-        ? [
-            { count: 6, yLo: 0.00, yHi: 0.38, sLo: 0.80, sHi: 1.25, vLo: 2, vHi:  6 },
-            { count: 6, yLo: 0.04, yHi: 0.46, sLo: 1.10, sHi: 1.70, vLo: 4, vHi: 10 },
-            { count: 5, yLo: 0.08, yHi: 0.48, sLo: 1.45, sHi: 2.15, vLo: 8, vHi: 16 },
-          ]
-        : [
-            { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
-            { count: 4, yLo: 0.06, yHi: 0.40, sLo: 0.80, sHi: 1.30, vLo:  7, vHi: 14 },
-            { count: 3, yLo: 0.08, yHi: 0.38, sLo: 1.10, sHi: 1.85, vLo: 13, vHi: 24 },
-          ]
-      const spanLo = overcast ? 180 : 130, spanHi = overcast ? 320 : 260
-      for (let li = 0; li < 3; li++) {
-        const cfg = layerCfg[li]
-        for (let i = 0; i < cfg.count; i++) {
-          const s  = rnd(cfg.sLo, cfg.sHi)
-          const cx = rnd(-0.15, 1.20) * W
-          const cy = rnd(cfg.yLo, cfg.yHi) * H
-          const cw = rnd(spanLo, spanHi) * s   // horizontal span
-          const ch = rnd(42, 80) * s           // vertical depth → drives blob radius
-          const nb = 4 + Math.floor(Math.random() * 4)   // 4–7 blobs per cloud
-          const blobs: CloudBlob[] = []
-          for (let b = 0; b < nb; b++) {
-            const t  = b / Math.max(nb - 1, 1)
-            const bx = cx - cw / 2 + t * cw + rnd(-18, 18) * s
-            const by = cy + rnd(-0.25, 0.25) * ch
-            const br = rnd(0.38, 0.68) * ch + rnd(-8, 8) * s
-            blobs.push({ x: bx, y: by, r: Math.max(18, br), ph: rnd(0, TAU) })
-          }
-          clouds.push(blobs)
-          cloudVx.push(rnd(cfg.vLo, cfg.vHi))
-          cloudLayer.push(li)
-        }
-      }
+      buildCloudScene()
 
     } else if (kind === 'fog') {
-      // Horizontal drifting bands (existing) + slow volumetric blobs for depth
+      // Horizontal drifting bands + slow volumetric blobs for depth
       for (let i = 0; i < 9; i++)
         fogBands.push({ y: rnd(0.06, 0.94) * H, ph: rnd(0, TAU), spd: rnd(0.3, 0.8), o: rnd(0.09, 0.19), h: rnd(60, 140) })
       const nb = Math.round(Math.min(7, area / 70000))
@@ -364,10 +475,8 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
 
         // ── Clear Night ───────────────────────────────────────────────────────
         case 'clear-night': {
-          // Diffuse background glow from moonlight
           if (moonGrad) { ctx.fillStyle = moonGrad; ctx.fillRect(0, 0, W, H) }
 
-          // Stars
           ctx.fillStyle = '#fff'
           for (const s of stars) {
             const a = 0.3 + 0.65 * (0.5 + 0.5 * Math.sin(s.ph))
@@ -389,10 +498,8 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           }
           ctx.globalAlpha = 1
 
-          // Moon disk
           drawMoon(ctx, moonX, moonY, moonR)
 
-          // Shooting star
           if (!reduced) {
             nextShoot -= dt
             if (nextShoot <= 0 && !shoot) {
@@ -417,7 +524,6 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
 
         // ── Fog ───────────────────────────────────────────────────────────────
         case 'fog': {
-          // Slow volumetric blobs (depth) drawn first, behind the bands
           ctx.fillStyle = '#fff'
           for (const m of motes) {
             const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r)
@@ -450,8 +556,10 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
         case 'cloudy-night':
         case 'overcast':
         case 'overcast-night': {
-          const palette = kind as CloudPalette
-          const showMoon = kind === 'cloudy-night'   // overcast deck hides the moon
+          const drawCloud = (c: Cloud) => {
+            const yo = Math.sin(c.ph) * (c.layer === 2 ? 5 : 3)
+            ctx.drawImage(c.img ?? c.fallback, c.x, c.y + yo, c.w, c.h)
+          }
 
           // 1. Stars (dim, behind all clouds — cloudy night only)
           if (kind === 'cloudy-night' && stars.length) {
@@ -465,36 +573,20 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
           }
 
           // 2. Far-layer clouds (behind moon)
-          for (let ci = 0; ci < clouds.length; ci++) {
-            if (cloudLayer[ci] !== 0) continue
-            drawCloudCluster(ctx, clouds[ci], 0, palette)
-          }
+          for (const c of clouds) if (c.layer === 0) drawCloud(c)
 
           // 3. Moon (between far and near cloud layers)
-          if (showMoon) drawMoon(ctx, moonX, moonY, moonR)
+          if (kind === 'cloudy-night') drawMoon(ctx, moonX, moonY, moonR)
 
           // 4. Mid + near clouds (in front of moon)
-          for (let ci = 0; ci < clouds.length; ci++) {
-            if (cloudLayer[ci] === 0) continue
-            drawCloudCluster(ctx, clouds[ci], cloudLayer[ci], palette)
-          }
+          for (const c of clouds) if (c.layer !== 0) drawCloud(c)
 
-          // Update positions
+          // Drift
           if (!reduced) {
-            for (let ci = 0; ci < clouds.length; ci++) {
-              const clump = clouds[ci]
-              const drift = cloudVx[ci] * dt
-              let minX = Infinity
-              for (const b of clump) {
-                b.x += drift; b.ph += dt * 0.14
-                b.y += Math.sin(b.ph) * 0.18
-                if (b.x - b.r < minX) minX = b.x - b.r
-              }
-              if (minX > W + 60) {
-                const maxX = Math.max(...clump.map(b => b.x + b.r))
-                const delta = -(maxX + rnd(30, 100))
-                for (const b of clump) b.x += delta
-              }
+            for (const c of clouds) {
+              c.x += c.vx * dt
+              c.ph += dt * 0.12
+              if (c.x > W) c.x = -c.w
             }
           }
           break
@@ -552,6 +644,7 @@ export function WeatherFX({ kind }: { kind: FxKind }) {
     document.addEventListener('visibilitychange', onVis)
 
     return () => {
+      cancelled = true
       cancelAnimationFrame(raf)
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('resize', resize)
