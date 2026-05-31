@@ -265,20 +265,20 @@ html[data-sky='fog'] body::before {
 /* 内容浮在动效层之上（吸顶头部/固定圆点各自管理定位，排除在外） */
 .app > *:not(.weather-fx):not(.loc-header):not(.page-dots) { position: relative; z-index: 1; }
 
-/* ── 顶部：[切换] 居中城市名 [刷新] ── */
+/* ── 顶部吸顶栏：无按钮，仅在滚过 hero 城市名后显示城市名 ── */
 .loc-header {
   position: sticky;
   top: 0;
   z-index: 10;
   display: flex;
   align-items: center;
+  justify-content: center;
+  pointer-events: none;
   /* 负边距 + 等量内边距让吸顶层满铺到 .app 两侧边缘 */
   margin: 0 -20px;
   padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
 }
-/* 滚动后吸顶态：不再用硬边毛玻璃条，改为「向下淡出」的天空渐隐
-   —— 顶部轻微压暗 + 渐隐模糊（mask 让模糊与暗色都向下消失），
-   无边框、无硬边，融入天空，和去框的通透首屏统一。 */
+/* 滚动后吸顶态：向下淡出的天空渐隐遮罩，无边框无硬边 */
 .loc-header::before {
   content: '';
   position: absolute;
@@ -297,32 +297,20 @@ html[data-sky='fog'] body::before {
   transition: opacity var(--transition-fast);
 }
 .loc-header.scrolled::before { opacity: 1; }
-.loc-center {
-  flex: 1;
-  min-width: 0;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-}
-.loc-header .city {
-  font-size: 22px;
+
+/* hero 滚走后淡入的吸顶城市名 */
+.loc-sticky-name {
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
-  line-height: 1.15;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(-5px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
-.loc-header .updated {
-  color: var(--text-dim);
-  font-size: 11px;
-  font-weight: 500;
+.loc-header.scrolled .loc-sticky-name {
+  opacity: 1;
+  transform: none;
 }
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
@@ -539,17 +527,36 @@ html[data-sky='fog'] body::before {
 .icon-btn.spin { animation: spin 0.7s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
 
 /* ── Hero：浮在天空背景上，无玻璃卡 ── */
-/* Hero（温度总揽）：与吸顶头部一起约占首屏上半部，配合全屏天气动效更大气。
-   min-height 用 dvh 适配移动端动态视口（地址栏伸缩不跳动），垂直居中。 */
+/* Hero（温度总揽）：城市名居顶、大温度居中，与吸顶栏合计约占首屏上半。
+   min-height 用 dvh 适配移动端动态视口，垂直居中整组内容。 */
 .hero {
   text-align: center;
-  min-height: 40vh;
-  min-height: 40dvh;
+  min-height: 44vh;
+  min-height: 44dvh;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: 12px 0 48px;
+  padding: 8px 0 48px;
   animation: riseIn 0.55s var(--spring) both;
+}
+/* 城市名：hero 顶部，大而醒目；Apple Weather 同款位置 */
+.hero-city {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 1px;
+}
+/* 更新时间：城市名下方弱色辅助文字 */
+.hero-updated {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 16px;
 }
 .hero-temp {
   font-size: clamp(88px, 27vw, 124px);
@@ -836,7 +843,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 @media (max-width: 400px) {
   .app { padding: 0 12px max(64px, calc(36px + env(safe-area-inset-bottom))); }
   .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
-  .loc-header .city { font-size: 20px; }
+  .hero-city { font-size: 24px; }
   .hero-temp { font-size: 92px; }
   .hero-cond { font-size: 19px; }
   .hero-hilo { font-size: 16px; }
@@ -856,7 +863,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 }
 
 .loc-header { animation: fadeIn 0.45s ease both; }
-.loc-header .city { animation: riseIn 0.5s var(--spring) both; }
+.hero-city { animation: riseIn 0.5s var(--spring) both; }
 .ranking { animation: riseIn 0.5s 0.06s var(--spring) both; }
 
 /* 排行行依次入场 */

@@ -180,9 +180,9 @@ export default function App() {
     }
   }, [])
 
-  // 滚动时头部切换为吸顶毛玻璃态
+  // 滚动时头部吸顶城市名淡入（hero 城市名滚出视口后触发）
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8)
+    const onScroll = () => setScrolled(window.scrollY > 80)
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
@@ -257,36 +257,8 @@ export default function App() {
           <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
         </svg>
       </div>
-      <header className={'loc-header' + (scrolled ? ' scrolled' : '')}>
-        <button
-          className="icon-btn switch"
-          title="切换城市"
-          onClick={() => selectCity((cityIdx + 1) % CITIES.length)}
-          aria-label="切换城市"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="17 1 21 5 17 9" />
-            <path d="M3 11V9a4 4 0 0 1 4-4h14" />
-            <polyline points="7 23 3 19 7 15" />
-            <path d="M21 13v2a4 4 0 0 1-4 4H3" />
-          </svg>
-        </button>
-        <div className="loc-center">
-          <span className="city">{city.name}</span>
-          {updatedAgo && <span className="updated">{updatedAgo}</span>}
-        </div>
-        <button
-          className={'icon-btn' + (loading ? ' spin' : '')}
-          title="刷新"
-          onClick={refresh}
-          aria-label="刷新"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="23 4 23 10 17 10" />
-            <polyline points="1 20 1 14 7 14" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
-        </button>
+      <header className={'loc-header' + (scrolled ? ' scrolled' : '')} aria-hidden="true">
+        <span className="loc-sticky-name">{city.name}</span>
       </header>
 
       {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
@@ -304,22 +276,26 @@ export default function App() {
           </div>
         )}
 
-        {stats ? (
-          <div className="hero">
-            <div className="hero-temp">{Math.round(stats.avg)}°</div>
-            <div className="hero-cond">{stats.text}</div>
-            <div className="hero-hilo">
-              <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
-              <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
-            </div>
-          </div>
-        ) : (
-          <div className="hero hero-skeleton">
-            <div className="hskel hskel-temp" />
-            <div className="hskel hskel-cond" />
-            <div className="hskel hskel-hilo" />
-          </div>
-        )}
+        <div className={'hero' + (!stats ? ' hero-skeleton' : '')}>
+          <span className="hero-city">{city.name}</span>
+          {updatedAgo && <span className="hero-updated">{updatedAgo}</span>}
+          {stats ? (
+            <>
+              <div className="hero-temp">{Math.round(stats.avg)}°</div>
+              <div className="hero-cond">{stats.text}</div>
+              <div className="hero-hilo">
+                <span>最高 <b>{stats.max.toFixed(1)}°</b></span>
+                <span>最低 <b>{stats.min.toFixed(1)}°</b></span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="hskel hskel-temp" />
+              <div className="hskel hskel-cond" />
+              <div className="hskel hskel-hilo" />
+            </>
+          )}
+        </div>
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
