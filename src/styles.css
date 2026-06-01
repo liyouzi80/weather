@@ -319,60 +319,36 @@ html[data-sky='fog'] body::before {
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
 
-/* 风险提示区块：气象预警 + 分钟级降水，统一跟在 hero 之后 */
+/* 风险提示区块：气象预警（一行文字）+ 分钟级降水，统一跟在 hero 之后 */
 .hazard-block { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-.warn-card {
+
+/* 预警一行提示：[色点] 暴雨预警 和 [色点] 雷雨大风预警 */
+.warn-inline {
   display: flex;
   align-items: center;
-  background: var(--glass);
-  border: 0.5px solid var(--glass-border);
-  border-radius: var(--radius);
-  padding: 14px 16px;
-  backdrop-filter: var(--mat-regular-blur);
-  -webkit-backdrop-filter: var(--mat-regular-blur);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
-  animation: riseIn 0.5s var(--spring) both;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  padding: 0 2px;
+  animation: riseIn 0.45s var(--spring) both;
 }
-.warn-badge {
+.warn-item {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 4px 11px;
-  border-radius: 9px;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
   white-space: nowrap;
 }
-.warn-badge svg { flex: none; }
-.warn-sender {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-left: 10px;
-  font-weight: 500;
+.warn-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
 }
-/* 多条预警合并卡（Apple Weather 风格） */
-.warn-merged {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 5px;
-}
-.warn-merged-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.warn-merged-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-.warn-merged-body {
+.warn-sep {
+  color: var(--text-dim);
   font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.4;
-  margin: 0;
-  font-weight: 500;
 }
 
 /* 分钟级降水卡 */

@@ -441,11 +441,7 @@ export default function App() {
         {/* 气象预警 + 分钟级降水：统一放在 hero 下方，视觉上构成「风险提示」区块 */}
         {(warnings.length > 0 || minutelyRain) && (
           <div className="hazard-block">
-            {warnings.length > 0 && (
-              warnings.length === 1
-                ? <WarningCard w={warnings[0]} />
-                : <MergedWarnings warnings={warnings} />
-            )}
+            {warnings.length > 0 && <WarningInline warnings={warnings} />}
             {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
           </div>
         )}
@@ -509,57 +505,30 @@ function warnColor(level: string): string {
   return '#ff9f0a'
 }
 
-const WARN_SVG = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-    <line x1="12" y1="9" x2="12" y2="13" />
-    <line x1="12" y1="17" x2="12.01" y2="17" />
-  </svg>
-)
-
-// 预警信号卡（单条）
-function WarningCard({ w }: { w: WeatherWarning }) {
-  const col = warnColor(w.level)
-  const badgeText = `${w.type}${w.level}预警`
-  const m = w.title.match(/([一-龥]{2,8}(?:气象台|气象局|天气预报台))/)
-  const sender = m ? m[1] : ''
-  const textColor = w.level.includes('黄') ? '#1a1a1a' : '#fff'
-  return (
-    <div className="warn-card">
-      <span className="warn-badge" style={{ background: col, color: textColor }}>
-        {WARN_SVG}
-        {badgeText}
-      </span>
-      {sender && <span className="warn-sender">{sender}</span>}
-    </div>
-  )
+// 预警严重程度（红4>橙3>黄2>蓝1）
+function severityOf(w: WeatherWarning) {
+  if (w.level.includes('红')) return 4
+  if (w.level.includes('橙')) return 3
+  if (w.level.includes('黄')) return 2
+  return 1
 }
 
-// 多条预警合并展示（Apple Weather 风格）
-function MergedWarnings({ warnings }: { warnings: WeatherWarning[] }) {
-  const severityOf = (w: WeatherWarning) => {
-    if (w.level.includes('红')) return 4
-    if (w.level.includes('橙')) return 3
-    if (w.level.includes('黄')) return 2
-    return 1
-  }
+// 预警一行文字提示：[色块] 暴雨预警 和 [色块] 雷雨大风预警
+function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
   const sorted = [...warnings].sort((a, b) => severityOf(b) - severityOf(a))
-  const primary = sorted[0]
-  const col = warnColor(primary.level)
-  const m = primary.title.match(/([一-龥]{2,8}(?:气象台|气象局|天气预报台))/)
-  const sender = m ? m[1] : ''
-  const types = sorted.map(w => w.type).join('、')
+  // 超过 2 条时只展示最高级别 + 剩余条数
+  const show = sorted.slice(0, 2)
+  const rest = sorted.length - 2
   return (
-    <div className="warn-card warn-merged">
-      <div className="warn-merged-head" style={{ color: col }}>
-        {WARN_SVG}
-        <span className="warn-merged-title">
-          {primary.type}预警及其他 {warnings.length - 1} 则
+    <div className="warn-inline">
+      {show.map((w, i) => (
+        <span key={w.type + w.level} className="warn-item">
+          {i > 0 && <span className="warn-sep">和</span>}
+          <span className="warn-dot" style={{ background: warnColor(w.level) }} />
+          {w.type}预警
         </span>
-      </div>
-      <p className="warn-merged-body">警报生效中：{types}。</p>
-      {sender && <span className="warn-sender" style={{ marginLeft: 0 }}>{sender}</span>}
+      ))}
+      {rest > 0 && <span className="warn-sep">等 {sorted.length} 则预警</span>}
     </div>
   )
 }
