@@ -464,13 +464,13 @@ html[data-sky='fog'] body::before {
    min-height 用 dvh 适配移动端动态视口，垂直居中整组内容。 */
 .hero {
   text-align: center;
-  min-height: 44vh;
-  min-height: 44dvh;
+  min-height: 54vh;
+  min-height: 54dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 0 48px;
+  padding: 8px 0 52px;
   animation: riseIn 0.55s var(--spring) both;
 }
 /* 城市名：hero 顶部，大而醒目；Apple Weather 同款位置 */
