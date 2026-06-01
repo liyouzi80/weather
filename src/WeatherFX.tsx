@@ -65,16 +65,16 @@ const CLOUD_PAL: Record<CloudPalette, {
   fb: string; fbAlpha: [number, number, number]; fbTop: string; fbBot: string
 }> = {
   'cloudy': {
-    top: '#eef4fc', mid: '#cdd9ea', bot: '#8d9fbc', op: 0.92,
-    fb: '210,220,234', fbAlpha: [0.55, 0.72, 0.88], fbTop: 'rgba(255,255,255,0.42)', fbBot: 'rgba(58,72,98,0.44)',
+    top: '#b4c2d4', mid: '#8094b0', bot: '#4e5e7a', op: 0.78,
+    fb: '152,170,194', fbAlpha: [0.40, 0.56, 0.72], fbTop: 'rgba(190,210,235,0.28)', fbBot: 'rgba(45,58,82,0.42)',
   },
   'cloudy-night': {
     top: '#8196ba', mid: '#54688c', bot: '#26344e', op: 0.88,
     fb: '92,112,148', fbAlpha: [0.44, 0.58, 0.72], fbTop: 'rgba(178,200,238,0.34)', fbBot: 'rgba(18,26,42,0.52)',
   },
   'overcast': {
-    top: '#c6ccd6', mid: '#a8afbb', bot: '#727a8a', op: 0.96,
-    fb: '150,158,172', fbAlpha: [0.82, 0.90, 0.97], fbTop: 'rgba(208,214,226,0.32)', fbBot: 'rgba(78,86,102,0.46)',
+    top: '#9aa4b6', mid: '#707a8e', bot: '#484f60', op: 0.88,
+    fb: '114,124,140', fbAlpha: [0.68, 0.80, 0.92], fbTop: 'rgba(160,172,192,0.26)', fbBot: 'rgba(52,60,78,0.44)',
   },
   'overcast-night': {
     top: '#5c6678', mid: '#3e4658', bot: '#1c2230', op: 0.90,
