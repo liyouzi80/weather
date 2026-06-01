@@ -114,6 +114,7 @@ export default function App() {
   const pullRef = useRef(0)
   const pullReadyRef = useRef(false)
   const swipeXRef = useRef(0)
+  const swipeRawRef = useRef(0)
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
   const gesture = useRef<'pull' | 'swipe' | 'ignore' | null>(null)
@@ -164,6 +165,7 @@ export default function App() {
         e.preventDefault()
         const clamped = Math.max(-70, Math.min(70, dx * 0.4))
         swipeXRef.current = clamped
+        swipeRawRef.current = dx   // 原始位移用于触发判断，不受阻尼影响
         const wrap = swipeWrapRef.current
         if (wrap) wrap.style.transform = `translateX(${clamped}px)`
         setDragging(true)
@@ -197,14 +199,15 @@ export default function App() {
     }
     const onEnd = () => {
       if (gesture.current === 'swipe') {
-        const dx = swipeXRef.current
+        const rawDx = swipeRawRef.current  // 原始位移判断触发（约 45px 真实手势距离）
         setDragging(false)
-        if (Math.abs(dx) >= SWIPE_TRIGGER) {
+        if (Math.abs(rawDx) >= SWIPE_TRIGGER) {
           const len = CITIES.length
-          const target = (cityIdxRef.current + (dx < 0 ? 1 : -1) + len) % len
+          const target = (cityIdxRef.current + (rawDx < 0 ? 1 : -1) + len) % len
           selectCityRef.current(target)
         }
         swipeXRef.current = 0
+        swipeRawRef.current = 0
         const wrap = swipeWrapRef.current
         if (wrap) wrap.style.transform = ''
       } else if (gesture.current === 'pull') {
@@ -319,6 +322,7 @@ export default function App() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
     let raf = 0
     let wasScrolled = false
+    let wasAtTop = true  // 追踪是否刚从滚动态返回顶部，用于城市名平滑淡入
     const onScroll = () => {
       if (raf) return
       raf = requestAnimationFrame(() => {
@@ -334,14 +338,26 @@ export default function App() {
         if (isScrolled !== wasScrolled) { wasScrolled = isScrolled; setScrolled(isScrolled) }
 
         if (y <= 0) {
+          const justArrived = !wasAtTop
+          wasAtTop = true
           hero.style.opacity = '1'; hero.style.transform = ''
           if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
           if (condEl) condEl.style.opacity = ''
           if (hiloEl) hiloEl.style.opacity = ''
-          if (cityEl) cityEl.style.opacity = ''
           if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
+          if (cityEl) {
+            // 从滚动态回到顶部时：平滑淡入城市名，避免硬跳
+            if (justArrived && cityEl.style.opacity) {
+              cityEl.style.transition = 'opacity 0.22s ease-out'
+              cityEl.style.opacity = ''
+              setTimeout(() => { if (cityEl) cityEl.style.transition = '' }, 240)
+            } else {
+              cityEl.style.opacity = ''
+            }
+          }
           return
         }
+        wasAtTop = false
         // Phase 1 (0–80px): 城市名 + 天气状况 + 高低温淡出
         const t1 = Math.min(y / 80, 1)
         // Phase 2 (80–180px): 温度数字缩小 + 向上飞出；吸顶温度交叉淡入

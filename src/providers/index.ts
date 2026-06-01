@@ -24,6 +24,15 @@ const FETCH_TIMEOUT = 8000
 const timeout = (ms: number): Promise<never> =>
   new Promise((_, reject) => setTimeout(() => reject(new Error('请求超时')), ms))
 
+// 将浏览器原生英文错误信息映射为中文，避免「Failed to fetch」直接暴露给用户
+function localizeError(msg: string): string {
+  if (msg === 'Failed to fetch' || /networkerror|network request failed/i.test(msg)) return '网络请求失败'
+  if (/abort/i.test(msg)) return '请求已取消'
+  if (/cors/i.test(msg)) return '跨域请求被拒'
+  if (/timeout|timed out/i.test(msg)) return '请求超时'
+  return msg
+}
+
 /** 并发拉取所有「已配置」信源，逐个返回结果（失败也返回，便于 UI 展示错误） */
 export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
   const active = PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(loc) ?? true))
@@ -36,7 +45,7 @@ export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
         return {
           providerId: p.id,
           providerName: p.name,
-          error: e instanceof Error ? e.message : String(e),
+          error: localizeError(e instanceof Error ? e.message : String(e)),
         }
       }
     }),

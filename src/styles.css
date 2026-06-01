@@ -228,13 +228,13 @@ html[data-sky='fog'] body::before {
   transition: background var(--transition-fast), width var(--transition-fast),
     border-radius var(--transition-fast);
 }
-/* 视觉 7px，点击热区扩到 44pt（HIG 最小触控目标） */
+/* 触控热区：垂直 44pt 满足 HIG，水平收窄至 28px 避免相邻圆点热区大幅重叠 */
 .page-dot::before {
   content: '';
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 44px;
+  width: 28px;
   height: 44px;
   transform: translate(-50%, -50%);
 }
