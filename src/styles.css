@@ -240,23 +240,24 @@ html[data-sky='fog'] body::before {
 }
 .page-dot.active { width: 20px; border-radius: 4px; background: #fff; }
 
-/* 下拉刷新指示器：随下拉距离展开高度 */
+/* 下拉刷新指示器：随下拉距离展开高度（height/opacity 完全由 JS 管理） */
 .pull-indicator {
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  /* 柔和半透明白，呼应单色 UI、在任意天空配色下都不突兀 */
-  color: rgba(255, 255, 255, 0.55);
-  transition: opacity 0.2s ease, color 0.2s ease;
+  height: 0;
+  opacity: 0;
+  /* 圆弧用 currentColor，ready 状态时提亮（color transition 由 CSS 处理） */
+  color: rgba(255, 255, 255, 0.65);
+  transition: color 0.2s ease;
 }
 /* 下拉/刷新中让出顶部安全区，避免被灵动岛/刘海遮挡 */
 .pull-indicator.active {
   box-sizing: content-box;
   padding-top: env(safe-area-inset-top, 0px);
 }
-/* 下拉时箭头随手指 1:1 旋转（不加过渡，避免追帧造成的「卡顿/橡皮筋」感） */
-/* 超过触发阈值时仅提亮（不变色），提示"松手即刷新" */
+/* 超过触发阈值时提亮圆弧，提示"松手即刷新" */
 .pull-indicator.ready { color: rgba(255, 255, 255, 0.95); }
 
 /* 实时天气动效：全屏背景层，浮在天空渐变之上、内容之下 */
