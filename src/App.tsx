@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
-import type { AqiResult, GeoLocation, ProviderResult, WeatherWarning } from './providers/types'
+import type { AqiResult, GeoLocation, MinutelyRain, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
 
@@ -261,7 +261,10 @@ export default function App() {
     return () => obs.disconnect()
   }, [])
 
-  // Hero 滚动视差淡出：随滚动渐隐 + 轻微上移（Apple Weather 同款效果）
+  // Hero 多阶段滚动动效（Apple Weather 同款多速率动画）：
+  //   Phase 1 (0–80px)  : 天气现象+高低温淡出
+  //   Phase 2 (80–180px): 温度数字缩小并上移
+  //   全程               : hero 视差上移 + 整体淡出
   // 纯 DOM 直操作 + rAF 节流，不走 React state，不触发任何重渲染
   useEffect(() => {
     const hero = heroRef.current
@@ -273,10 +276,32 @@ export default function App() {
       raf = requestAnimationFrame(() => {
         raf = 0
         const y = window.scrollY
-        if (y <= 0) { hero.style.opacity = '1'; hero.style.transform = ''; return }
-        const t = Math.min(y / 240, 1)
-        hero.style.opacity = `${(1 - t * 0.85).toFixed(3)}`
-        hero.style.transform = `translateY(${(-y * 0.22).toFixed(1)}px)`
+        // 查询内部元素（hero 是已挂载的小子树，每帧单次遍历开销可忽略）
+        const tempEl = hero.querySelector<HTMLElement>('.hero-temp')
+        const condEl = hero.querySelector<HTMLElement>('.hero-cond')
+        const hiloEl = hero.querySelector<HTMLElement>('.hero-hilo')
+        if (y <= 0) {
+          hero.style.opacity = '1'
+          hero.style.transform = ''
+          if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
+          if (condEl) condEl.style.opacity = ''
+          if (hiloEl) hiloEl.style.opacity = ''
+          return
+        }
+        // Phase 1: 天气状况 + 高低温 在前 80px 淡出
+        const t1 = Math.min(y / 80, 1)
+        // Phase 2: 温度数字在 80–180px 缩小 + 上移
+        const t2 = Math.max(0, Math.min((y - 80) / 100, 1))
+        // 整体：视差上移 + 200px 内淡出
+        hero.style.transform = `translateY(${(-y * 0.18).toFixed(1)}px)`
+        hero.style.opacity = `${Math.max(0, 1 - y / 200).toFixed(3)}`
+        if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
+        if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
+        if (tempEl) {
+          const scale = (1 - 0.30 * t2).toFixed(3)
+          const dy = (-44 * t2).toFixed(1)
+          tempEl.style.transform = `scale(${scale}) translateY(${dy}px)`
+        }
       })
     }
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -311,6 +336,11 @@ export default function App() {
   // 气象台预警信号（当前生效的，置顶展示）
   const warnings = useMemo(
     () => results.find((r) => r.current?.warnings?.length)?.current?.warnings ?? [],
+    [results],
+  )
+  // 分钟级降水（和风天气提供，有实际降水时才展示）
+  const minutelyRain = useMemo(
+    () => results.find((r) => r.current?.minutelyRain)?.current?.minutelyRain ?? null,
     [results],
   )
   const city = CITIES[cityIdx]
@@ -379,15 +409,6 @@ export default function App() {
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
-        {warnings.length > 0 && (
-          <div className="warn-list">
-            {warnings.length === 1
-              ? <WarningCard w={warnings[0]} />
-              : <MergedWarnings warnings={warnings} />
-            }
-          </div>
-        )}
-
         <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <h1 ref={heroCityRef} className="hero-city">{city.name}</h1>
           {loading && results.length > 0
@@ -416,6 +437,18 @@ export default function App() {
             </>
           )}
         </div>
+
+        {/* 气象预警 + 分钟级降水：统一放在 hero 下方，视觉上构成「风险提示」区块 */}
+        {(warnings.length > 0 || minutelyRain) && (
+          <div className="hazard-block">
+            {warnings.length > 0 && (
+              warnings.length === 1
+                ? <WarningCard w={warnings[0]} />
+                : <MergedWarnings warnings={warnings} />
+            )}
+            {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
+          </div>
+        )}
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
@@ -527,6 +560,58 @@ function MergedWarnings({ warnings }: { warnings: WeatherWarning[] }) {
       </div>
       <p className="warn-merged-body">警报生效中：{types}。</p>
       {sender && <span className="warn-sender" style={{ marginLeft: 0 }}>{sender}</span>}
+    </div>
+  )
+}
+
+// 分钟级降水卡（和风天气 minutely/5m）
+const RAIN_SVG = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="19" x2="8" y2="21" /><line x1="8" y1="13" x2="8" y2="15" />
+    <line x1="16" y1="19" x2="16" y2="21" /><line x1="16" y1="13" x2="16" y2="15" />
+    <line x1="12" y1="21" x2="12" y2="23" /><line x1="12" y1="15" x2="12" y2="17" />
+    <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
+  </svg>
+)
+const SNOW_SVG = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <path d="m17 7-5-5-5 5" /><path d="m7 17 5 5 5-5" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="m7 7-5 5 5 5" /><path d="m17 7 5 5-5 5" />
+  </svg>
+)
+function MinutelyRainCard({ data }: { data: MinutelyRain }) {
+  const bars = data.minutely.slice(0, 12)
+  const maxPrecip = Math.max(...bars.map(b => b.precip), 0.5)
+  const isSnow = bars.some(b => b.type === 'snow' && b.precip > 0)
+  return (
+    <div className="minutely-card">
+      <div className="minutely-head">
+        {isSnow ? SNOW_SVG : RAIN_SVG}
+        <span className="minutely-label">未来一小时</span>
+      </div>
+      <div className="minutely-chart" aria-hidden="true">
+        {bars.map((b, i) => {
+          const h = b.precip > 0 ? Math.max(8, (b.precip / maxPrecip) * 100) : 4
+          const opacity = b.precip > 0 ? 0.55 + (b.precip / maxPrecip) * 0.4 : 0.18
+          return (
+            <div
+              key={i}
+              className="minutely-bar"
+              style={{ height: `${h}%`, opacity }}
+            />
+          )
+        })}
+      </div>
+      <div className="minutely-time-row" aria-hidden="true">
+        <span>现在</span>
+        <span>30分钟</span>
+        <span>1小时</span>
+      </div>
+      {data.summary && <p className="minutely-summary">{data.summary}</p>}
     </div>
   )
 }

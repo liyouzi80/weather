@@ -1,7 +1,7 @@
 // 和风天气 QWeather。需要 API 密钥（免费开发版即可）。
 // 浏览器直接请求 devapi.qweather.com 会被 CORS 拦截，
 // 开发环境经 vite 代理 /proxy/qweather 转发；生产部署需自备同样的反向代理。
-import type { CurrentWeather, GeoLocation, WeatherProvider, WeatherWarning } from './types'
+import type { CurrentWeather, GeoLocation, MinutelyRain, WeatherProvider, WeatherWarning } from './types'
 import { getKey } from './keys'
 
 const BASE = '/proxy/qweather'
@@ -17,10 +17,11 @@ export const qweatherProvider: WeatherProvider = {
     if (!key) throw new Error('未配置和风天气密钥')
     // QWeather 经纬度顺序为 lon,lat
     const locStr = `${loc.lon.toFixed(2)},${loc.lat.toFixed(2)}`
-    // 实况 + 预警并行请求，预警失败不影响实况展示
-    const [weatherRes, warningRes] = await Promise.all([
+    // 实况 + 预警 + 分钟级降水并行请求，后两者失败不影响实况展示
+    const [weatherRes, warningRes, minutelyRes] = await Promise.all([
       fetch(`${BASE}/v7/weather/now?location=${locStr}&key=${key}`),
       fetch(`${BASE}/v7/warning/now?location=${locStr}&key=${key}`).catch(() => null),
+      fetch(`${BASE}/v7/minutely/5m?location=${locStr}&key=${key}`).catch(() => null),
     ])
     if (!weatherRes.ok) throw new Error(`HTTP ${weatherRes.status}`)
     const data = await weatherRes.json()
@@ -43,6 +44,22 @@ export const qweatherProvider: WeatherProvider = {
       }
     }
 
+    // 解析分钟级降水（取前 12 条 = 未来 60 分钟，有实际降水时才保留）
+    let minutelyRain: MinutelyRain | undefined
+    if (minutelyRes?.ok) {
+      const mData = await minutelyRes.json().catch(() => null)
+      if (mData?.code === '200' && Array.isArray(mData.minutely)) {
+        const items = mData.minutely.slice(0, 12).map((m: Record<string, string>) => ({
+          fxTime: m.fxTime,
+          precip: Number(m.precip),
+          type: m.type === 'snow' ? 'snow' as const : 'rain' as const,
+        }))
+        if (items.some((m: { precip: number }) => m.precip > 0)) {
+          minutelyRain = { summary: mData.summary ?? '', minutely: items }
+        }
+      }
+    }
+
     return {
       temp: Number(now.temp),
       feelsLike: Number(now.feelsLike),
@@ -54,6 +71,7 @@ export const qweatherProvider: WeatherProvider = {
       // obsTime 形如「2024-06-06T16:00+08:00」；取北京墙上时间 16:00 写入 UTC 字段，前端按 UTC 原样显示
       observedAt: now.obsTime ? `${now.obsTime.slice(0, 16)}:00Z` : undefined,
       ...(warnings.length > 0 && { warnings }),
+      ...(minutelyRain && { minutelyRain }),
     }
   },
 }

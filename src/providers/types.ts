@@ -35,6 +35,8 @@ export interface CurrentWeather {
   uvIndex?: number
   /** 气象台当前生效的预警信号，可选 */
   warnings?: WeatherWarning[]
+  /** 分钟级降水（未来一小时），可选 */
+  minutelyRain?: MinutelyRain
 }
 
 /** 气象台预警信号 */
@@ -45,6 +47,16 @@ export interface WeatherWarning {
   type: string
   /** 等级，如「蓝色」「黄色」「橙色」「红色」 */
   level: string
+}
+
+/** 分钟级降水（和风天气 /v7/minutely/5m） */
+export interface MinutelyRain {
+  summary: string
+  minutely: Array<{
+    fxTime: string
+    precip: number
+    type: 'rain' | 'snow'
+  }>
 }
 
 /** 各信源拉取后的统一结果（成功或失败） */
