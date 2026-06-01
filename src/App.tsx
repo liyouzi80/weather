@@ -96,8 +96,12 @@ export default function App() {
     // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
     window.scrollTo(0, 0)
     setScrolled(false)
-    // 重置 hero 视差状态（切城市回顶时立即恢复全显）
-    if (heroRef.current) { heroRef.current.style.opacity = '1'; heroRef.current.style.transform = '' }
+    // 重置 hero 视差 + 高度（切城市后重新量测）
+    if (heroRef.current) {
+      heroRef.current.style.opacity = '1'
+      heroRef.current.style.transform = ''
+      heroRef.current.style.minHeight = ''
+    }
   }, [cityIdx])
 
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
@@ -325,6 +329,22 @@ export default function App() {
     document.documentElement.dataset.sky = sky
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', SKY_THEME[sky] ?? '#0b1426')
   }, [stats, night])
+  // Hero 高度自适应：量测第4个排行行的实际底部位置，压缩 hero 让它刚好落在视口底部。
+  // CSS calc() 仅适配「无公告卡」场景；JS 量测处理公告卡、预警等可变内容。
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const hero = heroRef.current
+      const rows = document.querySelectorAll<HTMLElement>('.rank-row')
+      if (!hero || rows.length < 4) return
+      const row4Bottom = rows[3].getBoundingClientRect().bottom
+      const target = window.innerHeight - 24  // 第4行距底部留 24px，5th row 微露
+      if (row4Bottom <= target) return        // 已在视口内，CSS calc 已够用
+      const overflow = row4Bottom - target
+      hero.style.minHeight = `${Math.max(160, hero.getBoundingClientRect().height - overflow)}px`
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [results])
+
   // 实时天气动效类型（全屏背景层）
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
 
