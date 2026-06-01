@@ -100,9 +100,8 @@ export default function App() {
 
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
   // 用非被动原生监听，统一在一处判定主轴，避免纵向下拉与横向翻页冲突。
-  const [pull, setPull] = useState(0)
+  // pull/swipeX 用 DOM ref 直接操作，避免每帧 setState → React 重渲染导致卡顿。
   const [pullReady, setPullReady] = useState(false)
-  const [swipeX, setSwipeX] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const pullRef = useRef(0)
@@ -113,6 +112,9 @@ export default function App() {
   const gesture = useRef<'pull' | 'swipe' | 'ignore' | null>(null)
   const atTop = useRef(false)
   const appRef = useRef<HTMLDivElement>(null)
+  const pullIndicatorRef = useRef<HTMLDivElement>(null)
+  const pullSvgRef = useRef<SVGSVGElement>(null)
+  const swipeWrapRef = useRef<HTMLElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
   const selectCityRef = useRef(selectCity)
@@ -152,28 +154,28 @@ export default function App() {
         e.preventDefault()
         const clamped = Math.max(-70, Math.min(70, dx * 0.4))
         swipeXRef.current = clamped
-        setSwipeX(clamped)
+        const wrap = swipeWrapRef.current
+        if (wrap) wrap.style.transform = `translateX(${clamped}px)`
         setDragging(true)
       } else if (gesture.current === 'pull') {
-        if (dy > 0) {
-          e.preventDefault()
-          // 0.62 阻尼：手指行程更短即可触发，回应更跟手
-          const p = Math.min(dy * 0.62, PULL_MAX)
-          pullRef.current = p
-          setPull(p)
-          if (p >= PULL_TRIGGER && !pullReadyRef.current) {
-            pullReadyRef.current = true
-            setPullReady(true)
-            haptic(8)
-          } else if (p < PULL_TRIGGER && pullReadyRef.current) {
-            pullReadyRef.current = false
-            setPullReady(false)
-          }
-        } else {
-          e.preventDefault()
-          pullRef.current = 0
-          setPull(0)
-          if (pullReadyRef.current) { pullReadyRef.current = false; setPullReady(false) }
+        e.preventDefault()
+        const p = dy > 0 ? Math.min(dy * 0.62, PULL_MAX) : 0
+        pullRef.current = p
+        const ind = pullIndicatorRef.current
+        const svg = pullSvgRef.current
+        if (ind) {
+          ind.style.height = `${p}px`
+          ind.style.opacity = p > 6 ? '1' : '0'
+          ind.classList.toggle('active', p > 6)
+        }
+        if (svg) svg.style.transform = `rotate(${Math.min(p / PULL_TRIGGER, 1) * 270}deg)`
+        if (p >= PULL_TRIGGER && !pullReadyRef.current) {
+          pullReadyRef.current = true
+          setPullReady(true)
+          haptic(8)
+        } else if (p < PULL_TRIGGER && pullReadyRef.current) {
+          pullReadyRef.current = false
+          setPullReady(false)
         }
       }
     }
@@ -187,14 +189,18 @@ export default function App() {
           selectCityRef.current(target)
         }
         swipeXRef.current = 0
-        setSwipeX(0)
+        const wrap = swipeWrapRef.current
+        if (wrap) wrap.style.transform = ''
       } else if (gesture.current === 'pull') {
         if (pullRef.current >= PULL_TRIGGER) {
           haptic([12, 60, 8])
           refreshRef.current()
         }
         pullRef.current = 0
-        setPull(0)
+        const ind = pullIndicatorRef.current
+        const svg = pullSvgRef.current
+        if (ind) { ind.style.height = '0px'; ind.style.opacity = '0'; ind.classList.remove('active') }
+        if (svg) svg.style.transform = 'rotate(0deg)'
         pullReadyRef.current = false
         setPullReady(false)
       }
@@ -295,17 +301,16 @@ export default function App() {
     <div className="app" ref={appRef}>
       <WeatherFX kind={fx} tint={tint} />
       <div
-        className={'pull-indicator' + (loading || pull > 6 ? ' active' : '') + (pullReady ? ' ready' : '')}
-        style={{
-          height: loading ? 46 : pull,
-          opacity: loading || pull > 6 ? 1 : 0,
-        }}
+        ref={pullIndicatorRef}
+        className={'pull-indicator' + (loading ? ' active' : '') + (pullReady ? ' ready' : '')}
+        style={{ height: loading ? 46 : 0, opacity: loading ? 1 : 0 }}
       >
         <svg
+          ref={pullSvgRef}
           width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
           className={loading ? 'spin' : ''}
-          style={{ transform: `rotate(${loading ? 0 : Math.min(pull / PULL_TRIGGER, 1) * 270}deg)`, opacity: 0.85 }}
+          style={{ opacity: 0.85 }}
         >
           <polyline points="23 4 23 10 17 10" />
           <polyline points="1 20 1 14 7 14" />
@@ -318,8 +323,8 @@ export default function App() {
 
       {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
       <main
+        ref={swipeWrapRef as React.RefObject<HTMLElement>}
         className={'swipe-wrap' + (dragging ? ' dragging' : '')}
-        style={swipeX ? { transform: `translateX(${swipeX}px)` } : undefined}
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
