@@ -352,6 +352,29 @@ html[data-sky='fog'] body::before {
   margin-left: 10px;
   font-weight: 500;
 }
+/* 多条预警合并卡（Apple Weather 风格） */
+.warn-merged {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 5px;
+}
+.warn-merged-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.warn-merged-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.warn-merged-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin: 0;
+  font-weight: 500;
+}
 
 /* 番禺区气象台短时预报卡（仅有提示时展示） */
 .notice-card {

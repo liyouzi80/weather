@@ -381,9 +381,10 @@ export default function App() {
       <div className="app-content" key={cityIdx}>
         {warnings.length > 0 && (
           <div className="warn-list">
-            {warnings.map((w, i) => (
-              <WarningCard w={w} key={i} />
-            ))}
+            {warnings.length === 1
+              ? <WarningCard w={warnings[0]} />
+              : <MergedWarnings warnings={warnings} />
+            }
           </div>
         )}
 
@@ -475,26 +476,57 @@ function warnColor(level: string): string {
   return '#ff9f0a'
 }
 
-// 预警信号卡（置顶醒目展示，左侧色条按等级着色）
-// 徽章仅显示「类型 + 等级」；发布机构长名从 title 中去除，放到副文本展示
+const WARN_SVG = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+    <line x1="12" y1="9" x2="12" y2="13" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+)
+
+// 预警信号卡（单条）
 function WarningCard({ w }: { w: WeatherWarning }) {
   const col = warnColor(w.level)
   const badgeText = `${w.type}${w.level}预警`
-  // 从 title 中提取发布机构（含地区前缀的完整名称，如「番禺区气象台」）
   const m = w.title.match(/([一-龥]{2,8}(?:气象台|气象局|天气预报台))/)
   const sender = m ? m[1] : ''
   const textColor = w.level.includes('黄') ? '#1a1a1a' : '#fff'
   return (
     <div className="warn-card" style={{ borderLeftColor: col }}>
       <span className="warn-badge" style={{ background: col, color: textColor }}>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-          <line x1="12" y1="9" x2="12" y2="13" />
-          <line x1="12" y1="17" x2="12.01" y2="17" />
-        </svg>
+        {WARN_SVG}
         {badgeText}
       </span>
       {sender && <span className="warn-sender">{sender}</span>}
+    </div>
+  )
+}
+
+// 多条预警合并展示（Apple Weather 风格）
+function MergedWarnings({ warnings }: { warnings: WeatherWarning[] }) {
+  const severityOf = (w: WeatherWarning) => {
+    if (w.level.includes('红')) return 4
+    if (w.level.includes('橙')) return 3
+    if (w.level.includes('黄')) return 2
+    return 1
+  }
+  const sorted = [...warnings].sort((a, b) => severityOf(b) - severityOf(a))
+  const primary = sorted[0]
+  const col = warnColor(primary.level)
+  const m = primary.title.match(/([一-龥]{2,8}(?:气象台|气象局|天气预报台))/)
+  const sender = m ? m[1] : ''
+  const types = sorted.map(w => w.type).join('、')
+  return (
+    <div className="warn-card warn-merged" style={{ borderLeftColor: col }}>
+      <div className="warn-merged-head" style={{ color: col }}>
+        {WARN_SVG}
+        <span className="warn-merged-title">
+          {primary.type}预警及其他 {warnings.length - 1} 则
+        </span>
+      </div>
+      <p className="warn-merged-body">警报生效中：{types}。</p>
+      {sender && <span className="warn-sender" style={{ marginLeft: 0 }}>{sender}</span>}
     </div>
   )
 }
