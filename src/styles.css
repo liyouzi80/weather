@@ -326,7 +326,6 @@ html[data-sky='fog'] body::before {
   align-items: center;
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
-  border-left: 4px solid #ff9f0a;
   border-radius: var(--radius);
   padding: 14px 16px;
   backdrop-filter: var(--mat-regular-blur);

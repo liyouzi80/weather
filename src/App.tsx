@@ -526,7 +526,7 @@ function WarningCard({ w }: { w: WeatherWarning }) {
   const sender = m ? m[1] : ''
   const textColor = w.level.includes('黄') ? '#1a1a1a' : '#fff'
   return (
-    <div className="warn-card" style={{ borderLeftColor: col }}>
+    <div className="warn-card">
       <span className="warn-badge" style={{ background: col, color: textColor }}>
         {WARN_SVG}
         {badgeText}
@@ -551,7 +551,7 @@ function MergedWarnings({ warnings }: { warnings: WeatherWarning[] }) {
   const sender = m ? m[1] : ''
   const types = sorted.map(w => w.type).join('、')
   return (
-    <div className="warn-card warn-merged" style={{ borderLeftColor: col }}>
+    <div className="warn-card warn-merged">
       <div className="warn-merged-head" style={{ color: col }}>
         {WARN_SVG}
         <span className="warn-merged-title">
