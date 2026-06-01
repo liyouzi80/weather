@@ -297,12 +297,10 @@ html[data-sky='fog'] body::before {
     rgba(8, 12, 24, 0) 100%);
   -webkit-mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
   mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  opacity: 1;
 }
-.loc-header.scrolled::before { opacity: 1; }
 
-/* hero 滚走后淡入的吸顶城市名 */
+/* 吸顶栏：城市名 + 温度（城市名 scrolled 后淡入，温度由 JS 控制交叉淡变） */
 .loc-sticky-name {
   font-size: 17px;
   font-weight: 600;
@@ -316,6 +314,14 @@ html[data-sky='fog'] body::before {
   opacity: 1;
   transform: none;
 }
+/* 吸顶温度：由滚动 handler 管理 opacity，CSS 仅定义初始状态与样式 */
+.loc-sticky-temp {
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: rgba(255, 255, 255, 0.72);
+  opacity: 0;
+}
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
 
@@ -326,12 +332,13 @@ html[data-sky='fog'] body::before {
 .warn-inline {
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 4px 6px;
   font-size: 14px;
   font-weight: 500;
   color: var(--text);
-  padding: 0 2px;
+  text-align: center;
   animation: riseIn 0.45s var(--spring) both;
 }
 .warn-item {
@@ -531,18 +538,7 @@ html[data-sky='fog'] body::before {
   animation: riseIn 0.55s var(--spring) both;
   will-change: opacity, transform;
 }
-/* 城市名：hero 顶部，大而醒目；Apple Weather 同款位置 */
-.hero-city {
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin: 0 0 1px;
-}
-/* 更新时间：城市名下方弱色辅助文字；后台刷新中时轻微脉动 */
+/* 更新时间：弱色辅助文字；后台刷新中时轻微脉动 */
 .hero-updated {
   font-size: 12px;
   font-weight: 500;
