@@ -82,35 +82,128 @@ const CLOUD_PAL: Record<CloudPalette, {
   },
 }
 
-function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: number): void {
-  // Wide atmospheric scatter glow
+// ── Astronomical helpers ──────────────────────────────────────────────────────
+
+// Simplified Meeus moon position (accurate to ~1°). Returns altitude, azimuth
+// (N=0°, E=90°, S=180°, W=270°), and elongation (0°=new moon, 180°=full).
+function moonAltAzPhase(now: Date, latDeg: number, lonDeg: number): { alt: number; az: number; elongation: number } {
+  const JD = now.getTime() / 86400000 + 2440587.5
+  const T  = (JD - 2451545.0) / 36525
+  const R  = Math.PI / 180
+  const s  = (d: number) => Math.sin(d * R)
+  const c  = (d: number) => Math.cos(d * R)
+  const n  = (x: number) => ((x % 360) + 360) % 360
+
+  // Moon mean elements (degrees)
+  const Lp = n(218.3164477 + 481267.88123421 * T)
+  const D  = n(297.8501921 + 445267.1114034  * T)
+  const M  = n(357.5291092 + 35999.0502909   * T)
+  const Mp = n(134.9633964 + 477198.8675055  * T)
+  const F  = n(93.2720950  + 483202.0175233  * T)
+
+  // Longitude and latitude perturbations (degrees)
+  const dL = 6.289*s(Mp) + 1.274*s(2*D-Mp) + 0.658*s(2*D)
+           + 0.214*s(2*Mp) - 0.185*s(M) - 0.114*s(2*F)
+           + 0.059*s(2*D-2*Mp) + 0.057*s(2*D-M-Mp)
+  const dB = 5.128*s(F) + 0.280*s(Mp+F) + 0.277*s(Mp-F)
+           + 0.173*s(2*D-F) + 0.055*s(2*D-Mp+F) - 0.046*s(2*D-Mp-F)
+
+  const lam = n(Lp + dL)        // ecliptic longitude (degrees)
+  const bet = dB                  // ecliptic latitude  (degrees)
+  const eps = 23.439 - 0.013 * T // obliquity (degrees)
+
+  // Ecliptic → equatorial
+  const sinDec = s(bet)*c(eps) + c(bet)*s(eps)*s(lam)
+  const decRad = Math.asin(Math.max(-1, Math.min(1, sinDec)))
+  const decD   = decRad / R
+  const raRad  = Math.atan2(s(lam)*c(eps) - Math.tan(bet*R)*s(eps), c(lam))
+  const raHrs  = ((raRad / R + 360) % 360) / 15  // right ascension in hours
+
+  // Local hour angle (degrees, 0 = on meridian, <180 = west)
+  const JD0  = Math.floor(JD - 0.5) + 0.5
+  const T0   = (JD0 - 2451545.0) / 36525
+  const GMST = ((6.697374558 + 2400.0513369*T0 + 1.0027379093*(JD-JD0)*24) % 24 + 24) % 24
+  const HA   = ((GMST + lonDeg/15 - raHrs) * 15 + 360) % 360
+
+  // Horizontal coordinates
+  const sinAlt = s(decD)*s(latDeg) + c(decD)*c(latDeg)*c(HA)
+  const altD   = Math.asin(Math.max(-1, Math.min(1, sinAlt))) / R
+  const cosAlt = Math.cos(altD * R)
+  const cosAz  = cosAlt < 0.01 ? 0 : (s(decD) - sinAlt*s(latDeg)) / (cosAlt * c(latDeg))
+  const arcAz  = Math.acos(Math.max(-1, Math.min(1, cosAz))) / R  // [0, 180]
+  const az     = HA < 180 ? 360 - arcAz : arcAz                   // N=0, E=90, S=180, W=270
+
+  // Moon elongation (approximate Sun longitude)
+  const sunLam = n(280.46 + 36000.772*T + 1.915*s(357.5291092 + 35999.0502909*T))
+  const elongation = n(lam - sunLam)  // 0=new moon, 180=full moon
+
+  return { alt: altD, az, elongation }
+}
+
+// Draw moon disk with correct phase terminator.
+// elongation: 0=new moon (dark), 180=full moon (bright), degrees.
+function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: number, elongation: number): void {
+  const P     = Math.PI
+  const illum = (1 - Math.cos(elongation * P / 180)) / 2   // 0=new, 1=full
+
+  // Atmospheric scatter glow (intensity scales with illumination)
+  const ga = (0.12 + illum * 0.06).toFixed(3)
   const glow = ctx.createRadialGradient(mx, my, r * 0.8, mx, my, r * 6)
-  glow.addColorStop(0,   'rgba(215,232,255,0.18)')
-  glow.addColorStop(0.4, 'rgba(200,222,255,0.07)')
+  glow.addColorStop(0,   `rgba(215,232,255,${ga})`)
+  glow.addColorStop(0.4, `rgba(200,222,255,${(+ga * 0.39).toFixed(3)})`)
   glow.addColorStop(1,   'rgba(185,210,255,0)')
   ctx.fillStyle = glow
   ctx.beginPath(); ctx.arc(mx, my, r * 6, 0, TAU); ctx.fill()
 
-  // Tight halo ring (just outside disk edge)
+  // Tight halo ring
   const halo = ctx.createRadialGradient(mx, my, r, mx, my, r * 2.2)
-  halo.addColorStop(0,   'rgba(230,242,255,0.22)')
-  halo.addColorStop(0.6, 'rgba(210,228,255,0.06)')
+  halo.addColorStop(0,   `rgba(230,242,255,${(0.16 + illum * 0.06).toFixed(3)})`)
+  halo.addColorStop(0.6, 'rgba(210,228,255,0.05)')
   halo.addColorStop(1,   'rgba(195,218,255,0)')
   ctx.fillStyle = halo
   ctx.beginPath(); ctx.arc(mx, my, r * 2.2, 0, TAU); ctx.fill()
 
-  // Moon disk — lit from upper-left
+  // Phase disc — clip to disk boundary
+  ctx.save()
+  ctx.beginPath(); ctx.arc(mx, my, r, 0, TAU); ctx.clip()
+
+  // Lit surface (radial gradient lit from upper-left)
   const disk = ctx.createRadialGradient(mx - r * 0.3, my - r * 0.3, 0, mx, my, r)
-  disk.addColorStop(0,   'rgba(255,255,248,0.97)')
-  disk.addColorStop(0.65,'rgba(238,246,255,0.92)')
-  disk.addColorStop(1,   'rgba(210,228,255,0.85)')
+  disk.addColorStop(0,    'rgba(255,255,248,0.97)')
+  disk.addColorStop(0.65, 'rgba(238,246,255,0.92)')
+  disk.addColorStop(1,    'rgba(210,228,255,0.85)')
   ctx.fillStyle = disk
-  ctx.beginPath(); ctx.arc(mx, my, r, 0, TAU); ctx.fill()
+  ctx.fillRect(mx - r, my - r, r * 2, r * 2)
+
+  // Dark shadow terminator (skip near full moon)
+  if (illum < 0.97) {
+    const isWaxing  = elongation < 180
+    // crescent phase: terminator bows toward the lit limb; gibbous: toward dark side
+    const isCrescent = isWaxing ? elongation < 90 : elongation > 270
+    const rx = Math.max(0.5, Math.abs(Math.cos(elongation * P / 180)) * r)
+
+    ctx.fillStyle = 'rgba(8,16,34,0.90)'
+    ctx.beginPath()
+    if (isWaxing) {
+      // Dark on left: left semicircle + terminator
+      ctx.arc(mx, my, r, -P / 2, P / 2, true)
+      // right-side ellipse for crescent (bows right), left-side for gibbous (bows left)
+      ctx.ellipse(mx, my, rx, r, 0, P / 2, -P / 2, !isCrescent)
+    } else {
+      // Dark on right: right semicircle + terminator
+      ctx.arc(mx, my, r, -P / 2, P / 2, false)
+      ctx.ellipse(mx, my, rx, r, 0, P / 2, -P / 2, isCrescent)
+    }
+    ctx.closePath()
+    ctx.fill()
+  }
+
+  ctx.restore()
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
+export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: CloudTint; lat?: number; lon?: number }) {
   const ref = useRef<HTMLCanvasElement>(null)
   // Stable dep so the effect only rebuilds when the tint meaningfully changes
   const tintKey = tint ? `${tint.r},${tint.g},${tint.b},${tint.warmth.toFixed(2)}` : ''
@@ -126,6 +219,8 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
     let moonGrad: CanvasGradient | null = null
     // moon position (clear-night & cloudy-night)
     let moonX = 0, moonY = 0, moonR = 0
+    let moonElongation = 135  // degrees; 0=new moon, 180=full moon
+    let moonVisible = true
 
     const rainL: Drop[][] = [[], [], []]
     const flakes: Flake[] = []
@@ -321,14 +416,34 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
         sunGrad.addColorStop(1,    'rgba(255,130,30,0)')
       }
       if (kind === 'clear-night' || kind === 'cloudy-night') {
-        moonX = kind === 'clear-night' ? W * 0.80 : W * 0.26
-        moonY = kind === 'clear-night' ? H * 0.11 : H * 0.14
         moonR = H * 0.042
-        if (kind === 'clear-night') {
+        moonVisible = true
+        if (lat != null && lon != null) {
+          const mp = moonAltAzPhase(new Date(), lat, lon)
+          moonElongation = mp.elongation
+          if (mp.alt < 5) {
+            moonVisible = false
+          } else {
+            // azimuth → X: E=right, S=center, W=left (sin mapping)
+            moonX = W * 0.5 * (1 + Math.sin(mp.az * Math.PI / 180))
+            // altitude → Y: 90°=near top (5%), 5°=near 40%
+            moonY = H * (0.05 + 0.36 * (1 - (mp.alt - 5) / 85))
+            // clamp so moon stays in the upper portion of the canvas
+            moonX = Math.max(moonR, Math.min(W - moonR, moonX))
+            moonY = Math.max(moonR, Math.min(H * 0.44, moonY))
+          }
+        } else {
+          // fallback when no coordinates provided
+          moonX = kind === 'clear-night' ? W * 0.80 : W * 0.26
+          moonY = kind === 'clear-night' ? H * 0.11 : H * 0.14
+        }
+        if (kind === 'clear-night' && moonVisible) {
           moonGrad = ctx.createRadialGradient(moonX, moonY, 0, moonX, moonY, H * 0.30)
           moonGrad.addColorStop(0,   'rgba(240,248,255,0.12)')
           moonGrad.addColorStop(0.5, 'rgba(210,230,255,0.04)')
           moonGrad.addColorStop(1,   'rgba(180,205,255,0)')
+        } else {
+          moonGrad = null
         }
       }
 
@@ -531,7 +646,7 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
           }
           ctx.globalAlpha = 1
 
-          drawMoon(ctx, moonX, moonY, moonR)
+          if (moonVisible) drawMoon(ctx, moonX, moonY, moonR, moonElongation)
 
           if (!reduced) {
             nextShoot -= dt
@@ -608,7 +723,7 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
           for (const c of clouds) if (c.layer === 0) drawCloud(c)
 
           // 3. Moon (between far and near cloud layers)
-          if (kind === 'cloudy-night') drawMoon(ctx, moonX, moonY, moonR)
+          if (kind === 'cloudy-night' && moonVisible) drawMoon(ctx, moonX, moonY, moonR, moonElongation)
 
           // 4. Mid + near clouds (in front of moon)
           for (const c of clouds) if (c.layer !== 0) drawCloud(c)
@@ -681,7 +796,7 @@ export function WeatherFX({ kind, tint }: { kind: FxKind; tint?: CloudTint }) {
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('resize', resize)
     }
-  }, [kind, tintKey])
+  }, [kind, tintKey, lat, lon])
 
   return <canvas ref={ref} className="weather-fx" aria-hidden="true" />
 }

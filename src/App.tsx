@@ -454,7 +454,7 @@ export default function App() {
 
   return (
     <div className="app" ref={appRef}>
-      <WeatherFX kind={fx} tint={tint} />
+      <WeatherFX kind={fx} tint={tint} lat={CITIES[cityIdx].lat} lon={CITIES[cityIdx].lon} />
       <div ref={pullIndicatorRef} className={'pull-indicator' + (pullReady ? ' ready' : '')}>
         <svg
           ref={pullSvgRef}
