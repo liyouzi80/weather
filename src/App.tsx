@@ -329,8 +329,8 @@ export default function App() {
         const hiloEl = hero.querySelector<HTMLElement>('.hero-hilo')
         const cityEl = hero.querySelector<HTMLElement>('.hero-city')
 
-        // 吸顶 scrolled 仅在跨越 80px 阈值时触发 setState，避免每帧触发重渲染
-        const isScrolled = y > 80
+        // 吸顶 scrolled：显示阈值 80px，隐藏阈值 60px（滞后区间防止边界反复闪烁）
+        const isScrolled = wasScrolled ? y > 60 : y > 80
         if (isScrolled !== wasScrolled) { wasScrolled = isScrolled; setScrolled(isScrolled) }
 
         if (y <= 0) {
