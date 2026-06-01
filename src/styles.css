@@ -328,34 +328,25 @@ html[data-sky='fog'] body::before {
 /* 风险提示区块：气象预警（一行文字）+ 分钟级降水，统一跟在 hero 之后 */
 .hazard-block { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
 
-/* 预警一行提示：[色点] 暴雨预警 和 [色点] 雷雨大风预警 */
+/* 预警 chip 行 */
 .warn-inline {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 4px 6px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
-  text-align: center;
+  gap: 8px;
   animation: riseIn 0.45s var(--spring) both;
 }
-.warn-item {
+.warn-chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-}
-.warn-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  flex: none;
-}
-.warn-sep {
-  color: var(--text-dim);
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 0.5px solid transparent;
   font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 /* 分钟级降水卡 */
@@ -501,7 +492,7 @@ html[data-sky='fog'] body::before {
   animation: riseIn 0.5s var(--spring) both;
 }
 .mc-value {
-  font-size: 25px;
+  font-size: 19px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.02em;
@@ -509,7 +500,7 @@ html[data-sky='fog'] body::before {
 }
 .mc-label {
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.02em;
   color: var(--text-secondary);
 }
@@ -571,6 +562,8 @@ html[data-sky='fog'] body::before {
   letter-spacing: -0.04em;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
+  /* 缩放时向上折叠，视觉上「飞向」吸顶栏 */
+  transform-origin: 50% 20%;
 }
 /* 度数符号绝对悬挂在数字右侧：不计入宽度，让数字本身保持光学居中（同苹果天气） */
 .hero-deg {
@@ -656,15 +649,16 @@ html[data-sky='fog'] body::before {
 .rank-name { font-size: 14px; min-width: 100px; font-weight: 500; }
 .rank-bar {
   flex: 1;
-  height: 5px;
+  height: 2px;
   background: var(--fill-2);
-  border-radius: 3px;
+  border-radius: 2px;
   overflow: hidden;
 }
 .rank-bar-fill {
   display: block;
   height: 100%;
-  border-radius: 3px;
+  border-radius: 2px;
+  opacity: 0.65;
   transition: width 0.6s var(--spring);
 }
 .rank-temp {
@@ -682,6 +676,8 @@ html[data-sky='fog'] body::before {
   gap: 10px;
 }
 .card {
+  display: flex;
+  flex-direction: column;
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
   border-radius: var(--radius);
@@ -762,7 +758,8 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .card .obs {
   color: var(--text-dim);
   font-size: 11px;
-  margin-top: 10px;
+  margin-top: auto;
+  padding-top: 10px;
   font-weight: 500;
 }
 
@@ -777,24 +774,15 @@ a.card { text-decoration: none; color: inherit; display: block; }
   background: linear-gradient(105deg, rgba(64, 200, 224, 0.12), var(--glass) 58%);
 }
 
-/* Tags */
+/* Tags：纯色文字，无背景无投影 */
 .tag {
-  font-size: 10px;
-  padding: 3px 9px;
-  border-radius: 8px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
-.tag-hot {
-  background: rgba(255, 69, 58, 0.18);
-  color: #ff6961;
-  box-shadow: 0 0 12px var(--hot-glow);
-}
-.tag-cold {
-  background: rgba(64, 200, 224, 0.18);
-  color: #70d7e8;
-  box-shadow: 0 0 12px var(--cold-glow);
-}
+.tag-hot { color: var(--hot); }
+.tag-cold { color: var(--cold); }
 
 .aqi-section { margin-top: 20px; }
 .aqi-section .cards { margin-top: 4px; }

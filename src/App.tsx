@@ -277,16 +277,16 @@ export default function App() {
 
         if (y <= 0) {
           hero.style.opacity = '1'; hero.style.transform = ''
-          if (tempEl) { tempEl.style.transform = '' }
+          if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
           if (condEl) condEl.style.opacity = ''
           if (hiloEl) hiloEl.style.opacity = ''
           if (cityEl) cityEl.style.opacity = ''
           if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
           return
         }
-        // Phase 1: 城市名 + 天气状况 + 高低温 在前 80px 淡出
+        // Phase 1 (0–80px): 城市名 + 天气状况 + 高低温淡出
         const t1 = Math.min(y / 80, 1)
-        // Phase 2: 温度数字在 80–180px 缩小 + 上移；吸顶温度同步淡入
+        // Phase 2 (80–180px): 温度数字缩小 + 向上飞出；吸顶温度交叉淡入
         const t2 = Math.max(0, Math.min((y - 80) / 100, 1))
         hero.style.transform = `translateY(${(-y * 0.18).toFixed(1)}px)`
         hero.style.opacity = `${Math.max(0, 1 - y / 200).toFixed(3)}`
@@ -294,11 +294,13 @@ export default function App() {
         if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (tempEl) {
-          const scale = (1 - 0.30 * t2).toFixed(3)
-          const dy = (-44 * t2).toFixed(1)
+          // transform-origin: 50% 20% 令缩放从顶部折叠，translateY 让数字向上飞向吸顶栏
+          const scale = (1 - 0.28 * t2).toFixed(3)
+          const dy = (-88 * t2).toFixed(1)
           tempEl.style.transform = `scale(${scale}) translateY(${dy}px)`
+          tempEl.style.opacity = (1 - t2).toFixed(3)
         }
-        // 吸顶栏温度与 hero 温度交叉淡变
+        // 吸顶栏温度与 hero 温度镜像淡变，形成「数字飞过去」的视觉
         if (stickyTempRef.current) stickyTempRef.current.style.opacity = t2.toFixed(3)
       })
     }
@@ -507,6 +509,13 @@ function warnColor(level: string): string {
   if (level.includes('蓝')) return '#0a84ff'
   return '#ff9f0a'
 }
+function warnColorRgba(level: string, alpha: number): string {
+  if (level.includes('红')) return `rgba(255, 69, 58, ${alpha})`
+  if (level.includes('橙')) return `rgba(255, 159, 10, ${alpha})`
+  if (level.includes('黄')) return `rgba(255, 214, 10, ${alpha})`
+  if (level.includes('蓝')) return `rgba(10, 132, 255, ${alpha})`
+  return `rgba(255, 159, 10, ${alpha})`
+}
 
 // 预警严重程度（红4>橙3>黄2>蓝1）
 function severityOf(w: WeatherWarning) {
@@ -521,10 +530,16 @@ function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
   const sorted = [...warnings].sort((a, b) => severityOf(b) - severityOf(a))
   return (
     <div className="warn-inline">
-      {sorted.map((w, i) => (
-        <span key={w.type + w.level} className="warn-item">
-          {i > 0 && <span className="warn-sep">和</span>}
-          <span className="warn-dot" style={{ background: warnColor(w.level) }} />
+      {sorted.map((w) => (
+        <span
+          key={w.type + w.level}
+          className="warn-chip"
+          style={{
+            background: warnColorRgba(w.level, 0.15),
+            borderColor: warnColorRgba(w.level, 0.45),
+            color: warnColor(w.level),
+          }}
+        >
           {w.type}预警
         </span>
       ))}
