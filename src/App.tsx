@@ -96,6 +96,8 @@ export default function App() {
     // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
     window.scrollTo(0, 0)
     setScrolled(false)
+    // 重置 hero 视差状态（切城市回顶时立即恢复全显）
+    if (heroRef.current) { heroRef.current.style.opacity = '1'; heroRef.current.style.transform = '' }
   }, [cityIdx])
 
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
@@ -112,6 +114,8 @@ export default function App() {
   const gesture = useRef<'pull' | 'swipe' | 'ignore' | null>(null)
   const atTop = useRef(false)
   const appRef = useRef<HTMLDivElement>(null)
+  const heroRef = useRef<HTMLDivElement>(null)
+  const heroCityRef = useRef<HTMLHeadingElement>(null)
   const pullIndicatorRef = useRef<HTMLDivElement>(null)
   const pullSvgRef = useRef<SVGSVGElement>(null)
   const swipeWrapRef = useRef<HTMLElement>(null)
@@ -241,11 +245,38 @@ export default function App() {
     }
   }, [])
 
-  // 滚动时头部吸顶城市名淡入（hero 城市名滚出视口后触发）
+  // 吸顶城市名：IntersectionObserver 精确监测 hero 城市名是否滚出视口，零帧开销
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 80)
+    const el = heroCityRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setScrolled(!entry.isIntersecting),
+      { threshold: 0 }
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [])
+
+  // Hero 滚动视差淡出：随滚动渐隐 + 轻微上移（Apple Weather 同款效果）
+  // 纯 DOM 直操作 + rAF 节流，不走 React state，不触发任何重渲染
+  useEffect(() => {
+    const hero = heroRef.current
+    if (!hero) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        const y = window.scrollY
+        if (y <= 0) { hero.style.opacity = '1'; hero.style.transform = ''; return }
+        const t = Math.min(y / 240, 1)
+        hero.style.opacity = `${(1 - t * 0.85).toFixed(3)}`
+        hero.style.transform = `translateY(${(-y * 0.22).toFixed(1)}px)`
+      })
+    }
     window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
   }, [])
 
   // 头部刷新时间：相对格式，每 30 秒重算一次
@@ -336,8 +367,8 @@ export default function App() {
           </div>
         )}
 
-        <div className={'hero' + (!stats ? ' hero-skeleton' : '')}>
-          <h1 className="hero-city">{city.name}</h1>
+        <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
+          <h1 ref={heroCityRef} className="hero-city">{city.name}</h1>
           {loading && results.length > 0
             ? <span className="hero-updated refreshing">数据更新中…</span>
             : updatedAgo && <span className="hero-updated">{updatedAgo}</span>

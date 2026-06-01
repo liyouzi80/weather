@@ -472,6 +472,7 @@ html[data-sky='fog'] body::before {
   justify-content: center;
   padding: 8px 0 52px;
   animation: riseIn 0.55s var(--spring) both;
+  will-change: opacity, transform;
 }
 /* 城市名：hero 顶部，大而醒目；Apple Weather 同款位置 */
 .hero-city {
