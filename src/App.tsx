@@ -269,6 +269,7 @@ export default function App() {
         const tempEl = hero.querySelector<HTMLElement>('.hero-temp')
         const condEl = hero.querySelector<HTMLElement>('.hero-cond')
         const hiloEl = hero.querySelector<HTMLElement>('.hero-hilo')
+        const cityEl = hero.querySelector<HTMLElement>('.hero-city')
 
         // 吸顶 scrolled 仅在跨越 80px 阈值时触发 setState，避免每帧触发重渲染
         const isScrolled = y > 80
@@ -279,15 +280,17 @@ export default function App() {
           if (tempEl) { tempEl.style.transform = '' }
           if (condEl) condEl.style.opacity = ''
           if (hiloEl) hiloEl.style.opacity = ''
+          if (cityEl) cityEl.style.opacity = ''
           if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
           return
         }
-        // Phase 1: 天气状况 + 高低温 在前 80px 淡出
+        // Phase 1: 城市名 + 天气状况 + 高低温 在前 80px 淡出
         const t1 = Math.min(y / 80, 1)
         // Phase 2: 温度数字在 80–180px 缩小 + 上移；吸顶温度同步淡入
         const t2 = Math.max(0, Math.min((y - 80) / 100, 1))
         hero.style.transform = `translateY(${(-y * 0.18).toFixed(1)}px)`
         hero.style.opacity = `${Math.max(0, 1 - y / 200).toFixed(3)}`
+        if (cityEl) cityEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (tempEl) {
@@ -410,6 +413,7 @@ export default function App() {
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
         <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
+          <h1 className="hero-city">{city.name}</h1>
           {loading && results.length > 0
             ? <span className="hero-updated refreshing">数据更新中…</span>
             : updatedAgo && <span className="hero-updated">{updatedAgo}</span>

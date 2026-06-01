@@ -284,7 +284,7 @@ html[data-sky='fog'] body::before {
   margin: 0 -20px;
   padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
 }
-/* 滚动后吸顶态：向下淡出的天空渐隐遮罩，无边框无硬边 */
+/* 吸顶遮罩：滚动后出现，覆盖其下方的内容（90% 实底 → 底边淡出）*/
 .loc-header::before {
   content: '';
   position: absolute;
@@ -292,13 +292,13 @@ html[data-sky='fog'] body::before {
   z-index: -1;
   pointer-events: none;
   background: linear-gradient(180deg,
-    rgba(8, 12, 24, 0.55) 0%,
-    rgba(8, 12, 24, 0.26) 52%,
+    rgba(8, 12, 24, 0.94) 0%,
+    rgba(8, 12, 24, 0.88) 65%,
     rgba(8, 12, 24, 0) 100%);
-  -webkit-mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
-  mask-image: linear-gradient(180deg, #000 42%, transparent 100%);
-  opacity: 1;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
 }
+.loc-header.scrolled::before { opacity: 1; }
 
 /* 吸顶栏：城市名 + 温度（城市名 scrolled 后淡入，温度由 JS 控制交叉淡变） */
 .loc-sticky-name {
@@ -537,6 +537,17 @@ html[data-sky='fog'] body::before {
   padding: 8px 0 52px;
   animation: riseIn 0.55s var(--spring) both;
   will-change: opacity, transform;
+}
+/* 城市名：hero 顶部居中 */
+.hero-city {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 1px;
 }
 /* 更新时间：弱色辅助文字；后台刷新中时轻微脉动 */
 .hero-updated {
