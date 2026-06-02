@@ -610,13 +610,13 @@ html[data-sky='fog'] body::before {
 .hero-hilo {
   display: flex;
   justify-content: center;
-  gap: 22px;
-  font-size: 18px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.82);
-  margin-top: 7px;
+  gap: 16px;
+  font-size: 14px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.42);
+  margin-top: 5px;
+  letter-spacing: 0.01em;
 }
-.hero-hilo b { font-weight: 600; color: #fff; }
 
 /* Hero 骨架屏（加载中占位，结构与真实 hero 对齐） */
 .hero-skeleton { pointer-events: none; }

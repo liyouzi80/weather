@@ -522,14 +522,14 @@ export default function App() {
             <>
               <div
                 className="hero-temp"
-                aria-label={`当前 ${Math.round(stats.avg)} 度，${stats.text}，最高 ${Math.round(stats.max)} 度，最低 ${Math.round(stats.min)} 度`}
+                aria-label={`当前 ${Math.round(stats.avg)} 度，${stats.text}`}
               >
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
               <div className="hero-hilo" aria-hidden="true">
-                <span>最高 <b>{Math.round(stats.max)}°</b></span>
-                <span>最低 <b>{Math.round(stats.min)}°</b></span>
+                <span>↑ {Math.round(stats.max)}°</span>
+                <span>↓ {Math.round(stats.min)}°</span>
               </div>
             </>
           ) : (
