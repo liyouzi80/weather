@@ -1,0 +1,76 @@
+import SwiftUI
+
+// MARK: - Alert-only coloring: returns nil for normal ranges
+
+struct AlertStyle {
+    let color: Color
+    let level: String
+}
+
+func feelsAlert(_ t: Double) -> AlertStyle? {
+    if t <= 10 { return AlertStyle(color: Color(hex: "#64d2ff"), level: "偏冷") }
+    if t >= 38 { return AlertStyle(color: Color(hex: "#ff453a"), level: "酷热") }
+    if t >= 32 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "较热") }
+    return nil
+}
+
+func humidAlert(_ h: Double) -> AlertStyle? {
+    if h < 30  { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏干") }
+    if h > 90  { return AlertStyle(color: Color(hex: "#ff453a"), level: "潮湿") }
+    if h > 85  { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "闷湿") }
+    return nil
+}
+
+func aqiAlert(_ aqi: Int) -> AlertStyle? {
+    if aqi <= 100 { return nil }
+    if aqi <= 150 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "轻度污染") }
+    if aqi <= 200 { return AlertStyle(color: Color(hex: "#ff453a"), level: "中度污染") }
+    if aqi <= 300 { return AlertStyle(color: Color(hex: "#af52de"), level: "重度污染") }
+    return AlertStyle(color: Color(hex: "#a1304e"), level: "严重污染")
+}
+
+func uvAlert(_ uv: Double) -> AlertStyle? {
+    if uv <= 4 { return nil }
+    if uv <= 6 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "较强") }
+    if uv <= 9 { return AlertStyle(color: Color(hex: "#ff453a"), level: "强") }
+    return AlertStyle(color: Color(hex: "#bf5af2"), level: "极强")
+}
+
+// AQI full scale (for detail cards)
+func aqiColor(_ aqi: Int) -> Color {
+    if aqi <= 50  { return Color(hex: "#34c759") }
+    if aqi <= 100 { return Color(hex: "#ffd60a") }
+    if aqi <= 150 { return Color(hex: "#ff9f0a") }
+    if aqi <= 200 { return Color(hex: "#ff453a") }
+    if aqi <= 300 { return Color(hex: "#af52de") }
+    return Color(hex: "#a1304e")
+}
+
+func aqiCategory(_ aqi: Int) -> String {
+    if aqi <= 50  { return "优" }
+    if aqi <= 100 { return "良" }
+    if aqi <= 150 { return "轻度污染" }
+    if aqi <= 200 { return "中度污染" }
+    if aqi <= 300 { return "重度污染" }
+    return "严重污染"
+}
+
+func warnColor(_ level: String) -> Color {
+    if level.contains("红") { return Color(hex: "#ff453a") }
+    if level.contains("橙") { return Color(hex: "#ff9f0a") }
+    if level.contains("黄") { return Color(hex: "#ffd60a") }
+    return Color(hex: "#0a84ff")
+}
+
+// MARK: - Color from hex string
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let r = Double((int >> 16) & 0xFF) / 255
+        let g = Double((int >> 8)  & 0xFF) / 255
+        let b = Double(int & 0xFF)         / 255
+        self.init(red: r, green: g, blue: b)
+    }
+}
