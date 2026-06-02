@@ -409,44 +409,43 @@ html[data-sky='fog'] body::before {
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
   border-radius: var(--radius);
-  padding: 16px 18px;
+  padding: 14px 16px;
   margin-bottom: 20px;
   backdrop-filter: var(--mat-regular-blur);
   -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   animation: riseIn 0.5s var(--spring) both;
 }
+/* 来源行：图标 + 台站名（次要色） + 发布时间（靠右，极弱色） */
 .notice-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+/* 唯一使用紫色 accent 的元素 */
+.notice-icon { color: #a855f7; flex-shrink: 0; }
+.notice-source {
   font-size: 12px;
   font-weight: 600;
-  color: #c89bf0;
-  margin-bottom: 6px;
+  color: var(--text-secondary);
 }
-.notice-source { font-size: 12px; font-weight: 600; }
-/* 时间窗口胶囊（如「今天17—20时」）：内容行前置，紫色填充小标签 */
-.notice-time {
-  background: rgba(168, 85, 247, 0.18);
-  color: #c89bf0;
-  border-radius: 6px;
-  padding: 1px 7px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
-  white-space: nowrap;
-  margin-right: 6px;
-  align-self: center;
-}
-/* 发布时间（如「05-29 17:00」）：靠右弱色 */
 .notice-issued {
   margin-left: auto;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 400;
   color: var(--text-dim);
   white-space: nowrap;
 }
+/* 预报时间窗口：独立标题行，主色 + 半粗，作为这条预报的「标题」 */
+.notice-when {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  margin-bottom: 3px;
+}
+/* 天气详情行 */
 .notice-row {
   display: flex;
   align-items: baseline;
@@ -454,20 +453,29 @@ html[data-sky='fog'] body::before {
   gap: 0;
 }
 .notice-wx {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
 }
 .notice-detail {
   font-size: 13px;
   color: var(--text-secondary);
 }
 .notice-detail::before { content: ' · '; opacity: 0.45; }
+/* 注意事项：提权显示，暖琥珀色 + 三角警示图标 */
 .notice-note {
-  margin: 5px 0 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  margin: 7px 0 0;
   font-size: 12px;
-  color: var(--text-dim);
-  line-height: 1.4;
+  color: rgba(255, 195, 80, 0.90);
+  line-height: 1.45;
+}
+.notice-note svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: rgba(255, 175, 50, 0.95);
 }
 
 /* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */

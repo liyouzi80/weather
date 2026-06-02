@@ -971,21 +971,34 @@ function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
   const issued = fmtIssuedAt(issuedAt)
   return (
     <div className="notice-card">
+      {/* 来源行：图标（唯一紫色）+ 台站名 + 发布时间 */}
       <div className="notice-head">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="notice-icon">
           <path d="M3 11l18-5v12L3 14v-3z" />
           <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
         </svg>
         <span className="notice-source">番禺气象台</span>
         {issued && <span className="notice-issued">{issued}</span>}
       </div>
+      {/* 预报时间窗口独立成标题行 */}
+      {timeLabel && <div className="notice-when">{timeLabel}</div>}
+      {/* 天气详情行 */}
       <div className="notice-row">
-        {timeLabel && <span className="notice-time">{timeLabel}</span>}
         {weather && <span className="notice-wx">{weather}</span>}
         {wind && <span className="notice-detail">{wind}</span>}
         {temp && <span className="notice-detail">{temp}</span>}
       </div>
-      {note && <p className="notice-note">{note}</p>}
+      {/* 注意事项：提权显示 */}
+      {note && (
+        <div className="notice-note">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          <span>{note}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -1056,11 +1069,11 @@ function parseForecast(raw: string) {
   return { timeLabel, weather, wind, temp, note }
 }
 
-// "2026年05月29日 17:00" → "05-29 17:00"；解析失败则返回空串
+// "2026年05月29日 17:00" → "17:00 发布"；解析失败则返回空串
 function fmtIssuedAt(s?: string): string {
   if (!s) return ''
-  const m = s.match(/\d{4}年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}:\d{2})/)
-  return m ? `${m[1].padStart(2, '0')}-${m[2].padStart(2, '0')} ${m[3]}` : ''
+  const m = s.match(/\d{4}年\d{1,2}月\d{1,2}日\s*(\d{1,2}:\d{2})/)
+  return m ? `${m[1]} 发布` : ''
 }
 
 // 番禺区气象台短时预报时效检测：按"预报窗口结束时间"（北京时）判断是否过期。
