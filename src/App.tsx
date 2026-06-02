@@ -994,6 +994,9 @@ function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
 function parseForecast(raw: string) {
   let s = raw.trim()
 
+  // 先去区域名前缀（如「广州市番禺区，」），再提取时间窗口
+  s = s.replace(/^(?:广州市?)?番禺[区县]?\s*[，,]?\s*/, '')
+
   // 时间窗口：「今天17时到今天20时」→ timeLabel「今天17—20时」
   let timeLabel = ''
   const tm = s.match(/^(今[天日]|明天|后天)?(\d{1,2})时到(今[天日]|明天|后天)?(\d{1,2})时[\s，,]*/)
@@ -1004,9 +1007,6 @@ function parseForecast(raw: string) {
       : `${fromDay}${tm[2]}—${tm[4]}时`
     s = s.slice(tm[0].length)
   }
-
-  // 去区域名
-  s = s.replace(/^(?:广州市?)?番禺[区县]?\s*[，,]?\s*/, '')
 
   // 提取风向风力（如「偏南风2-3级」「东北风3级」）
   let wind = ''
