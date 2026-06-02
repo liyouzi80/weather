@@ -418,12 +418,12 @@ html[data-sky='fog'] body::before {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   animation: riseIn 0.5s var(--spring) both;
 }
-/* 来源行：图标 + 台站名（次要色） + 发布时间（靠右，极弱色） */
+/* ── 方案 A：单行 header = 图标 + 台站 + 时间段 + 发布时间 ── */
 .notice-head {
   display: flex;
   align-items: center;
   gap: 5px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 /* 唯一使用紫色 accent 的元素 */
 .notice-icon { color: #a855f7; flex-shrink: 0; }
@@ -432,6 +432,13 @@ html[data-sky='fog'] body::before {
   font-weight: 600;
   color: var(--text-secondary);
 }
+/* 时间段内嵌在 header，用 · 分隔，极弱色 */
+.notice-time-chip {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+.notice-time-chip::before { content: '·'; margin-right: 3px; opacity: 0.5; }
 .notice-issued {
   margin-left: auto;
   font-size: 11px;
@@ -439,31 +446,26 @@ html[data-sky='fog'] body::before {
   color: var(--text-dim);
   white-space: nowrap;
 }
-/* 预报时间窗口：独立标题行，主色 + 半粗，作为这条预报的「标题」 */
-.notice-when {
-  font-size: 15px;
+/* 天气现象：视觉主体，大字主色 */
+.notice-wx {
+  font-size: 18px;
   font-weight: 600;
   color: var(--text);
-  letter-spacing: -0.01em;
-  margin-bottom: 3px;
+  letter-spacing: -0.02em;
+  margin-bottom: 5px;
 }
-/* 天气详情行 */
+/* 风力 + 温度次要行 */
 .notice-row {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 0;
 }
-.notice-wx {
-  font-size: 13px;
-  font-weight: 400;
-  color: var(--text-secondary);
-}
 .notice-detail {
   font-size: 13px;
   color: var(--text-secondary);
 }
-.notice-detail::before { content: ' · '; opacity: 0.45; }
+.notice-detail + .notice-detail::before { content: ' · '; opacity: 0.45; }
 /* 注意事项：提权显示，暖琥珀色 + 三角警示图标 */
 .notice-note {
   display: flex;
