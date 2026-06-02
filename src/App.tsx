@@ -977,10 +977,10 @@ function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
           <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
         </svg>
         <span className="notice-source">番禺气象台</span>
-        {timeLabel && <span className="notice-time">{timeLabel}</span>}
         {issued && <span className="notice-issued">{issued}</span>}
       </div>
       <div className="notice-row">
+        {timeLabel && <span className="notice-time">{timeLabel}</span>}
         {weather && <span className="notice-wx">{weather}</span>}
         {wind && <span className="notice-detail">{wind}</span>}
         {temp && <span className="notice-detail">{temp}</span>}

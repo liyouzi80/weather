@@ -414,7 +414,6 @@ html[data-sky='fog'] body::before {
   margin-bottom: 20px;
   backdrop-filter: var(--mat-regular-blur);
   -webkit-backdrop-filter: var(--mat-regular-blur);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   animation: riseIn 0.5s var(--spring) both;
 }
 .notice-head {
@@ -427,7 +426,7 @@ html[data-sky='fog'] body::before {
   margin-bottom: 6px;
 }
 .notice-source { font-size: 12px; font-weight: 600; }
-/* 时间窗口胶囊（如「今天17—20时」）：紫色填充小标签 */
+/* 时间窗口胶囊（如「今天17—20时」）：内容行前置，紫色填充小标签 */
 .notice-time {
   background: rgba(168, 85, 247, 0.18);
   color: #c89bf0;
@@ -437,6 +436,8 @@ html[data-sky='fog'] body::before {
   font-weight: 700;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  margin-right: 6px;
+  align-self: center;
 }
 /* 发布时间（如「05-29 17:00」）：靠右弱色 */
 .notice-issued {
