@@ -223,7 +223,7 @@ html[data-sky='fog'] body::before {
   padding: 0;
   border: none;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.55);
   cursor: pointer;
   transition: background var(--transition-fast), width var(--transition-fast),
     border-radius var(--transition-fast);
@@ -300,6 +300,7 @@ html[data-sky='fog'] body::before {
   transition: opacity var(--transition-fast);
 }
 .loc-header.scrolled::before { opacity: 1; }
+.loc-header.scrolled { pointer-events: auto; cursor: pointer; }
 
 /* 吸顶栏：城市名 + 温度（城市名 scrolled 后淡入，温度由 JS 控制交叉淡变） */
 .loc-sticky-name {
@@ -408,6 +409,7 @@ html[data-sky='fog'] body::before {
 .notice-card {
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
+  border-top: 1.5px solid rgba(168, 85, 247, 0.35);
   border-radius: var(--radius);
   padding: 14px 16px;
   margin-bottom: 20px;
@@ -476,6 +478,19 @@ html[data-sky='fog'] body::before {
   flex-shrink: 0;
   margin-top: 1px;
   color: rgba(255, 175, 50, 0.95);
+}
+
+/* 下拉刷新引导提示 */
+.pull-hint {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  letter-spacing: 0.03em;
+  padding: 6px 0 2px;
+  animation: fadeIn 0.6s ease both;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */
@@ -587,10 +602,10 @@ html[data-sky='fog'] body::before {
   .hero-temp, .hero-deg { font-weight: 300; }
 }
 .hero-cond {
-  font-size: 21px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.72);
-  margin-top: 14px;
+  font-size: 22px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.90);
+  margin-top: 12px;
 }
 .hero-hilo {
   display: flex;

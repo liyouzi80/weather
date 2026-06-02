@@ -52,6 +52,9 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [updatedAgo, setUpdatedAgo] = useState('')
   const [initialLoad, setInitialLoad] = useState(true)
+  const [showPullHint, setShowPullHint] = useState(() => {
+    try { return !localStorage.getItem('pwr_hint_seen') } catch { return true }
+  })
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
 
@@ -104,6 +107,16 @@ export default function App() {
     }
     if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
   }, [cityIdx])
+
+  // 首次加载完成后显示下拉提示 4 秒，之后自动隐藏
+  useEffect(() => {
+    if (initialLoad || !showPullHint) return
+    const t = setTimeout(() => {
+      setShowPullHint(false)
+      try { localStorage.setItem('pwr_hint_seen', '1') } catch {}
+    }, 4000)
+    return () => clearTimeout(t)
+  }, [initialLoad, showPullHint])
 
   // 手势（移动端）：下拉刷新 + 左右滑动切城市。
   // 用非被动原生监听，统一在一处判定主轴，避免纵向下拉与横向翻页冲突。
@@ -217,6 +230,8 @@ export default function App() {
         setPullReady(false)
         if (triggered) {
           // Leave height/opacity as-is; loading useEffect will spring it back
+          try { localStorage.setItem('pwr_hint_seen', '1') } catch {}
+          setShowPullHint(false)
           refreshRef.current()
         } else {
           // Not triggered: spring-back the indicator
@@ -476,7 +491,12 @@ export default function App() {
           />
         </svg>
       </div>
-      <header className={'loc-header' + (scrolled ? ' scrolled' : '')} aria-hidden="true">
+      <header
+        className={'loc-header' + (scrolled ? ' scrolled' : '')}
+        onClick={scrolled ? () => window.scrollTo({ top: 0, behavior: 'smooth' }) : undefined}
+        aria-label={scrolled ? '回到顶部' : undefined}
+        role={scrolled ? 'button' : undefined}
+      >
         <span className="loc-sticky-name">{city.name}</span>
         {stats && (
           <span ref={stickyTempRef} className="loc-sticky-temp">
@@ -530,6 +550,10 @@ export default function App() {
         )}
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
+
+        {showPullHint && !initialLoad && (
+          <div className="pull-hint" aria-hidden="true">↓ 下拉更新</div>
+        )}
 
         {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
@@ -703,15 +727,7 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
       <div className="cards">
         {air.map((r) => {
           if (r.error || !r.air) {
-            return (
-              <div className="card err" key={r.providerId}>
-                <div className="head">
-                  <span className="dot" style={{ background: r.color }} />
-                  <span className="name">{r.providerName}</span>
-                </div>
-                <div className="err-msg">{r.error ?? '无数据'}</div>
-              </div>
-            )
+            return null   // AQI 源失败时静默跳过
           }
           const a = r.air
           const col = aqiColor(a.aqi)
@@ -761,17 +777,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
-  if (r.error) {
-    return (
-      <div className="card err">
-        <div className="head">
-          <span className="dot" style={{ background: color }} />
-          <span className="name">{r.providerName}</span>
-        </div>
-        <div className="err-msg">{r.error}</div>
-      </div>
-    )
-  }
+  if (r.error) return null   // 失败信源静默隐藏，不向用户暴露技术错误
 
   const c = r.current!
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
@@ -949,9 +955,9 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
   if (stats.humidity != null)
     cols.push({ key: 'humid', value: `${stats.humidity}%`, label: '湿度' })
   if (avgAqi != null)
-    cols.push({ key: 'aqi', value: aqiCategory(avgAqi), label: `空气 · AQI ${avgAqi}`, color: aqiColor(avgAqi) })
+    cols.push({ key: 'aqi', value: `${avgAqi}`, label: `空气 · ${aqiCategory(avgAqi)}`, color: aqiColor(avgAqi) })
   if (stats.uvIndex != null)
-    cols.push({ key: 'uv', value: uvLevel(stats.uvIndex), label: `紫外线 · UV ${Math.round(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
+    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, label: `紫外线 · ${uvLevel(stats.uvIndex)}`, color: uvColor(stats.uvIndex) })
   if (cols.length === 0) return null
   return (
     <div className="metric-strip">
