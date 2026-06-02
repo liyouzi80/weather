@@ -994,30 +994,21 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
 
 // 番禺区气象台短时预报卡：智能提取时间窗口 + 精简正文
 function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
-  const { timeLabel, weather, wind, temp, note } = parseForecast(text)
+  const { timeLabel, note } = parseForecast(text)
   const issued = fmtIssuedAt(issuedAt)
+  // 时间窗口和注意事项都没有时不渲染
+  if (!timeLabel && !note) return null
   return (
     <div className="notice-card">
-      {/* 方案 A：单行 header = 图标 + 台站 + 时间段 + 发布时间 */}
       <div className="notice-head">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="notice-icon">
           <path d="M3 11l18-5v12L3 14v-3z" />
           <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
         </svg>
         <span className="notice-source">番禺气象台</span>
-        {timeLabel && <span className="notice-time-chip">{timeLabel}</span>}
         {issued && <span className="notice-issued">{issued}</span>}
       </div>
-      {/* 天气现象：提升为视觉主体 */}
-      {weather && <div className="notice-wx">{weather}</div>}
-      {/* 风力 + 温度次要详情行 */}
-      {(wind || temp) && (
-        <div className="notice-row">
-          {wind && <span className="notice-detail">{wind}</span>}
-          {temp && <span className="notice-detail">{temp}</span>}
-        </div>
-      )}
-      {/* 注意事项：琥珀色警示 */}
+      {timeLabel && <div className="notice-when">{timeLabel}</div>}
       {note && (
         <div className="notice-note">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
