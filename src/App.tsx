@@ -994,19 +994,20 @@ function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
 function parseForecast(raw: string) {
   let s = raw.trim()
 
-  // 先去区域名前缀（如「广州市番禺区，」），再提取时间窗口
-  s = s.replace(/^(?:广州市?)?番禺[区县]?\s*[，,]?\s*/, '')
-
-  // 时间窗口：「今天17时到今天20时」→ timeLabel「今天17—20时」
+  // 时间窗口：全文搜索「今天11时到14时」类模式（无 ^ 锚，实际格式为"过去…预计，今天X时到Y时，…"）
+  // 找到后将正文截取自时间段之后，丢弃前面的历史观测描述。
   let timeLabel = ''
-  const tm = s.match(/^(今[天日]|明天|后天)?(\d{1,2})时到(今[天日]|明天|后天)?(\d{1,2})时[\s，,]*/)
+  const tm = s.match(/(今[天日]|明天|后天)?(\d{1,2})时到(今[天日]|明天|后天)?(\d{1,2})时[\s，,]*/)
   if (tm) {
     const fromDay = tm[1] ?? '', toDay = tm[3] ?? fromDay
     timeLabel = toDay && toDay !== fromDay
       ? `${fromDay}${tm[2]}—${toDay}${tm[4]}时`
       : `${fromDay}${tm[2]}—${tm[4]}时`
-    s = s.slice(tm[0].length)
+    s = s.slice((tm.index ?? 0) + tm[0].length)
   }
+
+  // 去区域名前缀（若时间段后仍有残留）
+  s = s.replace(/^(?:广州市?)?番禺[区县]?\s*[，,]?\s*/, '')
 
   // 提取风向风力（如「偏南风2-3级」「东北风3级」）
   let wind = ''
