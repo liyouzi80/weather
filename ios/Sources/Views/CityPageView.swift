@@ -56,7 +56,7 @@ struct CityPageView: View {
     }
 
     private var scrollContent: some View {
-        ScrollView {
+        ScrollView(showsIndicators: false) {
             // 滚动偏移探针
             GeometryReader { g in
                 Color.clear.preference(key: ScrollOffsetKey.self,
