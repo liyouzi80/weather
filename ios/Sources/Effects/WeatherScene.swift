@@ -21,7 +21,7 @@ class WeatherScene: SKScene {
     var lat: Double = 23.0
     var lon: Double = 113.0
 
-    private var moonNode: SKShapeNode?
+    private var moonNode: SKSpriteNode?
     private var moonTimer: Timer?
 
     // 云朵持续飘移：每帧推进 + 环绕循环（比小幅 SKAction 摆动更明显）
@@ -31,6 +31,7 @@ class WeatherScene: SKScene {
     // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
     private lazy var dropTexture: SKTexture = makeDropTexture()
     private lazy var dotTexture: SKTexture = makeDotTexture()
+    private lazy var moonTexture: SKTexture = makeMoonTexture()
 
     // 云朵调色板（亮顶 → 中 → 暗底，营造体积感；对应 PWA CLOUD_PAL）
     struct CloudPalette {
@@ -277,22 +278,42 @@ class WeatherScene: SKScene {
         let mx = W * 0.5 * (1 + CGFloat(sin(pos.azimuth * .pi / 180)))
         let my = H * (0.05 + 0.36 * CGFloat(1 - (pos.altitude - 5) / 85))
 
+        // 月盘半径 26pt；纹理含光晕，整张贴图边长约 5 倍盘径
         let r: CGFloat = 26
-        let moon = SKShapeNode(circleOfRadius: r)
-        moon.fillColor = UIColor(white: 0.95, alpha: 0.9)
-        moon.strokeColor = UIColor(white: 1, alpha: 0.6)
-        moon.lineWidth = 0.5
+        let moon = SKSpriteNode(texture: moonTexture)
+        moon.size = CGSize(width: r * 5, height: r * 5)
         moon.position = CGPoint(x: mx, y: H - my)
         moon.zPosition = 5
-
-        // Glow
-        let glow = SKShapeNode(circleOfRadius: r * 2)
-        glow.fillColor = UIColor(white: 0.9, alpha: CGFloat(pos.illumination) * 0.12)
-        glow.strokeColor = .clear
-        glow.position = moon.position
-        addChild(glow)
+        // 月相越满越亮（新月偏暗），范围 0.55…1.0
+        moon.alpha = 0.55 + 0.45 * CGFloat(pos.illumination)
         addChild(moon)
         moonNode = moon
+    }
+
+    /// 月亮纹理：暖白发光月盘 + 柔和光晕，径向渐变羽化边缘（取代扁平灰色实心圆）。
+    /// 贴图为正方形，月盘占内 ~40%，外侧渐隐为透明光晕。
+    private func makeMoonTexture() -> SKTexture {
+        let d: CGFloat = 130          // 纹理边长（含光晕）
+        let s = CGSize(width: d, height: d)
+        let renderer = UIGraphicsImageRenderer(size: s)
+        let img = renderer.image { ctx in
+            let cg = ctx.cgContext
+            let center = CGPoint(x: d / 2, y: d / 2)
+            // 多段：亮核 → 月盘边缘限暗 → 光晕渐隐到透明（带一丝冷蓝）
+            let colors = [
+                UIColor(red: 1.00, green: 0.99, blue: 0.96, alpha: 1.00).cgColor, // 0 亮核
+                UIColor(red: 0.98, green: 0.97, blue: 0.93, alpha: 0.98).cgColor, // 0.28
+                UIColor(red: 0.92, green: 0.93, blue: 0.97, alpha: 0.90).cgColor, // 0.40 月盘限
+                UIColor(red: 0.85, green: 0.89, blue: 1.00, alpha: 0.28).cgColor, // 0.45 光晕起
+                UIColor(red: 0.78, green: 0.84, blue: 1.00, alpha: 0.00).cgColor, // 1.0 透明
+            ]
+            let locations: [CGFloat] = [0.0, 0.28, 0.40, 0.45, 1.0]
+            let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                  colors: colors as CFArray, locations: locations)!
+            cg.drawRadialGradient(grad, startCenter: center, startRadius: 0,
+                                  endCenter: center, endRadius: d / 2, options: [])
+        }
+        return SKTexture(image: img)
     }
 
     // MARK: - Clouds (GameplayKit 分形噪声)
