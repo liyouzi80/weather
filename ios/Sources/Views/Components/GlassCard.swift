@@ -14,17 +14,14 @@ struct GlassCard<Content: View>: View {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .fill(Color.white.opacity(0.05))
                     }
-                    .overlay(alignment: .top) {
+                    .overlay {
                         if let accent = topAccent {
-                            Rectangle()
-                                .fill(accent)
-                                .frame(height: 1.5)
-                                .clipShape(
-                                    UnevenRoundedRectangle(
-                                        topLeadingRadius: 20,
-                                        topTrailingRadius: 20,
-                                        style: .continuous
-                                    )
+                            // 顶部边框 accent 色，向下渐隐——贴合圆角，替代硬横条
+                            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(colors: [accent, accent.opacity(0)],
+                                                   startPoint: .top, endPoint: .center),
+                                    lineWidth: 1
                                 )
                         }
                     }
@@ -46,17 +43,13 @@ struct GlassBackground: ViewModifier {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                             .fill(Color.white.opacity(0.05))
                     }
-                    .overlay(alignment: .top) {
+                    .overlay {
                         if let accent = topAccent {
-                            Rectangle()
-                                .fill(accent)
-                                .frame(height: 1.5)
-                                .clipShape(
-                                    UnevenRoundedRectangle(
-                                        topLeadingRadius: cornerRadius,
-                                        topTrailingRadius: cornerRadius,
-                                        style: .continuous
-                                    )
+                            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                                .strokeBorder(
+                                    LinearGradient(colors: [accent, accent.opacity(0)],
+                                                   startPoint: .top, endPoint: .center),
+                                    lineWidth: 1
                                 )
                         }
                     }

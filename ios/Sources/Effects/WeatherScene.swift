@@ -12,6 +12,10 @@ class WeatherScene: SKScene {
     private var moonNode: SKShapeNode?
     private var moonTimer: Timer?
 
+    // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
+    private lazy var dropTexture: SKTexture = makeDropTexture()
+    private lazy var dotTexture: SKTexture = makeDotTexture()
+
     override func didMove(to view: SKView) {
         backgroundColor = .clear
         scaleMode = .resizeFill
@@ -46,35 +50,36 @@ class WeatherScene: SKScene {
     // MARK: - Rain
 
     private func setupRain(thunder: Bool) {
-        guard let emitter = SKEmitterNode(fileNamed: "Rain.sks") else {
-            // Fallback: programmatic rain
-            addProgrammaticRain()
-            return
+        // 优先加载 Xcode 创建的 Rain.sks，缺失则用程序化雨
+        if let emitter = SKEmitterNode(fileNamed: "Rain.sks") {
+            emitter.position = CGPoint(x: size.width / 2, y: size.height + 50)
+            emitter.particlePositionRange = CGVector(dx: size.width * 1.5, dy: 0)
+            addChild(emitter)
+        } else {
+            addProgrammaticRain(thunder: thunder)
         }
-        emitter.position = CGPoint(x: size.width / 2, y: size.height + 50)
-        emitter.particlePositionRange = CGVector(dx: size.width * 1.5, dy: 0)
-        addChild(emitter)
         if thunder { scheduleThunder() }
     }
 
-    private func addProgrammaticRain() {
+    private func addProgrammaticRain(thunder: Bool) {
         let emitter = SKEmitterNode()
-        emitter.particleTexture = SKTexture(imageNamed: "spark")
-        emitter.particleBirthRate = 120
-        emitter.particleLifetime = 1.2
+        emitter.particleTexture = dropTexture
+        emitter.particleBirthRate = thunder ? 320 : 220
+        emitter.particleLifetime = 1.1
         emitter.particleLifetimeRange = 0.3
-        emitter.particleSpeed = 600
-        emitter.particleSpeedRange = 100
-        emitter.emissionAngle = -.pi / 2 + 0.1
-        emitter.emissionAngleRange = 0.05
-        emitter.particleAlpha = 0.5
+        emitter.particleSpeed = 1100
+        emitter.particleSpeedRange = 200
+        emitter.emissionAngle = -.pi / 2 - 0.08
+        emitter.emissionAngleRange = 0.04
+        emitter.particleAlpha = 0.55
         emitter.particleAlphaRange = 0.2
-        emitter.particleScale = 0.03
-        emitter.particleScaleRange = 0.01
-        emitter.particleColor = UIColor(white: 0.85, alpha: 1)
+        emitter.particleScale = 1.0
+        emitter.particleScaleRange = 0.3
+        emitter.particleColor = UIColor(white: 0.88, alpha: 1)
         emitter.particleColorBlendFactor = 1
         emitter.position = CGPoint(x: size.width / 2, y: size.height + 20)
         emitter.particlePositionRange = CGVector(dx: size.width * 1.4, dy: 0)
+        emitter.zPosition = 1
         addChild(emitter)
     }
 
@@ -103,21 +108,24 @@ class WeatherScene: SKScene {
 
     private func setupSnow() {
         let emitter = SKEmitterNode()
-        emitter.particleBirthRate = 25
-        emitter.particleLifetime = 5
+        emitter.particleTexture = dotTexture
+        emitter.particleBirthRate = 28
+        emitter.particleLifetime = 6
         emitter.particleLifetimeRange = 2
-        emitter.particleSpeed = 60
+        emitter.particleSpeed = 70
         emitter.particleSpeedRange = 30
         emitter.emissionAngle = -.pi / 2
         emitter.emissionAngleRange = .pi / 6
-        emitter.particleAlpha = 0.8
+        emitter.particleAlpha = 0.85
         emitter.particleAlphaRange = 0.3
-        emitter.particleScale = 0.06
-        emitter.particleScaleRange = 0.04
+        emitter.particleScale = 0.5
+        emitter.particleScaleRange = 0.3
         emitter.particleColor = .white
         emitter.particleColorBlendFactor = 1
-        emitter.position = CGPoint(x: size.width / 2, y: size.height + 20)
         emitter.particlePositionRange = CGVector(dx: size.width * 1.2, dy: 0)
+        emitter.position = CGPoint(x: size.width / 2, y: size.height + 20)
+        // 雪花横向飘移
+        emitter.xAcceleration = 8
         addChild(emitter)
     }
 
@@ -142,18 +150,29 @@ class WeatherScene: SKScene {
     // MARK: - Clear day (god rays + dust)
 
     private func setupClearDay() {
-        // Light dust particles
+        // 右上角柔和阳光光晕
+        let sun = SKShapeNode(circleOfRadius: 120)
+        sun.fillColor = UIColor(red: 1, green: 0.93, blue: 0.65, alpha: 0.16)
+        sun.strokeColor = .clear
+        sun.glowWidth = 60
+        sun.position = CGPoint(x: size.width * 0.82, y: size.height * 0.82)
+        sun.zPosition = 0
+        addChild(sun)
+
+        // 漂浮浮尘
         let dust = SKEmitterNode()
-        dust.particleBirthRate = 4
-        dust.particleLifetime = 8
+        dust.particleTexture = dotTexture
+        dust.particleBirthRate = 10
+        dust.particleLifetime = 9
         dust.particleLifetimeRange = 4
-        dust.particleSpeed = 15
-        dust.particleSpeedRange = 10
+        dust.particleSpeed = 18
+        dust.particleSpeedRange = 12
         dust.emissionAngle = 0
         dust.emissionAngleRange = .pi * 2
-        dust.particleAlpha = 0.4
-        dust.particleAlphaRange = 0.3
-        dust.particleScale = 0.015
+        dust.particleAlpha = 0.35
+        dust.particleAlphaRange = 0.25
+        dust.particleScale = 0.10
+        dust.particleScaleRange = 0.06
         dust.particleColor = UIColor(red: 1, green: 0.95, blue: 0.7, alpha: 1)
         dust.particleColorBlendFactor = 1
         dust.position = CGPoint(x: size.width * 0.5, y: size.height * 0.6)
@@ -254,6 +273,43 @@ class WeatherScene: SKScene {
         if text.contains("阴") { return "overcast" }
         if text.contains("多云") || text.contains("间") { return "cloudy" }
         return night ? "clear-night" : "clear-day"
+    }
+
+    // MARK: - 程序化粒子纹理
+
+    /// 细长雨滴（竖直渐隐线条）
+    private func makeDropTexture() -> SKTexture {
+        let s = CGSize(width: 3, height: 16)
+        let renderer = UIGraphicsImageRenderer(size: s)
+        let img = renderer.image { ctx in
+            let cg = ctx.cgContext
+            let colors = [UIColor(white: 1, alpha: 0).cgColor,
+                          UIColor(white: 1, alpha: 1).cgColor]
+            let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                  colors: colors as CFArray, locations: [0, 1])!
+            cg.addRect(CGRect(origin: .zero, size: s))
+            cg.clip()
+            cg.drawLinearGradient(grad, start: CGPoint(x: 0, y: 0),
+                                  end: CGPoint(x: 0, y: s.height), options: [])
+        }
+        return SKTexture(image: img)
+    }
+
+    /// 柔和圆点（雪花 / 浮尘），径向渐隐边缘
+    private func makeDotTexture() -> SKTexture {
+        let d: CGFloat = 16
+        let s = CGSize(width: d, height: d)
+        let renderer = UIGraphicsImageRenderer(size: s)
+        let img = renderer.image { ctx in
+            let cg = ctx.cgContext
+            let colors = [UIColor(white: 1, alpha: 1).cgColor,
+                          UIColor(white: 1, alpha: 0).cgColor]
+            let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                  colors: colors as CFArray, locations: [0, 1])!
+            cg.drawRadialGradient(grad, startCenter: CGPoint(x: d / 2, y: d / 2), startRadius: 0,
+                                  endCenter: CGPoint(x: d / 2, y: d / 2), endRadius: d / 2, options: [])
+        }
+        return SKTexture(image: img)
     }
 }
 

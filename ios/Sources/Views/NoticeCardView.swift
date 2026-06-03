@@ -12,7 +12,7 @@ struct NoticeCardView: View {
     var body: some View {
         let (timeLabel, note) = parsed
         if !timeLabel.isEmpty || !note.isEmpty {
-            GlassCard(topAccent: Color(hex: "#a855f7").opacity(0.50)) {
+            GlassCard(topAccent: Color(hex: "#a855f7").opacity(0.75)) {
                 VStack(alignment: .leading, spacing: 8) {
                     // Header row
                     HStack(spacing: 5) {

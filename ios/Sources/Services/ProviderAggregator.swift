@@ -84,10 +84,11 @@ class ProviderAggregator {
         let counts = texts.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
         return counts.max { $0.value < $1.value }?.key ?? texts[0]
     }
+}
 
-    nonisolated private func localizeError(_ msg: String) -> String {
-        if msg.contains("timed out") || msg.contains("timeout") { return "请求超时" }
-        if msg.contains("offline") || msg.contains("network") { return "网络请求失败" }
-        return msg
-    }
+// 文件级函数：可从 @Sendable 任务闭包直接调用，无需捕获 self
+private func localizeError(_ msg: String) -> String {
+    if msg.contains("timed out") || msg.contains("timeout") { return "请求超时" }
+    if msg.contains("offline") || msg.contains("network") { return "网络请求失败" }
+    return msg
 }
