@@ -3,7 +3,7 @@ options:
   bundleIdPrefix: com.personal
   deploymentTarget:
     iOS: "17.0"
-  xcodeVersion: "26"
+  xcodeVersion: "16"
   createIntermediateGroups: true
 
 settings:
