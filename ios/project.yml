@@ -37,6 +37,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.personal.tianqi
         PRODUCT_NAME: 天气
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
         SUPPORTS_MAC_DESIGNED_FOR_IPAD: NO
         INFOPLIST_FILE: Sources/Info.plist
