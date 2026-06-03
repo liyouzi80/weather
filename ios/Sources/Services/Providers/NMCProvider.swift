@@ -38,17 +38,17 @@ struct NMCProvider: WeatherProvider {
         }
         let resp: NMCWeatherResp = try await fetchJSON(url, headers: referer)
         guard let real = resp.data?.real, let w = real.weather,
-              let temp = w.temperature, temp != 9999 else { throw FetchError.noData }
+              let temp = w.temperature?.value, temp != 9999 else { throw FetchError.noData }
 
         // nmc 缺测值为 9999
         func clean(_ v: Double?) -> Double? { (v == nil || v == 9999) ? nil : v }
-        let speedMs = real.wind?.speed.flatMap { Double($0) }
+        let speedMs = real.wind?.speed?.value
 
         return CurrentWeather(
             temp: temp,
-            feelsLike: clean(w.feelst),
+            feelsLike: clean(w.feelst?.value),
             text: w.info ?? "未知",
-            humidity: clean(w.humidity),
+            humidity: clean(w.humidity?.value),
             windSpeed: speedMs.map { ($0 * 3.6 * 10).rounded() / 10 }, // m/s -> km/h
             windDir: real.wind?.direct,
             // publish_time 形如「2026-05-31 10:00」（北京时），原样写入 UTC 字段，前端按 UTC 显示
@@ -71,16 +71,31 @@ struct NMCProvider: WeatherProvider {
                 let weather: NMCWeather?
                 let wind: NMCWind?
                 struct NMCWeather: Decodable {
-                    let temperature: Double?
-                    let feelst: Double?
+                    let temperature: LenientDouble?
+                    let feelst: LenientDouble?
                     let info: String?
-                    let humidity: Double?
+                    let humidity: LenientDouble?
                 }
                 struct NMCWind: Decodable {
-                    let speed: String?
+                    let speed: LenientDouble?
                     let direct: String?
                 }
             }
+        }
+    }
+}
+
+// 容错数值解码：字段可能是数字或字符串数字（中国气象接口常见），两者都接受，否则为 nil。
+struct LenientDouble: Decodable {
+    let value: Double?
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        if let d = try? c.decode(Double.self) {
+            value = d
+        } else if let s = try? c.decode(String.self) {
+            value = Double(s)
+        } else {
+            value = nil
         }
     }
 }

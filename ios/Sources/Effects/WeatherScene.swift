@@ -27,6 +27,14 @@ class WeatherScene: SKScene {
         moonTimer?.invalidate()
     }
 
+    // 尺寸从无效变有效（或显著变化）时按正确尺寸重建效果，避免首帧 0 尺寸导致粒子布错
+    override func didChangeSize(_ oldSize: CGSize) {
+        super.didChangeSize(oldSize)
+        if size.width > 1, abs(size.width - oldSize.width) > 1 {
+            setupEffect()
+        }
+    }
+
     // MARK: Effect dispatch
 
     private func setupEffect() {

@@ -19,7 +19,12 @@ struct OWMProvider: WeatherProvider {
             humidity: Double(resp.main.humidity),
             windSpeed: resp.wind?.speed.map { $0 * 3.6 },
             windDir: resp.wind?.deg.map { degreesToDir($0) },
-            observedAt: resp.dt.map { ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: TimeInterval($0))) },
+            observedAt: resp.dt.map { dt in
+                // dt 为 UTC 时间戳；+8h 转北京墙上时间后写入 UTC 字段，前端按 UTC 渲染即原样显示
+                let fmt = ISO8601DateFormatter()
+                fmt.timeZone = TimeZone(identifier: "UTC")
+                return fmt.string(from: Date(timeIntervalSince1970: TimeInterval(dt) + 8 * 3600))
+            },
             forecast: nil, forecastIssuedAt: nil,
             uvIndex: nil, warnings: nil, minutelyRain: nil
         )
