@@ -306,8 +306,9 @@ class WeatherScene: SKScene {
     /// 月亮纹理：真实月面照片作反照率 + 物理 Lambert 相位光照（柔和终止线）+ 临边/光晕。
     /// 与 PWA buildMoonSprite 同一套数学，呈照片级真实月相（贴近苹果天气）。
     private func makeMoonTexture(elongation: Double) -> SKTexture {
-        let W = 220, H = 220
+        let W = 320, H = 320
         let cx = Double(W) / 2, cy = Double(H) / 2
+        let inset = 0.965               // 采样内缩，避开月盘最外缘的暗边
         let diskR = Double(W) * 0.30
         let haloR = Double(W) / 2
         let er = elongation * .pi / 180
@@ -343,14 +344,14 @@ class WeatherScene: SKScene {
                     // 采样真实月面（正交投影）
                     var ar = 200.0, ag = 205.0, ab = 210.0
                     if let alb {
-                        let sx = Int(clamp01(nx * 0.5 + 0.5) * Double(alb.w - 1))
-                        let sy = Int(clamp01(ny * 0.5 + 0.5) * Double(alb.h - 1))
+                        let sx = Int(clamp01(nx * inset * 0.5 + 0.5) * Double(alb.w - 1))
+                        let sy = Int(clamp01(ny * inset * 0.5 + 0.5) * Double(alb.h - 1))
                         let i = (sy * alb.w + sx) * 4
                         ar = Double(alb.px[i+0]); ag = Double(alb.px[i+1]); ab = Double(alb.px[i+2])
                     }
                     let lit = clamp01(ndotl)
                     let bright = 0.42 + 0.58 * pow(lit, 0.5)
-                    let aDisk = smoothstep(-0.02, 0.12, ndotl) * (1 - smoothstep(diskR - 1.0, diskR + 1.2, dist))
+                    let aDisk = smoothstep(-0.02, 0.12, ndotl) * (1 - smoothstep(diskR - 1.5, diskR + 0.5, dist))
                     if aDisk > 0 {
                         r = ar * bright; g = ag * bright; b = ab * bright; a = aDisk
                     } else {

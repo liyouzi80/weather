@@ -161,10 +161,12 @@ function buildMoonSprite(r: number, elongation: number): HTMLCanvasElement | nul
   const D = Math.max(8, Math.round(r / 0.30))   // 整张含光晕，盘径=0.30*D
   const cx = D / 2, diskR = D * 0.30, haloR = D / 2
 
-  // 先把月面缩放绘入月盘外接方框，输出像素即可直接取对应反照率
+  // 把月面绘入比月盘略大的方框（内缩 inset，使盘缘采样落在月面内、避开暗边）
+  const inset = 0.965
   const ac = document.createElement('canvas'); ac.width = D; ac.height = D
   const actx = ac.getContext('2d'); if (!actx) return null
-  actx.drawImage(moonAlbedoImg, cx - diskR, cx - diskR, diskR * 2, diskR * 2)
+  const ds = (diskR * 2) / inset
+  actx.drawImage(moonAlbedoImg, cx - ds / 2, cx - ds / 2, ds, ds)
   const alb = actx.getImageData(0, 0, D, D).data
 
   const out = document.createElement('canvas'); out.width = D; out.height = D
@@ -190,7 +192,7 @@ function buildMoonSprite(r: number, elongation: number): HTMLCanvasElement | nul
         const ar = alb[ai], ag = alb[ai + 1], ab = alb[ai + 2]
         const lit = c01(ndotl)
         const bright = 0.42 + 0.58 * Math.pow(lit, 0.5)
-        const aDisk = ss(-0.02, 0.12, ndotl) * (1 - ss(diskR - 1.0, diskR + 1.2, dist))
+        const aDisk = ss(-0.02, 0.12, ndotl) * (1 - ss(diskR - 1.5, diskR + 0.5, dist))
         if (aDisk > 0) { r0 = ar * bright; g0 = ag * bright; b0 = ab * bright; a = aDisk }
         else { r0 = 200; g0 = 210; b0 = 225; a = halo }
       } else if (dist <= haloR) {
