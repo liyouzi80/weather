@@ -31,7 +31,6 @@ class WeatherScene: SKScene {
     // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
     private lazy var dropTexture: SKTexture = makeDropTexture()
     private lazy var dotTexture: SKTexture = makeDotTexture()
-    private lazy var moonTexture: SKTexture = makeMoonTexture()
 
     // 云朵调色板（亮顶 → 中 → 暗底，营造体积感；对应 PWA CLOUD_PAL）
     struct CloudPalette {
@@ -278,42 +277,90 @@ class WeatherScene: SKScene {
         let mx = W * 0.5 * (1 + CGFloat(sin(pos.azimuth * .pi / 180)))
         let my = H * (0.05 + 0.36 * CGFloat(1 - (pos.altitude - 5) / 85))
 
-        // 月盘半径 26pt；纹理含光晕，整张贴图边长约 5 倍盘径
-        let r: CGFloat = 26
-        let moon = SKSpriteNode(texture: moonTexture)
-        moon.size = CGSize(width: r * 5, height: r * 5)
+        // 按当前黄经差（月相）现画纹理：月盘呈真实月牙/弦月/凸月 + 柔和光晕
+        let moon = SKSpriteNode(texture: makeMoonTexture(elongation: pos.elongation))
+        moon.size = CGSize(width: 110, height: 110)   // 月盘直径约 57pt（其余为光晕）
         moon.position = CGPoint(x: mx, y: H - my)
         moon.zPosition = 5
-        // 月相越满越亮（新月偏暗），范围 0.55…1.0
-        moon.alpha = 0.55 + 0.45 * CGFloat(pos.illumination)
         addChild(moon)
         moonNode = moon
     }
 
-    /// 月亮纹理：暖白发光月盘 + 柔和光晕，径向渐变羽化边缘（取代扁平灰色实心圆）。
-    /// 贴图为正方形，月盘占内 ~40%，外侧渐隐为透明光晕。
-    private func makeMoonTexture() -> SKTexture {
-        let d: CGFloat = 130          // 纹理边长（含光晕）
-        let s = CGSize(width: d, height: d)
-        let renderer = UIGraphicsImageRenderer(size: s)
-        let img = renderer.image { ctx in
-            let cg = ctx.cgContext
-            let center = CGPoint(x: d / 2, y: d / 2)
-            // 多段：亮核 → 月盘边缘限暗 → 光晕渐隐到透明（带一丝冷蓝）
-            let colors = [
-                UIColor(red: 1.00, green: 0.99, blue: 0.96, alpha: 1.00).cgColor, // 0 亮核
-                UIColor(red: 0.98, green: 0.97, blue: 0.93, alpha: 0.98).cgColor, // 0.28
-                UIColor(red: 0.92, green: 0.93, blue: 0.97, alpha: 0.90).cgColor, // 0.40 月盘限
-                UIColor(red: 0.85, green: 0.89, blue: 1.00, alpha: 0.28).cgColor, // 0.45 光晕起
-                UIColor(red: 0.78, green: 0.84, blue: 1.00, alpha: 0.00).cgColor, // 1.0 透明
-            ]
-            let locations: [CGFloat] = [0.0, 0.28, 0.40, 0.45, 1.0]
-            let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                  colors: colors as CFArray, locations: locations)!
-            cg.drawRadialGradient(grad, startCenter: center, startRadius: 0,
-                                  endCenter: center, endRadius: d / 2, options: [])
+    /// 月亮纹理：按 elongation（0=新月…180=满月）逐像素渲染真实月相。
+    /// 与 PWA drawMoon 同逻辑——球面光照的亮面 + 终止线，外加柔和光晕。
+    private func makeMoonTexture(elongation: Double) -> SKTexture {
+        let W = 170, H = 170
+        let cx = Double(W) / 2, cy = Double(H) / 2
+        let diskR = 44.0
+        let haloR = Double(W) / 2          // 光晕铺满纹理
+        let er = elongation * .pi / 180
+        let waxing = elongation < 180      // 上弦（渐盈）亮面在右；下弦在左
+        let kx = cos(er)                   // 终止线归一化横坐标系数：+1 新月 … -1 满月
+        let illum = (1 - cos(er)) / 2
+
+        func clamp01(_ v: Double) -> Double { max(0, min(1, v)) }
+        func smoothstep(_ a: Double, _ b: Double, _ x: Double) -> Double {
+            let t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t)
         }
-        return SKTexture(image: img)
+
+        var px = [UInt8](repeating: 0, count: W * H * 4)
+        for y in 0..<H {
+            let dy = Double(y) - cy
+            for x in 0..<W {
+                let dx = Double(x) - cx
+                let dist = (dx * dx + dy * dy).squareRoot()
+                var r = 0.0, g = 0.0, b = 0.0, a = 0.0
+
+                if dist <= diskR + 1 {
+                    let nx = dx / diskR, ny = dy / diskR
+                    // 终止线：当前行半宽 sqrt(1-ny²)，终止线归一化横坐标 = kx*半宽
+                    let halfW = (1 - ny * ny > 0) ? (1 - ny * ny).squareRoot() : 0
+                    let xt = kx * halfW
+                    // 到终止线的有符号距离（>0 受光，<0 阴影），亮面侧依盈亏而定
+                    // 渐盈：亮面在右，lit ⇔ nx>xt；渐亏：亮面在左，lit ⇔ nx<-xt
+                    let sd = waxing ? (nx - xt) : (-xt - nx)
+                    let litFrac = smoothstep(-0.05, 0.05, sd)
+
+                    // 球面光照（光从左上偏向观察者），亮面有限边减光
+                    let z = max(0, 1 - nx * nx - ny * ny).squareRoot()
+                    let ndotl = max(0, nx * (-0.30) + ny * (-0.30) + z * 0.90)
+                    let bright = 0.58 + 0.42 * ndotl
+
+                    // 亮面暖白、阴影面极暗（弱地照），按 litFrac 混合
+                    let litR = 255.0 * bright, litG = 252.0 * bright, litB = 243.0 * bright
+                    let darkR = 26.0, darkG = 34.0, darkB = 60.0
+                    let litA = 0.97, darkA = 0.07
+                    r = darkR + (litR - darkR) * litFrac
+                    g = darkG + (litG - darkG) * litFrac
+                    b = darkB + (litB - darkB) * litFrac
+                    a = darkA + (litA - darkA) * litFrac
+                    // 月盘外缘羽化抗锯齿
+                    a *= 1 - smoothstep(diskR - 1.0, diskR + 1.0, dist)
+                } else if dist <= haloR {
+                    // 光晕：随月相亮度增强，向外二次方渐隐（冷白）
+                    let ht = (dist - diskR) / (haloR - diskR)   // 0..1
+                    let fall = (1 - ht) * (1 - ht)
+                    a = fall * (0.14 + 0.10 * illum)
+                    r = 215; g = 232; b = 255
+                }
+
+                let i = (y * W + x) * 4
+                px[i+0] = UInt8(clamp01(r / 255) * a * 255)   // 预乘 alpha
+                px[i+1] = UInt8(clamp01(g / 255) * a * 255)
+                px[i+2] = UInt8(clamp01(b / 255) * a * 255)
+                px[i+3] = UInt8(clamp01(a) * 255)
+            }
+        }
+
+        let cs = CGColorSpaceCreateDeviceRGB()
+        guard let provider = CGDataProvider(data: Data(px) as CFData),
+              let cg = CGImage(width: W, height: H, bitsPerComponent: 8, bitsPerPixel: 32,
+                               bytesPerRow: W * 4, space: cs,
+                               bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                               provider: provider, decode: nil, shouldInterpolate: true,
+                               intent: .defaultIntent)
+        else { return dotTexture }
+        return SKTexture(image: UIImage(cgImage: cg))
     }
 
     // MARK: - Clouds (GameplayKit 分形噪声)
