@@ -30,8 +30,8 @@ struct CityPageView: View {
             // 天气动效背景 + 轻微视差放大
             Group {
                 if let stats = vm.stats {
-                    WeatherBackground(weatherText: stats.text, isNight: isNight,
-                                      lat: vm.loc.lat, lon: vm.loc.lon)
+                    WeatherFXView(weatherText: stats.text, isNight: isNight,
+                                  lat: vm.loc.lat, lon: vm.loc.lon)
                 } else {
                     Color(hex: "#0b1426")
                 }
