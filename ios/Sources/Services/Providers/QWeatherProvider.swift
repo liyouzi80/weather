@@ -30,10 +30,10 @@ struct QWeatherProvider: WeatherProvider {
 
         let minutelyRain: MinutelyRain? = rain.flatMap { r in
             guard let m = r.minutely, !m.isEmpty else { return nil }
-            return MinutelyRain(
-                summary: r.summary ?? "",
-                minutely: m.map { MinutelyRain.Minutely(fxTime: $0.fxTime, precip: Double($0.precip) ?? 0, type: $0.type) }
-            )
+            let items = m.map { MinutelyRain.Minutely(fxTime: $0.fxTime, precip: Double($0.precip) ?? 0, type: $0.type) }
+            // 仅当未来一小时有实际降水时才返回，否则不展示卡片（与 PWA 一致）
+            guard items.contains(where: { $0.precip > 0 }) else { return nil }
+            return MinutelyRain(summary: r.summary ?? "", minutely: items)
         }
 
         return CurrentWeather(
