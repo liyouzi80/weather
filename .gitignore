@@ -5,3 +5,8 @@ dist
 *.log
 .DS_Store
 tsconfig.tsbuildinfo
+
+# iOS：本地 API key，不提交（从 Keys.swift.template 复制后填写）
+ios/Sources/Utils/Keys.swift
+# Xcodegen 生成物
+ios/TianQi.xcodeproj

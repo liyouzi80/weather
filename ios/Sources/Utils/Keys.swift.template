@@ -1,0 +1,13 @@
+import Foundation
+
+// 复制本文件为同目录下的 Keys.swift，填入你的 key 后即可（Keys.swift 已被 .gitignore 忽略，不会提交）：
+//   cp Keys.swift.template Keys.swift
+//
+// 可选信源 API key（和风 / 彩云 / OWM）。番禺核心源（中央气象台 / 番禺气象台 / AQI）
+// 全部原生直抓，无需任何 key 或后端。填了 key 就多一个对比源，不填则自动跳过。
+// 值可从仓库根目录的 .env 里对应的 VITE_*_KEY 复制过来。
+enum Keys {
+    static let qweather = ""   // = VITE_QWEATHER_KEY
+    static let caiyun   = ""   // = VITE_CAIYUN_KEY
+    static let owm      = ""   // = VITE_OWM_KEY
+}
