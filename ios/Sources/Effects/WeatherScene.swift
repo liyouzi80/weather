@@ -1,7 +1,16 @@
 import SpriteKit
 import SwiftUI
-import CoreImage
-import CoreImage.CIFilterBuiltins
+
+// 天气文案 → 特效类型（与 web 端一致）。供 SpriteKit 场景与 SwiftUI 背景共用。
+func weatherFXKind(_ text: String, night: Bool) -> String {
+    if text.contains("雷") { return "thunder" }
+    if text.contains("雨") { return "rain" }
+    if text.contains("雪") { return "snow" }
+    if text.contains("雾") || text.contains("霾") || text.contains("沙") || text.contains("尘") { return "fog" }
+    if text.contains("阴") { return night ? "overcast-night" : "overcast" }
+    if text.contains("多云") || text.contains("间") { return night ? "cloudy-night" : "cloudy" }
+    return night ? "clear-night" : "clear-day"
+}
 
 // MARK: - SpriteKit weather scene
 
@@ -17,33 +26,8 @@ class WeatherScene: SKScene {
     // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
     private lazy var dropTexture: SKTexture = makeDropTexture()
     private lazy var dotTexture: SKTexture = makeDotTexture()
-
-    // 云朵调色板（对应 PWA CLOUD_PAL：亮顶 → 中 → 暗底，营造体积感）
-    private struct CloudPalette {
-        let top: UIColor, mid: UIColor, bot: UIColor
-    }
-    private static let palCloudy = CloudPalette(
-        top: UIColor(red: 180/255, green: 194/255, blue: 212/255, alpha: 1),
-        mid: UIColor(red: 128/255, green: 148/255, blue: 176/255, alpha: 1),
-        bot: UIColor(red:  78/255, green:  94/255, blue: 122/255, alpha: 1))
-    private static let palCloudyNight = CloudPalette(
-        top: UIColor(red: 129/255, green: 150/255, blue: 186/255, alpha: 1),
-        mid: UIColor(red:  84/255, green: 104/255, blue: 140/255, alpha: 1),
-        bot: UIColor(red:  38/255, green:  52/255, blue:  78/255, alpha: 1))
-    private static let palOvercast = CloudPalette(
-        top: UIColor(red: 154/255, green: 164/255, blue: 182/255, alpha: 1),
-        mid: UIColor(red: 112/255, green: 122/255, blue: 142/255, alpha: 1),
-        bot: UIColor(red:  72/255, green:  79/255, blue:  96/255, alpha: 1))
-    private static let palOvercastNight = CloudPalette(
-        top: UIColor(red:  92/255, green: 102/255, blue: 120/255, alpha: 1),
-        mid: UIColor(red:  62/255, green:  70/255, blue:  88/255, alpha: 1),
-        bot: UIColor(red:  28/255, green:  34/255, blue:  48/255, alpha: 1))
-
-    // 多张云纹理（昼/夜 × 多云/阴），每张随机塑形，飘移时穿插
-    private lazy var cloudyTexes: [SKTexture]   = (0..<3).map { _ in buildCloudTex(Self.palCloudy) }
-    private lazy var cloudyNightTexes: [SKTexture] = (0..<3).map { _ in buildCloudTex(Self.palCloudyNight) }
-    private lazy var overcastTexes: [SKTexture] = (0..<3).map { _ in buildCloudTex(Self.palOvercast) }
-    private lazy var overcastNightTexes: [SKTexture] = (0..<3).map { _ in buildCloudTex(Self.palOvercastNight) }
+    // 注：多云/阴天的云特效改由 SwiftUI 原生 SF Symbols 实现（见 CloudSymbolsView），
+    //     此处 SpriteKit 仅负责雨/雪/雷/雾/晴等粒子与天体效果。
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
@@ -71,17 +55,17 @@ class WeatherScene: SKScene {
         removeAllActions()
         moonNode = nil
 
-        let kind = fxKind(weatherText, night: isNight)
+        let kind = weatherFXKind(weatherText, night: isNight)
         switch kind {
         case "rain", "thunder": setupRain(thunder: kind == "thunder")
         case "snow":            setupSnow()
         case "fog":             setupFog()
         case "clear-day":       setupClearDay()
         case "clear-night":     setupClearNight()
-        case "cloudy":          setupClouds(overcast: false, night: false)
-        case "cloudy-night":    setupClouds(overcast: false, night: true)
-        case "overcast":        setupClouds(overcast: true,  night: false)
-        case "overcast-night":  setupClouds(overcast: true,  night: true)
+        // 多云/阴天由 SwiftUI 层（CloudSymbolsView）渲染，此处不绘制；
+        // 正常不会走到这里（WeatherBackground 已拦截），保险起见留空背景
+        case "cloudy", "cloudy-night", "overcast", "overcast-night":
+            break
         default:                setupClearDay()
         }
     }
@@ -269,113 +253,6 @@ class WeatherScene: SKScene {
         moonNode = moon
     }
 
-    // MARK: - Clouds
-
-    private func setupClouds(overcast: Bool, night: Bool) {
-        let texes: [SKTexture]
-        switch (overcast, night) {
-        case (false, false): texes = cloudyTexes
-        case (false, true):  texes = cloudyNightTexes
-        case (true,  false): texes = overcastTexes
-        case (true,  true):  texes = overcastNightTexes
-        }
-
-        // 3层深度：远（小、慢、靠上）→ 近（大、快、靠下），参照 PWA layerCfg
-        let layers: [(count: Int, wLo: CGFloat, wHi: CGFloat,
-                      alphaLo: CGFloat, alphaHi: CGFloat,
-                      yLo: CGFloat, yHi: CGFloat, vLo: CGFloat, vHi: CGFloat)] = overcast
-            ? [
-                (3, 260, 360, 0.70, 0.88, 0.70, 0.98, 18, 36),
-                (3, 320, 440, 0.78, 0.92, 0.60, 0.94, 30, 54),
-                (2, 380, 520, 0.72, 0.90, 0.50, 0.84, 50, 84),
-              ]
-            : [
-                (2, 220, 320, 0.55, 0.72, 0.74, 0.98, 14, 28),
-                (2, 280, 400, 0.62, 0.80, 0.66, 0.94, 24, 46),
-                (2, 340, 480, 0.55, 0.74, 0.56, 0.86, 38, 66),
-              ]
-
-        var zPos: CGFloat = 0
-        for layer in layers {
-            for _ in 0..<layer.count {
-                let cloud = SKSpriteNode(texture: texes.randomElement()!)
-                let w = CGFloat.random(in: layer.wLo...layer.wHi)
-                cloud.size = CGSize(width: w, height: w * 0.44)
-                cloud.alpha = CGFloat.random(in: layer.alphaLo...layer.alphaHi)
-                let yFrac = CGFloat.random(in: layer.yLo...layer.yHi)
-                cloud.position = CGPoint(
-                    x: CGFloat.random(in: -(w * 0.3)...(size.width + w * 0.3)),
-                    y: size.height * yFrac
-                )
-                cloud.zPosition = zPos; zPos += 1
-                let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: layer.vLo...layer.vHi)
-                let dur = Double.random(in: 32...64)
-                cloud.run(SKAction.repeatForever(SKAction.sequence([
-                    SKAction.moveBy(x: dx, y: 0, duration: dur),
-                    SKAction.moveBy(x: -dx, y: 0, duration: dur)
-                ])))
-                addChild(cloud)
-            }
-        }
-        if night { addMoon() }
-    }
-
-    /// 预烘焙写实云朵纹理（对应 PWA：合并轮廓 → 模糊羽化 → 体积渐变）：
-    ///  1) 沿圆顶包络随机塑形多个泡（中间大、两边小、底部压平）→ 合并实心轮廓
-    ///  2) CIGaussianBlur 统一模糊，泡间边界融合 + 边缘羽化
-    ///  3) sourceIn 把「亮顶→中→暗底」垂直渐变裁进云形，赋予体积/立体感
-    private func buildCloudTex(_ pal: CloudPalette) -> SKTexture {
-        let W: CGFloat = 360, H: CGFloat = 150
-        let pad: CGFloat = 30
-        let full = CGSize(width: W + pad*2, height: H + pad*2)
-
-        // 1. 不规则积云轮廓（UIKit 坐标 y 向下：圆顶朝上、平底朝下）
-        let n = 13
-        let baseY = pad + H * 0.86
-        var blobs: [(CGFloat, CGFloat, CGFloat)] = []
-        for i in 0..<n {
-            let t = CGFloat(i) / CGFloat(n - 1)
-            let env = 0.40 + 0.60 * sin(t * .pi)              // 圆顶包络
-            let r = max(14, H * 0.30 * env * CGFloat.random(in: 0.82...1.18))
-            let cx = pad + t * W + CGFloat.random(in: -12...12)
-            let cy = baseY - r * CGFloat.random(in: 0.05...0.42)  // 各泡底部贴近基线
-            blobs.append((cx, cy, r))
-        }
-
-        let silhouette = UIGraphicsImageRenderer(size: full).image { _ in
-            UIColor.white.setFill()
-            for (cx, cy, r) in blobs {
-                UIBezierPath(ovalIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)).fill()
-            }
-        }
-
-        // 2. CIGaussianBlur 羽化（裁回原尺寸，避免 extent 膨胀）
-        let ciCtx = CIContext(options: [.useSoftwareRenderer: false])
-        guard let ci = CIImage(image: silhouette),
-              let out = CIFilter(name: "CIGaussianBlur", parameters: [
-                  kCIInputImageKey: ci, kCIInputRadiusKey: NSNumber(value: 11)
-              ])?.outputImage?.cropped(to: ci.extent),
-              let blurredCG = ciCtx.createCGImage(out, from: ci.extent)
-        else { return dotTexture }
-        let blurred = UIImage(cgImage: blurredCG)
-
-        // 3. 体积渐变（亮顶 → 中 → 暗底）裁进云形
-        let final = UIGraphicsImageRenderer(size: full).image { ctx in
-            let cg = ctx.cgContext
-            blurred.draw(at: .zero)                 // 目标 alpha = 羽化云形
-            cg.setBlendMode(.sourceIn)              // 用渐变着色，保留云形 alpha
-            let colors = [pal.top.cgColor, pal.mid.cgColor, pal.bot.cgColor] as CFArray
-            let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                  colors: colors, locations: [0, 0.5, 1])!
-            cg.drawLinearGradient(
-                grad,
-                start: CGPoint(x: 0, y: pad + H*0.40),   // 圆顶（亮）
-                end:   CGPoint(x: 0, y: pad + H*0.90),   // 平底（暗）
-                options: [.drawsBeforeStartLocation, .drawsAfterEndLocation])
-        }
-        return SKTexture(image: final)
-    }
-
     // MARK: - Moon timer (refresh every 10 min)
 
     private func startMoonTimer() {
@@ -385,18 +262,6 @@ class WeatherScene: SKScene {
     }
     private func refreshMoon() {
         if isNight { setupEffect() }
-    }
-
-    // MARK: - fx kind mapping (mirrors web app)
-
-    private func fxKind(_ text: String, night: Bool) -> String {
-        if text.contains("雷") { return "thunder" }
-        if text.contains("雨") { return "rain" }
-        if text.contains("雪") { return "snow" }
-        if text.contains("雾") || text.contains("霾") || text.contains("沙") || text.contains("尘") { return "fog" }
-        if text.contains("阴") { return night ? "overcast-night" : "overcast" }
-        if text.contains("多云") || text.contains("间") { return night ? "cloudy-night" : "cloudy" }
-        return night ? "clear-night" : "clear-day"
     }
 
     // MARK: - 程序化粒子纹理
