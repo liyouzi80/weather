@@ -1,5 +1,13 @@
 import SwiftUI
 
+// 卡片材质：对齐 PWA —— 扁平半透明深色填充（不用毛玻璃高斯模糊）。
+// 在近乎纯色的天空渐变上观感与 .ultraThinMaterial 几乎一致，且让背景天气动效
+// 隐约透出，省去移动端 GPU 合成开销。
+extension Color {
+    static let cardFill = Color(red: 20/255, green: 23/255, blue: 35/255).opacity(0.52)
+    static let cardBorder = Color.white.opacity(0.10)
+}
+
 struct GlassCard<Content: View>: View {
     var topAccent: Color? = nil
     @ViewBuilder let content: () -> Content
@@ -9,10 +17,10 @@ struct GlassCard<Content: View>: View {
             .padding(16)
             .background {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.cardFill)
                     .overlay {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
+                            .strokeBorder(Color.cardBorder, lineWidth: 0.5)
                     }
                     .overlay {
                         if let accent = topAccent {
@@ -38,10 +46,10 @@ struct GlassBackground: ViewModifier {
         content
             .background {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.cardFill)
                     .overlay {
                         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                            .fill(Color.white.opacity(0.05))
+                            .strokeBorder(Color.cardBorder, lineWidth: 0.5)
                     }
                     .overlay {
                         if let accent = topAccent {

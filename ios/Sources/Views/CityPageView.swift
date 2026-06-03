@@ -158,7 +158,14 @@ struct CityPageView: View {
         .padding(.top, statusInset)
         .padding(.bottom, 10)
         .frame(maxWidth: .infinity)
-        .background(.ultraThinMaterial)
+        .background(
+            // 对齐 PWA 吸顶头：扁平深色渐变（非毛玻璃），底部渐隐
+            LinearGradient(
+                colors: [Color(hex: "#080c18").opacity(0.94),
+                         Color(hex: "#080c18").opacity(0.88),
+                         Color(hex: "#080c18").opacity(0)],
+                startPoint: .top, endPoint: .bottom)
+        )
         .opacity(Double(max(0, (scrollProgress - 0.55) / 0.35)))
         .ignoresSafeArea(edges: .top)
         .allowsHitTesting(false)

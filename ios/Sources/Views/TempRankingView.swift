@@ -8,12 +8,8 @@ struct TempRankingView: View {
                .sorted { ($0.base.current?.temp ?? 0) > ($1.base.current?.temp ?? 0) }
     }
 
-    private var maxTemp: Double {
-        sorted.first?.base.current?.temp ?? 1
-    }
-    private var minTemp: Double {
-        sorted.last?.base.current?.temp ?? 0
-    }
+    private var maxTemp: Double { sorted.first?.base.current?.temp ?? 1 }
+    private var minTemp: Double { sorted.last?.base.current?.temp ?? 0 }
 
     var body: some View {
         if sorted.count >= 2 {
@@ -23,32 +19,9 @@ struct TempRankingView: View {
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(.white.opacity(0.50))
 
-                    ForEach(sorted) { item in
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { idx, item in
                         if let temp = item.base.current?.temp {
-                            HStack(spacing: 10) {
-                                Text(item.base.providerName)
-                                    .font(.system(size: 13, weight: .medium))
-                                    .foregroundStyle(.white.opacity(0.80))
-                                    .frame(width: 90, alignment: .leading)
-
-                                GeometryReader { geo in
-                                    let range = maxTemp - minTemp
-                                    let frac = range > 0 ? (temp - minTemp) / range : 0.5
-                                    let barWidth = max(24, geo.size.width * CGFloat(frac))
-                                    HStack(spacing: 0) {
-                                        Capsule()
-                                            .fill(barColor(temp: temp, item: item))
-                                            .frame(width: barWidth, height: 6)
-                                        Spacer(minLength: 0)
-                                    }
-                                }
-                                .frame(height: 6)
-
-                                Text("\(Int(temp.rounded()))°")
-                                    .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                                    .foregroundStyle(.white.opacity(0.90))
-                                    .frame(width: 32, alignment: .trailing)
-                            }
+                            row(idx: idx, item: item, temp: temp)
                         }
                     }
                 }
@@ -56,9 +29,46 @@ struct TempRankingView: View {
         }
     }
 
-    private func barColor(temp: Double, item: AnnotatedResult) -> Color {
-        if item.isMax { return Color(hex: "#ff9f0a") }
-        if item.isMin { return Color(hex: "#64d2ff") }
-        return .white.opacity(0.35)
+    private func row(idx: Int, item: AnnotatedResult, temp: Double) -> some View {
+        let color = Color(hex: item.base.color)
+        return HStack(spacing: 10) {
+            Text("\(idx + 1)")
+                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.35))
+                .frame(width: 14, alignment: .center)
+
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+
+            Text(item.base.providerName)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.85))
+                .lineLimit(1)
+                .frame(width: 84, alignment: .leading)
+
+            GeometryReader { geo in
+                let range = maxTemp - minTemp
+                let frac = range > 0 ? (temp - minTemp) / range : 1.0
+                // 最短 14% 让最低温也有可见的条，其余按比例（对齐 PWA）
+                let barWidth = geo.size.width * CGFloat(0.14 + 0.86 * frac)
+                HStack(spacing: 0) {
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [color.opacity(0.75), color],
+                                startPoint: .leading, endPoint: .trailing)
+                        )
+                        .frame(width: barWidth, height: 6)
+                    Spacer(minLength: 0)
+                }
+            }
+            .frame(height: 6)
+
+            Text("\(Int(temp.rounded()))°")
+                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.90))
+                .frame(width: 30, alignment: .trailing)
+        }
     }
 }

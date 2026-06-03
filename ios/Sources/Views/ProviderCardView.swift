@@ -74,10 +74,14 @@ struct ProviderCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.cardFill)
                     .overlay {
                         RoundedRectangle(cornerRadius: 20, style: .continuous)
                             .fill(tintGradient)
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .strokeBorder(Color.cardBorder, lineWidth: 0.5)
                     }
                     .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
             }
