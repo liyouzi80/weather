@@ -59,6 +59,13 @@ struct GZQXProvider: WeatherProvider {
             if !w.isEmpty { warnings = w }
         }
 
+        // 基本站实况没有天气现象描述（rt.text 恒为 nil）；若短时预报也不在时效内、
+        // 且无生效预警，这张信源卡无实质内容（仅温度/湿度/风），与 PWA 一致：静默隐藏。
+        // 注意：预警/预报会经 current 透传给独立卡片，故有任一时仍需保留 current。
+        if rt.text == nil && forecast == nil && (warnings?.isEmpty ?? true) {
+            throw FetchError.noData
+        }
+
         return CurrentWeather(
             temp: rt.temp,
             feelsLike: nil,
