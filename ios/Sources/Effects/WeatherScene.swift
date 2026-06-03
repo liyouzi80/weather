@@ -24,6 +24,10 @@ class WeatherScene: SKScene {
     private var moonNode: SKShapeNode?
     private var moonTimer: Timer?
 
+    // 云朵持续飘移：每帧推进 + 环绕循环（比小幅 SKAction 摆动更明显）
+    private var cloudNodes: [(node: SKSpriteNode, vx: CGFloat, halfW: CGFloat)] = []
+    private var lastUpdate: TimeInterval = 0
+
     // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
     private lazy var dropTexture: SKTexture = makeDropTexture()
     private lazy var dotTexture: SKTexture = makeDotTexture()
@@ -68,12 +72,30 @@ class WeatherScene: SKScene {
         }
     }
 
+    // 每帧推进云朵，飘出一侧后从另一侧环绕回来，形成持续可见的漂移
+    override func update(_ currentTime: TimeInterval) {
+        guard !cloudNodes.isEmpty else { lastUpdate = currentTime; return }
+        let dt = lastUpdate == 0 ? 0 : min(0.05, currentTime - lastUpdate)
+        lastUpdate = currentTime
+        guard dt > 0 else { return }
+        for c in cloudNodes {
+            c.node.position.x += c.vx * CGFloat(dt)
+            let margin = c.halfW + 8
+            if c.vx > 0, c.node.position.x - c.halfW > size.width {
+                c.node.position.x = -margin
+            } else if c.vx < 0, c.node.position.x + c.halfW < 0 {
+                c.node.position.x = size.width + margin
+            }
+        }
+    }
+
     // MARK: Effect dispatch
 
     private func setupEffect() {
         removeAllChildren()
         removeAllActions()
         moonNode = nil
+        cloudNodes.removeAll()
 
         let kind = weatherFXKind(weatherText, night: isNight)
         switch kind {
@@ -284,19 +306,20 @@ class WeatherScene: SKScene {
         case (true,  true):  texes = overcastNightTexes
         }
 
-        // 3 层深度：远（小、慢、靠上）→ 近（大、快、靠下）
+        // 3 层深度：远（小、慢、靠上）→ 近（大、快、靠下）。
+        // 速度 v 为 pt/s，持续单向飘移（环绕循环），数值取得肉眼可感。
         let layers: [(count: Int, wLo: CGFloat, wHi: CGFloat,
                       alphaLo: CGFloat, alphaHi: CGFloat,
                       yLo: CGFloat, yHi: CGFloat, vLo: CGFloat, vHi: CGFloat)] = overcast
             ? [
-                (3, 280, 380, 0.72, 0.90, 0.74, 0.99, 16, 32),
-                (3, 340, 460, 0.80, 0.95, 0.64, 0.96, 28, 50),
-                (2, 400, 540, 0.74, 0.92, 0.54, 0.88, 46, 78),
+                (3, 280, 380, 0.72, 0.90, 0.74, 0.99, 10, 18),
+                (3, 340, 460, 0.80, 0.95, 0.64, 0.96, 16, 26),
+                (2, 400, 540, 0.74, 0.92, 0.54, 0.88, 24, 38),
               ]
             : [
-                (2, 240, 340, 0.60, 0.78, 0.78, 0.99, 12, 26),
-                (2, 300, 420, 0.66, 0.84, 0.70, 0.96, 22, 44),
-                (2, 360, 500, 0.60, 0.80, 0.60, 0.90, 36, 62),
+                (2, 240, 340, 0.60, 0.78, 0.78, 0.99,  9, 16),
+                (2, 300, 420, 0.66, 0.84, 0.70, 0.96, 14, 24),
+                (2, 360, 500, 0.60, 0.80, 0.60, 0.90, 22, 36),
               ]
 
         var zPos: CGFloat = 0
@@ -312,13 +335,9 @@ class WeatherScene: SKScene {
                     y: size.height * yFrac
                 )
                 cloud.zPosition = zPos; zPos += 1
-                let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: layer.vLo...layer.vHi)
-                let dur = Double.random(in: 34...66)
-                cloud.run(SKAction.repeatForever(SKAction.sequence([
-                    SKAction.moveBy(x: dx, y: 0, duration: dur),
-                    SKAction.moveBy(x: -dx, y: 0, duration: dur)
-                ])))
+                let vx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: layer.vLo...layer.vHi)
                 addChild(cloud)
+                cloudNodes.append((node: cloud, vx: vx, halfW: w / 2))
             }
         }
         if night { addMoon() }
@@ -330,8 +349,8 @@ class WeatherScene: SKScene {
     ///  - 垂直「亮顶→中→暗底」体积着色 + 噪声明暗起伏 → 立体感
     private func buildNoiseCloudTex(_ pal: CloudPalette, seed: Int32) -> SKTexture {
         let w = 256, h = 140
-        let source = GKPerlinNoiseSource(frequency: 1.8, octaveCount: 6,
-                                         persistence: 0.55, lacunarity: 2.1, seed: seed)
+        let source = GKPerlinNoiseSource(frequency: 2.2, octaveCount: 6,
+                                         persistence: 0.58, lacunarity: 2.2, seed: seed)
         let noise = GKNoise(source)
         let map = GKNoiseMap(noise,
                              size: vector_double2(2.4, 1.3),
@@ -369,10 +388,11 @@ class WeatherScene: SKScene {
                 let env = max(0, 1 - (ex * ex + ey * ey))            // 椭圆包络 0..1
                 let n = Double(map.value(at: vector_int2(Int32(x), Int32(y))))  // -1..1
                 let nn = (n + 1) * 0.5                                // 0..1
-                let density = env * (0.45 + 0.55 * nn)
-                let a = smoothstep(0.26, 0.60, density)              // 羽化 + 分形破碎边缘
-                // 噪声明暗起伏（高噪声受光偏亮）
-                let lift = (nn - 0.5) * 0.12
+                let nnC = smoothstep(0.34, 0.80, nn)                  // 提升噪声对比：团块分明、薄雾消失
+                let density = env * (0.34 + 0.66 * nnC)
+                let a = smoothstep(0.36, 0.66, density)              // 抬高下限去掉朦胧薄边，核心更实
+                // 噪声明暗起伏（高噪声受光偏亮），加大对比让云不发灰
+                let lift = (nnC - 0.5) * 0.18
                 let r = clamp01(cr + lift), g = clamp01(cg + lift), b = clamp01(cb + lift)
                 let i = (y * w + x) * 4
                 px[i+0] = UInt8(r * a * 255)     // 预乘 alpha
