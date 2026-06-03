@@ -7,6 +7,8 @@ class ProviderAggregator {
     let providers: [any WeatherProvider] = [
         NMCProvider(),
         GZQXProvider(),
+        WeatherCNProvider(),
+        TencentProvider(),
         QWeatherProvider(),
         CaiyunProvider(),
         OWMProvider(),
