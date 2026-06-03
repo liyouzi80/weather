@@ -20,11 +20,11 @@ struct ProviderCardView: View {
                     if result.isMax {
                         Text("最高")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#ff9f0a"))
+                            .foregroundStyle(Color(hex: "#ff453a"))
                     } else if result.isMin {
                         Text("最低")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(Color(hex: "#64d2ff"))
+                            .foregroundStyle(Color(hex: "#40c8e0"))
                     }
                     Spacer()
                     Text(String(format: "%.1f", w.temp) + "°")
@@ -33,7 +33,7 @@ struct ProviderCardView: View {
                 }
 
                 // 指标平铺行
-                FlowLayout(spacing: 16) {
+                FlowLayout(spacing: 18) {
                     if w.text != "未知" {
                         HStack(spacing: 5) {
                             Image(systemName: weatherSymbol(w.text))
@@ -70,20 +70,24 @@ struct ProviderCardView: View {
                         .foregroundStyle(.white.opacity(0.32))
                 }
             }
-            .padding(16)
+            .padding(.vertical, 16)
+            .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
                     .fill(Color.cardFill)
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
                             .fill(tintGradient)
                     }
                     .overlay {
-                        RoundedRectangle(cornerRadius: 20, style: .continuous)
-                            .strokeBorder(Color.cardBorder, lineWidth: 0.5)
+                        RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
+                            .strokeBorder(
+                                LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.04)],
+                                               startPoint: .top, endPoint: .bottom),
+                                lineWidth: 0.5)
                     }
-                    .shadow(color: .black.opacity(0.22), radius: 10, y: 4)
+                    .shadow(color: .black.opacity(0.25), radius: 20, y: 4)
             }
         }
     }

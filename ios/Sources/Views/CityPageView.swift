@@ -67,11 +67,12 @@ struct CityPageView: View {
             LazyVStack(spacing: 0) {
                 // Hero — 上滑时淡出 + 缩小 + 视差
                 if let stats = vm.stats {
-                    HeroView(stats: stats, cityName: vm.loc.name)
+                    HeroView(stats: stats, cityName: vm.loc.name, updatedAt: vm.updatedAt)
                         .padding(.horizontal, 20)
                         .opacity(1 - scrollProgress * 0.9)
                         .scaleEffect(1 - scrollProgress * 0.12, anchor: .top)
                         .offset(y: scrollOffset < 0 ? -scrollOffset * 0.25 : 0)
+                        .riseIn(0)
                 } else {
                     HeroSkeletonView()
                 }
@@ -81,6 +82,7 @@ struct CityPageView: View {
                     WarningView(warnings: vm.warnings)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 16)
+                        .riseIn(0.04)
                 }
 
                 // 关键指标条
@@ -88,6 +90,7 @@ struct CityPageView: View {
                     MetricStripView(stats: stats, avgAqi: vm.avgAqi)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 28)
+                        .riseIn(0.06)
                 }
 
                 // 番禺气象台短时预报卡
@@ -95,6 +98,7 @@ struct CityPageView: View {
                     NoticeCardView(text: f.text, issuedAt: f.issuedAt)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
+                        .riseIn(0.10)
                 }
 
                 // 分钟级降水
@@ -102,6 +106,7 @@ struct CityPageView: View {
                     MinutelyRainView(rain: rain)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 16)
+                        .riseIn(0.12)
                 }
 
                 // 温度排行（信源卡片之前）
@@ -109,12 +114,14 @@ struct CityPageView: View {
                     TempRankingView(results: vm.annotated)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 12)
+                        .riseIn(0.14)
                 }
 
-                // 信源卡片（iPad 横屏两列）
-                LazyVGrid(columns: providerColumns, spacing: 12) {
-                    ForEach(vm.annotated) { item in
+                // 信源卡片（iPad 横屏两列）—— 逐卡错峰入场
+                LazyVGrid(columns: providerColumns, spacing: 10) {
+                    ForEach(Array(vm.annotated.enumerated()), id: \.element.id) { idx, item in
                         ProviderCardView(result: item)
+                            .riseIn(0.16 + Double(idx) * 0.05)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -124,6 +131,7 @@ struct CityPageView: View {
                     AQISectionView(air: vm.air)
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
+                        .riseIn(0.20)
                 }
 
                 Spacer(minLength: 48)
@@ -138,19 +146,17 @@ struct CityPageView: View {
         }
     }
 
-    // 上滑吸顶条：城市名 + 温度 + 天气，滚过 55% 后淡入
+    // 上滑吸顶条：城市名 · 温度（对齐 PWA loc-sticky，滚过 55% 后淡入）
     private var stickyHeader: some View {
         HStack(spacing: 8) {
             Text(vm.loc.name)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
+                .kerning(-0.34)
                 .foregroundStyle(.white)
             if let s = vm.stats {
-                Text("\(Int(s.avg.rounded()))°")
-                    .font(.system(size: 16, weight: .medium).monospacedDigit())
-                    .foregroundStyle(.white)
-                Text(s.text)
-                    .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.70))
+                Text("· \(Int(s.avg.rounded()))°")
+                    .font(.system(size: 17, weight: .regular).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.72))
             }
             Spacer()
         }

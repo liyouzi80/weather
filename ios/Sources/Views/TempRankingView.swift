@@ -33,7 +33,7 @@ struct TempRankingView: View {
         let color = Color(hex: item.base.color)
         return HStack(spacing: 10) {
             Text("\(idx + 1)")
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                .font(.system(size: 12, weight: .bold).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.35))
                 .frame(width: 14, alignment: .center)
 
@@ -45,7 +45,7 @@ struct TempRankingView: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.white.opacity(0.85))
                 .lineLimit(1)
-                .frame(width: 84, alignment: .leading)
+                .frame(width: 100, alignment: .leading)
 
             GeometryReader { geo in
                 let range = maxTemp - minTemp
@@ -54,21 +54,18 @@ struct TempRankingView: View {
                 let barWidth = geo.size.width * CGFloat(0.14 + 0.86 * frac)
                 HStack(spacing: 0) {
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [color.opacity(0.75), color],
-                                startPoint: .leading, endPoint: .trailing)
-                        )
-                        .frame(width: barWidth, height: 6)
+                        .fill(color.opacity(0.85))
+                        .frame(width: barWidth, height: 3)
                     Spacer(minLength: 0)
                 }
+                .frame(maxHeight: .infinity, alignment: .center)
             }
-            .frame(height: 6)
+            .frame(height: 16)
 
-            Text("\(Int(temp.rounded()))°")
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.90))
-                .frame(width: 30, alignment: .trailing)
+            Text(String(format: "%.1f", temp) + "°")
+                .font(.system(size: 16, weight: .bold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.92))
+                .frame(width: 46, alignment: .trailing)
         }
     }
 }

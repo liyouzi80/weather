@@ -22,8 +22,18 @@ struct AQISectionView: View {
 private struct AQICardView: View {
     let result: AqiResult
     let air: AirQuality
+    @Environment(\.openURL) private var openURL
 
     var body: some View {
+        if let url = result.url {
+            Button { openURL(url) } label: { card }
+                .buttonStyle(PressScaleStyle())
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
         GlassCard {
             VStack(alignment: .leading, spacing: 8) {
                 // 标题行：圆点 + 信源名（与信源卡片统一）... 等级 数值AQI
@@ -35,6 +45,11 @@ private struct AQICardView: View {
                     Text(result.providerName)
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(.white)
+                    if result.url != nil {
+                        Image(systemName: "arrow.up.forward")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.40))
+                    }
                     Spacer()
                     Text(aqiCategory(air.aqi))
                         .font(.system(size: 12, weight: .semibold))

@@ -30,7 +30,9 @@ struct MinutelyRainView: View {
                 if hasRain {
                     HStack(alignment: .bottom, spacing: 2) {
                         ForEach(Array(rain.minutely.enumerated()), id: \.offset) { _, m in
-                            RoundedRectangle(cornerRadius: 1.5)
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: 2, bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0, topTrailingRadius: 2)
                                 .fill(barColor(m.precip))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: max(3, CGFloat(m.precip / maxPrecip) * 46))
@@ -39,12 +41,13 @@ struct MinutelyRainView: View {
                     .frame(height: 46)
                     .padding(.top, 2)
 
+                    // QWeather /minutely/5m 返回 12×5min = 未来 1 小时
                     HStack {
                         Text("现在")
                         Spacer()
-                        Text("1小时后")
+                        Text("30分钟")
                         Spacer()
-                        Text("2小时后")
+                        Text("1小时")
                     }
                     .font(.system(size: 10))
                     .foregroundStyle(.white.opacity(0.35))
@@ -56,6 +59,6 @@ struct MinutelyRainView: View {
     private func barColor(_ p: Double) -> Color {
         guard p > 0 else { return Color.white.opacity(0.08) }
         let t = min(p / maxPrecip, 1)
-        return Color(hex: "#5ac8fa").opacity(0.4 + 0.6 * t) // 浅蓝 → 深蓝，强度越大越深
+        return Color(hex: "#0a84ff").opacity(0.55 + 0.4 * t) // 对齐 PWA 强度爬升 0.55→0.95
     }
 }
