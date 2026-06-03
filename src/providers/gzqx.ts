@@ -20,9 +20,10 @@ export const gzqxProvider: WeatherProvider = {
     const d = await res.json()
     if (d.error) throw new Error(d.error)
     if (d.temp == null) throw new Error('未解析到温度（页面结构可能已变）')
-    // 基本站实况没有天气现象描述（text 始终 undefined）；若预报也不在时效内，
-    // 卡片无实质内容，静默隐藏（与其他失败信源处理一致）。
-    if (!d.text && !d.forecast) throw new Error('无有效天气内容')
+    // 基本站实况没有天气现象描述（text 始终 undefined）；若预报也不在时效内、
+    // 且无生效预警，卡片无实质内容，静默隐藏（与其他失败信源处理一致）。
+    // 注意：预警/预报经 current 透传给独立卡片，故有任一时仍需保留 current。
+    if (!d.text && !d.forecast && !d.warnings?.length) throw new Error('无有效天气内容')
     return {
       temp: d.temp,
       feelsLike: d.feelsLike,
