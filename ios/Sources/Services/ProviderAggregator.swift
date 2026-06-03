@@ -52,7 +52,8 @@ class ProviderAggregator {
         let uvs   = ok.compactMap { $0.current?.uvIndex }
 
         let avg = temps.reduce(0, +) / Double(temps.count)
-        let text = mostCommonWeather(ok.compactMap { $0.current?.text })
+        // 排除「未知」（番禺基本站无天气现象描述），避免盖过其他源的真实天气
+        let text = mostCommonWeather(ok.compactMap { $0.current?.text }.filter { $0 != "未知" })
 
         return WeatherStats(
             avg: avg,
