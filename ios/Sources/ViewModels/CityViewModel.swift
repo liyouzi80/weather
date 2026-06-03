@@ -2,6 +2,7 @@ import Foundation
 import Observation
 
 @Observable
+@MainActor
 class CityViewModel {
     var results: [ProviderResult] = []
     var air: [AqiResult] = []

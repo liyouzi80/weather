@@ -1,4 +1,19 @@
 name: TianQi
+schemes:
+  TianQi:
+    build:
+      targets:
+        TianQi: all
+    run:
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
 options:
   bundleIdPrefix: com.personal
   deploymentTarget:

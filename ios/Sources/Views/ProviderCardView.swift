@@ -17,12 +17,12 @@ struct ProviderCardView: View {
                             .foregroundStyle(.white.opacity(0.70))
                         Spacer()
                         if result.isMax {
-                            Text("最高").font(.system(size: 11, weight: .600))
+                            Text("最高").font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Color(hex: "#ff9f0a"))
                                 .padding(.horizontal, 7).padding(.vertical, 2)
                                 .background(Capsule().fill(Color(hex: "#ff9f0a").opacity(0.15)))
                         } else if result.isMin {
-                            Text("最低").font(.system(size: 11, weight: .600))
+                            Text("最低").font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(Color(hex: "#64d2ff"))
                                 .padding(.horizontal, 7).padding(.vertical, 2)
                                 .background(Capsule().fill(Color(hex: "#64d2ff").opacity(0.15)))
