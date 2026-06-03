@@ -140,68 +140,82 @@ function moonAltAzPhase(now: Date, latDeg: number, lonDeg: number): { alt: numbe
   return { alt: altD, az, elongation }
 }
 
-// Draw moon disk with correct phase terminator.
-// elongation: 0=new moon (dark), 180=full moon (bright), degrees.
-function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: number, elongation: number): void {
-  const P     = Math.PI
-  const illum = (1 - Math.cos(elongation * P / 180)) / 2   // 0=new, 1=full
+// 真实月面反照率贴图（与 iOS 共用 /moon-albedo.png，CC BY-SA 3.0 Gregory H. Revera）。
+const moonAlbedoImg: HTMLImageElement | null =
+  typeof Image !== 'undefined' ? new Image() : null
+let moonAlbedoReady = false
+if (moonAlbedoImg) {
+  moonAlbedoImg.onload = () => { moonAlbedoReady = true }
+  moonAlbedoImg.src = '/moon-albedo.png'
+}
+// 离屏 sprite 缓存（月相一会话内基本不变，避免每帧逐像素）。键含 elongation(0.5°) 与半径。
+const moonSpriteCache = new Map<string, HTMLCanvasElement>()
 
-  // Atmospheric scatter glow (intensity scales with illumination)
-  const ga = (0.12 + illum * 0.06).toFixed(3)
-  const glow = ctx.createRadialGradient(mx, my, r * 0.8, mx, my, r * 6)
-  glow.addColorStop(0,   `rgba(215,232,255,${ga})`)
-  glow.addColorStop(0.4, `rgba(200,222,255,${(+ga * 0.39).toFixed(3)})`)
-  glow.addColorStop(1,   'rgba(185,210,255,0)')
-  ctx.fillStyle = glow
-  ctx.beginPath(); ctx.arc(mx, my, r * 6, 0, TAU); ctx.fill()
+// 用真实月面 + 物理 Lambert 相位光照烘焙离屏月亮（与 iOS makeMoonTexture 同一套数学）。
+function buildMoonSprite(r: number, elongation: number): HTMLCanvasElement | null {
+  if (!moonAlbedoReady || !moonAlbedoImg) return null
+  const P = Math.PI
+  const er = elongation * P / 180
+  const se = Math.sin(er), ce = Math.cos(er)
+  const illum = (1 - ce) / 2
+  const D = Math.max(8, Math.round(r / 0.30))   // 整张含光晕，盘径=0.30*D
+  const cx = D / 2, diskR = D * 0.30, haloR = D / 2
 
-  // Tight halo ring
-  const halo = ctx.createRadialGradient(mx, my, r, mx, my, r * 2.2)
-  halo.addColorStop(0,   `rgba(230,242,255,${(0.16 + illum * 0.06).toFixed(3)})`)
-  halo.addColorStop(0.6, 'rgba(210,228,255,0.05)')
-  halo.addColorStop(1,   'rgba(195,218,255,0)')
-  ctx.fillStyle = halo
-  ctx.beginPath(); ctx.arc(mx, my, r * 2.2, 0, TAU); ctx.fill()
+  // 先把月面缩放绘入月盘外接方框，输出像素即可直接取对应反照率
+  const ac = document.createElement('canvas'); ac.width = D; ac.height = D
+  const actx = ac.getContext('2d'); if (!actx) return null
+  actx.drawImage(moonAlbedoImg, cx - diskR, cx - diskR, diskR * 2, diskR * 2)
+  const alb = actx.getImageData(0, 0, D, D).data
 
-  // Phase disc — clip to disk boundary
-  ctx.save()
-  ctx.beginPath(); ctx.arc(mx, my, r, 0, TAU); ctx.clip()
+  const out = document.createElement('canvas'); out.width = D; out.height = D
+  const octx = out.getContext('2d'); if (!octx) return null
+  const img = octx.createImageData(D, D); const dat = img.data
+  const c01 = (v: number) => (v < 0 ? 0 : v > 1 ? 1 : v)
+  const ss = (a: number, b: number, x: number) => { const t = c01((x - a) / (b - a)); return t * t * (3 - 2 * t) }
 
-  // Lit surface (radial gradient lit from upper-left)
-  const disk = ctx.createRadialGradient(mx - r * 0.3, my - r * 0.3, 0, mx, my, r)
-  disk.addColorStop(0,    'rgba(255,255,248,0.97)')
-  disk.addColorStop(0.65, 'rgba(238,246,255,0.92)')
-  disk.addColorStop(1,    'rgba(210,228,255,0.85)')
-  ctx.fillStyle = disk
-  ctx.fillRect(mx - r, my - r, r * 2, r * 2)
-
-  // Shadow side: erase to transparent so it blends with the night sky
-  // (只显示受光面，暗面与背景融合，更写实)。
-  if (illum < 0.97) {
-    const isWaxing  = elongation < 180
-    // crescent phase: terminator bows toward the lit limb; gibbous: toward dark side
-    const isCrescent = isWaxing ? elongation < 90 : elongation > 270
-    const rx = Math.max(0.5, Math.abs(Math.cos(elongation * P / 180)) * r)
-
-    ctx.globalCompositeOperation = 'destination-out'
-    ctx.fillStyle = 'rgba(0,0,0,1)'
-    ctx.beginPath()
-    if (isWaxing) {
-      // Dark on left: left semicircle + terminator
-      ctx.arc(mx, my, r, -P / 2, P / 2, true)
-      // right-side ellipse for crescent (bows right), left-side for gibbous (bows left)
-      ctx.ellipse(mx, my, rx, r, 0, P / 2, -P / 2, !isCrescent)
-    } else {
-      // Dark on right: right semicircle + terminator
-      ctx.arc(mx, my, r, -P / 2, P / 2, false)
-      ctx.ellipse(mx, my, rx, r, 0, P / 2, -P / 2, isCrescent)
+  for (let y = 0; y < D; y++) {
+    for (let x = 0; x < D; x++) {
+      const dx = x - cx, dy = y - cx, dist = Math.hypot(dx, dy)
+      let r0 = 0, g0 = 0, b0 = 0, a = 0
+      let halo = 0
+      if (dist <= haloR) {
+        const ht = c01((dist - diskR * 0.85) / (haloR - diskR * 0.85))
+        halo = (1 - ht) * (1 - ht) * 0.05 * (0.5 + 0.5 * illum)
+      }
+      if (dist <= diskR + 1.2) {
+        const nx = dx / diskR, ny = dy / diskR
+        const z = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny))
+        const ndotl = nx * se - z * ce      // Lambert: N·L, L=(sin e,0,-cos e)
+        const ai = (y * D + x) * 4
+        const ar = alb[ai], ag = alb[ai + 1], ab = alb[ai + 2]
+        const lit = c01(ndotl)
+        const bright = 0.42 + 0.58 * Math.pow(lit, 0.5)
+        const aDisk = ss(-0.02, 0.12, ndotl) * (1 - ss(diskR - 1.0, diskR + 1.2, dist))
+        if (aDisk > 0) { r0 = ar * bright; g0 = ag * bright; b0 = ab * bright; a = aDisk }
+        else { r0 = 200; g0 = 210; b0 = 225; a = halo }
+      } else if (dist <= haloR) {
+        r0 = 200; g0 = 210; b0 = 225; a = halo
+      }
+      const o = (y * D + x) * 4
+      dat[o] = c01(r0 / 255) * 255; dat[o + 1] = c01(g0 / 255) * 255
+      dat[o + 2] = c01(b0 / 255) * 255; dat[o + 3] = c01(a) * 255
     }
-    ctx.closePath()
-    ctx.fill()
-    ctx.globalCompositeOperation = 'source-over'
   }
+  octx.putImageData(img, 0, 0)
+  return out
+}
 
-  ctx.restore()
+// Draw realistic moon (real surface + physical phase). elongation: 0=new, 180=full (deg).
+function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: number, elongation: number): void {
+  const key = `${Math.round(elongation * 2)}_${Math.round(r)}`
+  let sprite = moonSpriteCache.get(key)
+  if (!sprite) {
+    const built = buildMoonSprite(r, elongation)
+    if (!built) return                 // 贴图未就绪：下一帧再画
+    if (moonSpriteCache.size > 8) moonSpriteCache.clear()
+    moonSpriteCache.set(key, built); sprite = built
+  }
+  ctx.drawImage(sprite, mx - sprite.width / 2, my - sprite.height / 2)
 }
 
 // ── Component ────────────────────────────────────────────────────────────────

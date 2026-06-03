@@ -286,17 +286,34 @@ class WeatherScene: SKScene {
         moonNode = moon
     }
 
-    /// 月亮纹理：按 elongation（0=新月…180=满月）逐像素渲染真实月相。
-    /// 与 PWA drawMoon 同逻辑——球面光照的亮面 + 终止线，外加柔和光晕。
+    // 真实月面反照率贴图（NASA 级公版照，CC BY-SA 3.0 Gregory H. Revera），
+    // 顶行=上，nx,ny∈[-1,1] 正交映射采样。仅加载一次。
+    private lazy var moonAlbedo: (px: [UInt8], w: Int, h: Int)? = loadMoonAlbedo()
+    private func loadMoonAlbedo() -> (px: [UInt8], w: Int, h: Int)? {
+        guard let ui = UIImage(named: "moon-albedo"), let cg = ui.cgImage else { return nil }
+        let w = cg.width, h = cg.height
+        var buf = [UInt8](repeating: 0, count: w * h * 4)
+        let cs = CGColorSpaceCreateDeviceRGB()
+        guard let ctx = CGContext(data: &buf, width: w, height: h, bitsPerComponent: 8,
+                                  bytesPerRow: w * 4, space: cs,
+                                  bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        // 翻转使缓冲区顶行=图像顶部（与 PWA / Python 采样方向一致）
+        ctx.translateBy(x: 0, y: CGFloat(h)); ctx.scaleBy(x: 1, y: -1)
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: w, height: h))
+        return (buf, w, h)
+    }
+
+    /// 月亮纹理：真实月面照片作反照率 + 物理 Lambert 相位光照（柔和终止线）+ 临边/光晕。
+    /// 与 PWA buildMoonSprite 同一套数学，呈照片级真实月相（贴近苹果天气）。
     private func makeMoonTexture(elongation: Double) -> SKTexture {
-        let W = 170, H = 170
+        let W = 220, H = 220
         let cx = Double(W) / 2, cy = Double(H) / 2
-        let diskR = 44.0
-        let haloR = Double(W) / 2          // 光晕铺满纹理
+        let diskR = Double(W) * 0.30
+        let haloR = Double(W) / 2
         let er = elongation * .pi / 180
-        let waxing = elongation < 180      // 上弦（渐盈）亮面在右；下弦在左
-        let kx = cos(er)                   // 终止线归一化横坐标系数：+1 新月 … -1 满月
-        let illum = (1 - cos(er)) / 2
+        let se = sin(er), ce = cos(er)
+        let illum = (1 - ce) / 2
+        let alb = moonAlbedo
 
         func clamp01(_ v: Double) -> Double { max(0, min(1, v)) }
         func smoothstep(_ a: Double, _ b: Double, _ x: Double) -> Double {
@@ -311,34 +328,36 @@ class WeatherScene: SKScene {
                 let dist = (dx * dx + dy * dy).squareRoot()
                 var r = 0.0, g = 0.0, b = 0.0, a = 0.0
 
-                if dist <= diskR + 1 {
+                // 光晕（盘内外连续，消除暗环；很克制）
+                var halo = 0.0
+                if dist <= haloR {
+                    let ht = clamp01((dist - diskR * 0.85) / (haloR - diskR * 0.85))
+                    halo = (1 - ht) * (1 - ht) * 0.05 * (0.5 + 0.5 * illum)
+                }
+
+                if dist <= diskR + 1.2 {
                     let nx = dx / diskR, ny = dy / diskR
-                    // 终止线：当前行半宽 sqrt(1-ny²)，终止线归一化横坐标 = kx*半宽
-                    let halfW = (1 - ny * ny > 0) ? (1 - ny * ny).squareRoot() : 0
-                    let xt = kx * halfW
-                    // 到终止线的有符号距离（>0 受光，<0 阴影），亮面侧依盈亏而定
-                    // 渐盈：亮面在右，lit ⇔ nx>xt；渐亏：亮面在左，lit ⇔ nx<-xt
-                    let sd = waxing ? (nx - xt) : (-xt - nx)
-                    let litFrac = smoothstep(-0.05, 0.05, sd)
-
-                    // 球面光照（光从左上偏向观察者），亮面有限边减光
                     let z = max(0, 1 - nx * nx - ny * ny).squareRoot()
-                    let ndotl = max(0, nx * (-0.30) + ny * (-0.30) + z * 0.90)
-                    let bright = 0.58 + 0.42 * ndotl
+                    let ndotl = nx * se - z * ce          // Lambert: N·L, L=(sin e,0,-cos e)
 
-                    // 只渲染受光面：暗面 alpha→0 与背景融合（更写实）；按 litFrac 平滑过渡
-                    let litR = 255.0 * bright, litG = 252.0 * bright, litB = 243.0 * bright
-                    let litA = 0.97
-                    r = litR; g = litG; b = litB
-                    a = litA * litFrac
-                    // 月盘外缘羽化抗锯齿
-                    a *= 1 - smoothstep(diskR - 1.0, diskR + 1.0, dist)
+                    // 采样真实月面（正交投影）
+                    var ar = 200.0, ag = 205.0, ab = 210.0
+                    if let alb {
+                        let sx = Int(clamp01(nx * 0.5 + 0.5) * Double(alb.w - 1))
+                        let sy = Int(clamp01(ny * 0.5 + 0.5) * Double(alb.h - 1))
+                        let i = (sy * alb.w + sx) * 4
+                        ar = Double(alb.px[i+0]); ag = Double(alb.px[i+1]); ab = Double(alb.px[i+2])
+                    }
+                    let lit = clamp01(ndotl)
+                    let bright = 0.42 + 0.58 * pow(lit, 0.5)
+                    let aDisk = smoothstep(-0.02, 0.12, ndotl) * (1 - smoothstep(diskR - 1.0, diskR + 1.2, dist))
+                    if aDisk > 0 {
+                        r = ar * bright; g = ag * bright; b = ab * bright; a = aDisk
+                    } else {
+                        r = 200; g = 210; b = 225; a = halo
+                    }
                 } else if dist <= haloR {
-                    // 光晕：随月相亮度增强，向外二次方渐隐（冷白）
-                    let ht = (dist - diskR) / (haloR - diskR)   // 0..1
-                    let fall = (1 - ht) * (1 - ht)
-                    a = fall * (0.14 + 0.10 * illum)
-                    r = 215; g = 232; b = 255
+                    r = 200; g = 210; b = 225; a = halo
                 }
 
                 let i = (y * W + x) * 4
