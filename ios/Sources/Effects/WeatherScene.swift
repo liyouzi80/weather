@@ -326,14 +326,11 @@ class WeatherScene: SKScene {
                     let ndotl = max(0, nx * (-0.30) + ny * (-0.30) + z * 0.90)
                     let bright = 0.58 + 0.42 * ndotl
 
-                    // 亮面暖白、阴影面极暗（弱地照），按 litFrac 混合
+                    // 只渲染受光面：暗面 alpha→0 与背景融合（更写实）；按 litFrac 平滑过渡
                     let litR = 255.0 * bright, litG = 252.0 * bright, litB = 243.0 * bright
-                    let darkR = 26.0, darkG = 34.0, darkB = 60.0
-                    let litA = 0.97, darkA = 0.07
-                    r = darkR + (litR - darkR) * litFrac
-                    g = darkG + (litG - darkG) * litFrac
-                    b = darkB + (litB - darkB) * litFrac
-                    a = darkA + (litA - darkA) * litFrac
+                    let litA = 0.97
+                    r = litR; g = litG; b = litB
+                    a = litA * litFrac
                     // 月盘外缘羽化抗锯齿
                     a *= 1 - smoothstep(diskR - 1.0, diskR + 1.0, dist)
                 } else if dist <= haloR {

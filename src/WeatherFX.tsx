@@ -175,14 +175,16 @@ function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: numb
   ctx.fillStyle = disk
   ctx.fillRect(mx - r, my - r, r * 2, r * 2)
 
-  // Dark shadow terminator (skip near full moon)
+  // Shadow side: erase to transparent so it blends with the night sky
+  // (只显示受光面，暗面与背景融合，更写实)。
   if (illum < 0.97) {
     const isWaxing  = elongation < 180
     // crescent phase: terminator bows toward the lit limb; gibbous: toward dark side
     const isCrescent = isWaxing ? elongation < 90 : elongation > 270
     const rx = Math.max(0.5, Math.abs(Math.cos(elongation * P / 180)) * r)
 
-    ctx.fillStyle = 'rgba(8,16,34,0.90)'
+    ctx.globalCompositeOperation = 'destination-out'
+    ctx.fillStyle = 'rgba(0,0,0,1)'
     ctx.beginPath()
     if (isWaxing) {
       // Dark on left: left semicircle + terminator
@@ -196,6 +198,7 @@ function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: numb
     }
     ctx.closePath()
     ctx.fill()
+    ctx.globalCompositeOperation = 'source-over'
   }
 
   ctx.restore()
