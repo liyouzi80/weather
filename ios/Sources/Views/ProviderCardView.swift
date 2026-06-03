@@ -101,7 +101,8 @@ struct ProviderCardView: View {
             return LinearGradient(colors: [Color(hex: "#40c8e0").opacity(0.13), .clear],
                                   startPoint: .topLeading, endPoint: UnitPoint(x: 0.62, y: 0.62))
         }
-        return LinearGradient(colors: [Color.white.opacity(0.05), Color.white.opacity(0.05)],
+        // 普通卡片不叠任何色，保持与 AQI / 温度排行（纯 GlassCard）相同的透明度
+        return LinearGradient(colors: [.clear, .clear],
                               startPoint: .top, endPoint: .bottom)
     }
 
