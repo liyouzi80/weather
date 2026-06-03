@@ -777,9 +777,9 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
-  if (r.error) return null   // 失败信源静默隐藏，不向用户暴露技术错误
+  if (r.error || !r.current) return null   // 失败/无数据信源静默隐藏
 
-  const c = r.current!
+  const c = r.current
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
   return (
     <div className={cls}>
