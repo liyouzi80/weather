@@ -34,9 +34,9 @@ class CityViewModel {
     }
 
     var panyuForecast: (text: String, issuedAt: String?)? {
+        // 时效过滤已在 GZQXProvider 抓取时完成（过期不返回 forecast），此处直接透传。
         guard let r = results.first(where: { $0.current?.forecast != nil })?.current,
-              let text = r.forecast,
-              isForecastCurrent(text, issuedAt: r.forecastIssuedAt) else { return nil }
+              let text = r.forecast else { return nil }
         return (text, r.forecastIssuedAt)
     }
 
@@ -50,23 +50,5 @@ class CityViewModel {
         loading = false
         initialLoad = false
         updatedAt = Date()
-    }
-
-    // Mirrors web app's isForecastCurrent logic
-    private func isForecastCurrent(_ text: String, issuedAt: String?) -> Bool {
-        let cal = Calendar.current
-        var tz = TimeZone(identifier: "Asia/Shanghai")!
-        var comps = cal.dateComponents(in: tz, from: Date())
-        let hour = comps.hour ?? 0
-
-        // Look for time window in forecast text
-        let pattern = #"(?:今[天日]|明天|后天)?(\d{1,2})时到(?:今[天日]|明天|后天)?(\d{1,2})时"#
-        guard let regex = try? NSRegularExpression(pattern: pattern),
-              let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) else {
-            return true // can't determine, show it
-        }
-        let fromHour = Int((text as NSString).substring(with: match.range(at: 1))) ?? 0
-        let toHour   = Int((text as NSString).substring(with: match.range(at: 2))) ?? 24
-        return hour < toHour || (fromHour > toHour) // handles overnight windows
     }
 }

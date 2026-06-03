@@ -25,10 +25,10 @@ struct NMCProvider: WeatherProvider {
             throw FetchError.invalidURL
         }
         let resp: NMCWeatherResp = try await fetchJSON(url, headers: ["Referer": "https://www.nmc.cn/"])
-        guard let r = resp.data?.real?.weather else { throw FetchError.noData }
+        guard let r = resp.data?.real?.weather, let temp = r.temperature, temp > -999 else { throw FetchError.noData }
 
         return CurrentWeather(
-            temp: r.temperature,
+            temp: temp,
             feelsLike: r.feelst,
             text: r.info ?? "未知",
             humidity: r.humidity,
@@ -53,7 +53,7 @@ struct NMCProvider: WeatherProvider {
                 let publish_time: String?
                 let weather: NMCWeather?
                 struct NMCWeather: Decodable {
-                    let temperature: Double
+                    let temperature: Double?
                     let feelst: Double?
                     let info: String?
                     let humidity: Double?

@@ -18,18 +18,21 @@ xcodegen generate
 open TianQi.xcodeproj
 ```
 
-### 3. 配置 API Keys 和 Base URL
+### 3. （可选）配置对比信源 API Key
 
-在 Xcode 中：Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables，添加：
+**番禺核心源（中央气象台 / 番禺气象台 / 美国 AQI）全部原生直抓，无需任何 key、无需任何后端，开箱即用。**
 
-| 变量名 | 说明 |
-|---|---|
-| `QWEATHER_KEY` | 和风天气 API Key |
-| `CAIYUN_KEY` | 彩云天气 token |
-| `OWM_KEY` | OpenWeatherMap API Key |
-| `BASE_URL` | Cloudflare Pages 部署地址，如 `https://xxx.pages.dev` |
+若想额外加入和风 / 彩云 / OWM 作对比源，在 `Sources/Utils/Keys.swift` 里硬编码：
 
-（或直接在 `Sources/Utils/Keys.swift` 里硬编码，仅个人使用）
+```swift
+enum Keys {
+    static let qweather = "和风 key"   // 不填则跳过
+    static let caiyun   = "彩云 token" // 不填则跳过
+    static let owm      = "OWM key"    // 不填则跳过
+}
+```
+
+> 建议把 `Keys.swift` 加入 `.gitignore` 防止 key 泄漏。
 
 ### 4. 配置签名
 
@@ -40,6 +43,20 @@ Xcode → Target TianQi → Signing & Capabilities：
 ### 5. 连接 iPhone，选设备，点 Run ▶
 
 ---
+
+## 架构：纯原生，无后端
+
+不同于网页版（受浏览器 CORS 限制，需 Cloudflare Functions 代抓），原生 App 的
+`URLSession` 无 CORS 限制，**所有数据源都在设备上直接抓取**，不依赖任何后端：
+
+| 数据源 | 抓取方式 | 是否需 key |
+|---|---|---|
+| 中央气象台 `nmc.cn` | 直连 REST | 否 |
+| 番禺气象台 `tqyb.com.cn` | 直抓 JS 数据文件 + HTML 解析 | 否 |
+| 美国 AQI `air-quality.com` / `iqair.cn` | 直抓网页正则解析 | 否 |
+| 和风 / 彩云 / OWM | 直连官方 API | 是（可选） |
+
+> `tqyb.com.cn` 为 HTTP，已在 `project.yml` 配置 ATS 例外放行。
 
 ## 项目结构
 

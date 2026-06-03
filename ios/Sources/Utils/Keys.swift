@@ -1,14 +1,11 @@
 import Foundation
 
-// API keys — fill in via Xcode scheme environment variables or hardcode for personal use.
-// Variable names match the web app's VITE_* convention.
+// 可选信源 API key（和风 / 彩云 / OWM）。番禺核心源（中央气象台 / 番禺气象台 / AQI）
+// 全部原生直抓，无需任何 key 或后端。填了 key 就多一个对比源，不填则自动跳过。
+//
+// 个人自用：直接在下面硬编码即可（建议把本文件加入 .gitignore 防止泄漏）。
 enum Keys {
-    static let qweather   = Bundle.main.object(forInfoDictionaryKey: "QWEATHER_KEY")   as? String ?? ""
-    static let caiyun     = Bundle.main.object(forInfoDictionaryKey: "CAIYUN_KEY")     as? String ?? ""
-    static let owm        = Bundle.main.object(forInfoDictionaryKey: "OWM_KEY")        as? String ?? ""
-
-    // Base URL of your Cloudflare Pages deployment (for server-side scraping endpoints)
-    // e.g. "https://your-project.pages.dev"
-    static let baseURL    = Bundle.main.object(forInfoDictionaryKey: "BASE_URL") as? String
-                            ?? "https://your-project.pages.dev"
+    static let qweather = ""
+    static let caiyun   = ""
+    static let owm      = ""
 }

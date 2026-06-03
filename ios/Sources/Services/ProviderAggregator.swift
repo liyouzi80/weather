@@ -38,28 +38,7 @@ class ProviderAggregator {
 
     func fetchAqi(loc: GeoLocation) async -> [AqiResult] {
         let city = loc.cityName ?? loc.name
-        guard let url = URL(string: "\(Keys.baseURL)/api/aqi?cityName=\(city.urlEncoded)") else { return [] }
-        struct AqiAPIResp: Decodable {
-            let sources: [Source]?
-            struct Source: Decodable {
-                let id: String; let name: String; let color: String
-                let aqi: Int?; let dominant: String?; let pm25: Double?
-                let observedAt: String?; let url: String?; let error: String?
-            }
-        }
-        do {
-            let resp: AqiAPIResp = try await fetchJSON(url, timeout: 12)
-            return (resp.sources ?? []).map { s in
-                AqiResult(
-                    id: s.id, providerId: s.id, providerName: s.name, color: s.color,
-                    url: s.url.flatMap { URL(string: $0) },
-                    air: s.aqi.map { AirQuality(aqi: $0, dominant: s.dominant, pm25: s.pm25, observedAt: s.observedAt) },
-                    error: s.error
-                )
-            }
-        } catch {
-            return []
-        }
+        return await AqiScraper.aggregate(cityName: city)
     }
 
     // MARK: Stats
@@ -110,8 +89,4 @@ class ProviderAggregator {
         if msg.contains("offline") || msg.contains("network") { return "网络请求失败" }
         return msg
     }
-}
-
-private extension String {
-    var urlEncoded: String { addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? self }
 }
