@@ -141,7 +141,7 @@ class WeatherScene: SKScene {
 
     private func setupFog() {
         for i in 0..<6 {
-            let fog = SKSpriteNode(color: UIColor(white: 0.9, alpha: 0.06 + Double(i) * 0.015),
+            let fog = SKSpriteNode(color: UIColor(white: 0.9, alpha: 0.14 + Double(i) * 0.025),
                                    size: CGSize(width: size.width * 1.8, height: size.height * 0.18))
             fog.position = CGPoint(x: size.width * 0.5,
                                    y: size.height * (0.15 + Double(i) * 0.15))
@@ -241,23 +241,50 @@ class WeatherScene: SKScene {
     // MARK: - Clouds
 
     private func setupClouds(overcast: Bool) {
-        let count = overcast ? 8 : 5
-        let alpha: Double = overcast ? 0.18 : 0.10
+        let count = overcast ? 9 : 6
         for i in 0..<count {
-            let cloud = SKSpriteNode(color: UIColor(white: 0.85, alpha: alpha + Double(i) * 0.01),
-                                     size: CGSize(width: CGFloat.random(in: 160...260),
-                                                  height: CGFloat.random(in: 50...90)))
-            cloud.position = CGPoint(x: CGFloat.random(in: 0...size.width),
-                                     y: size.height * CGFloat.random(in: 0.4...0.9))
-            let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: 40...80)
-            let dur = Double.random(in: 18...35)
+            let cloud = makeCloudNode(
+                width: CGFloat.random(in: 180...300),
+                height: CGFloat.random(in: 55...100),
+                alpha: overcast ? CGFloat.random(in: 0.32...0.52) : CGFloat.random(in: 0.20...0.38)
+            )
+            cloud.position = CGPoint(x: CGFloat.random(in: -40...size.width + 40),
+                                     y: size.height * CGFloat.random(in: 0.38...0.92))
+            let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: 50...100)
+            let dur = Double.random(in: 22...42)
             cloud.run(SKAction.repeatForever(SKAction.sequence([
                 SKAction.moveBy(x: dx, y: 0, duration: dur),
                 SKAction.moveBy(x: -dx, y: 0, duration: dur)
             ])))
+            cloud.zPosition = CGFloat(i)
             addChild(cloud)
         }
-        if !isNight && !overcast { addMoon() } // moon between cloud layers at night
+        if isNight { addMoon() }
+    }
+
+    // 用多个重叠椭圆组合成云朵轮廓
+    private func makeCloudNode(width: CGFloat, height: CGFloat, alpha: CGFloat) -> SKNode {
+        let container = SKNode()
+        let baseColor = UIColor(white: 0.90, alpha: alpha)
+        // Main body
+        let body = SKShapeNode(ellipseOf: CGSize(width: width, height: height))
+        body.fillColor = baseColor
+        body.strokeColor = .clear
+        body.glowWidth = 10
+        container.addChild(body)
+        // Bumps along the top
+        let bumpCount = Int(width / 65)
+        for j in 0..<max(2, bumpCount) {
+            let r = CGFloat.random(in: height * 0.50...height * 0.80)
+            let bump = SKShapeNode(circleOfRadius: r)
+            bump.fillColor = UIColor(white: 0.92, alpha: alpha * 0.85)
+            bump.strokeColor = .clear
+            let fraction = CGFloat(j) / CGFloat(max(1, bumpCount - 1))
+            bump.position = CGPoint(x: (fraction - 0.5) * width * 0.75,
+                                    y: height * 0.25)
+            container.addChild(bump)
+        }
+        return container
     }
 
     // MARK: - Moon timer (refresh every 10 min)

@@ -104,6 +104,13 @@ struct CityPageView: View {
                         .padding(.bottom, 16)
                 }
 
+                // 温度排行（信源卡片之前）
+                if vm.annotated.filter({ $0.base.hasData }).count >= 2 {
+                    TempRankingView(results: vm.annotated)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 12)
+                }
+
                 // 信源卡片（iPad 横屏两列）
                 LazyVGrid(columns: providerColumns, spacing: 12) {
                     ForEach(vm.annotated) { item in
@@ -111,13 +118,6 @@ struct CityPageView: View {
                     }
                 }
                 .padding(.horizontal, 16)
-
-                // 温度排行
-                if vm.annotated.filter({ $0.base.hasData }).count >= 2 {
-                    TempRankingView(results: vm.annotated)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                }
 
                 // AQI
                 if !vm.air.isEmpty {
