@@ -15,6 +15,7 @@ class WeatherScene: SKScene {
     // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
     private lazy var dropTexture: SKTexture = makeDropTexture()
     private lazy var dotTexture: SKTexture = makeDotTexture()
+    private lazy var cloudTexture: SKTexture = makeCloudTexture()
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
@@ -240,51 +241,58 @@ class WeatherScene: SKScene {
 
     // MARK: - Clouds
 
+    // 柔和羽化的云朵纹理 sprite——少量、靠上、低透明度缓慢飘移，避免「肥皂泡」观感
     private func setupClouds(overcast: Bool) {
-        let count = overcast ? 9 : 6
+        let count = overcast ? 5 : 3
         for i in 0..<count {
-            let cloud = makeCloudNode(
-                width: CGFloat.random(in: 180...300),
-                height: CGFloat.random(in: 55...100),
-                alpha: overcast ? CGFloat.random(in: 0.32...0.52) : CGFloat.random(in: 0.20...0.38)
-            )
-            cloud.position = CGPoint(x: CGFloat.random(in: -40...size.width + 40),
-                                     y: size.height * CGFloat.random(in: 0.38...0.92))
-            let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: 50...100)
-            let dur = Double.random(in: 22...42)
+            let cloud = SKSpriteNode(texture: cloudTexture)
+            let w = CGFloat.random(in: 260...400)
+            cloud.size = CGSize(width: w, height: w * 0.55)
+            cloud.alpha = overcast ? CGFloat.random(in: 0.30...0.46)
+                                   : CGFloat.random(in: 0.16...0.28)
+            // 阴天偏灰、覆盖更靠下；多云偏白、集中在顶部
+            if overcast {
+                cloud.color = UIColor(white: 0.78, alpha: 1)
+                cloud.colorBlendFactor = 0.5
+            }
+            let yBand: ClosedRange<CGFloat> = overcast ? 0.62...0.98 : 0.74...0.97
+            cloud.position = CGPoint(x: CGFloat.random(in: 0...size.width),
+                                     y: size.height * CGFloat.random(in: yBand))
+            cloud.zPosition = CGFloat(i)
+            let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: 30...60)
+            let dur = Double.random(in: 30...52)
             cloud.run(SKAction.repeatForever(SKAction.sequence([
                 SKAction.moveBy(x: dx, y: 0, duration: dur),
                 SKAction.moveBy(x: -dx, y: 0, duration: dur)
             ])))
-            cloud.zPosition = CGFloat(i)
             addChild(cloud)
         }
         if isNight { addMoon() }
     }
 
-    // 用多个重叠椭圆组合成云朵轮廓
-    private func makeCloudNode(width: CGFloat, height: CGFloat, alpha: CGFloat) -> SKNode {
-        let container = SKNode()
-        let baseColor = UIColor(white: 0.90, alpha: alpha)
-        // Main body
-        let body = SKShapeNode(ellipseOf: CGSize(width: width, height: height))
-        body.fillColor = baseColor
-        body.strokeColor = .clear
-        body.glowWidth = 10
-        container.addChild(body)
-        // Bumps along the top
-        let bumpCount = Int(width / 65)
-        for j in 0..<max(2, bumpCount) {
-            let r = CGFloat.random(in: height * 0.50...height * 0.80)
-            let bump = SKShapeNode(circleOfRadius: r)
-            bump.fillColor = UIColor(white: 0.92, alpha: alpha * 0.85)
-            bump.strokeColor = .clear
-            let fraction = CGFloat(j) / CGFloat(max(1, bumpCount - 1))
-            bump.position = CGPoint(x: (fraction - 0.5) * width * 0.75,
-                                    y: height * 0.25)
-            container.addChild(bump)
+    /// 由多个重叠柔和径向渐变拼出一朵羽化云（边缘自然渐隐，无硬边）
+    private func makeCloudTexture() -> SKTexture {
+        let s = CGSize(width: 256, height: 140)
+        let renderer = UIGraphicsImageRenderer(size: s)
+        let img = renderer.image { ctx in
+            let cg = ctx.cgContext
+            // (中心x比例, 中心y比例, 半径占高比例)
+            let puffs: [(CGFloat, CGFloat, CGFloat)] = [
+                (0.30, 0.52, 0.40), (0.45, 0.40, 0.50), (0.58, 0.52, 0.46),
+                (0.50, 0.60, 0.42), (0.70, 0.58, 0.34), (0.26, 0.60, 0.30),
+            ]
+            for (fx, fy, fr) in puffs {
+                let center = CGPoint(x: s.width * fx, y: s.height * fy)
+                let radius = s.height * fr
+                let colors = [UIColor(white: 1, alpha: 0.85).cgColor,
+                              UIColor(white: 1, alpha: 0).cgColor]
+                let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                                      colors: colors as CFArray, locations: [0, 1])!
+                cg.drawRadialGradient(grad, startCenter: center, startRadius: 0,
+                                      endCenter: center, endRadius: radius, options: [])
+            }
         }
-        return container
+        return SKTexture(image: img)
     }
 
     // MARK: - Moon timer (refresh every 10 min)
