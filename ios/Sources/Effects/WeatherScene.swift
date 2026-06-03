@@ -15,7 +15,9 @@ class WeatherScene: SKScene {
     // 程序化粒子纹理（无纹理的 SKEmitterNode 不渲染任何粒子）
     private lazy var dropTexture: SKTexture = makeDropTexture()
     private lazy var dotTexture: SKTexture = makeDotTexture()
-    private lazy var cloudTexture: SKTexture = makeCloudTexture()
+    // 云朵纹理：实心轮廓 + CIGaussianBlur，使各泡自然融合（对应 PWA canvas blur 效果）
+    private lazy var cloudTex: SKTexture     = buildCloudTex(overcast: false)
+    private lazy var overcastTex: SKTexture  = buildCloudTex(overcast: true)
 
     override func didMove(to view: SKView) {
         backgroundColor = .clear
@@ -50,8 +52,10 @@ class WeatherScene: SKScene {
         case "fog":             setupFog()
         case "clear-day":       setupClearDay()
         case "clear-night":     setupClearNight()
-        case "cloudy":          setupClouds(overcast: false)
-        case "overcast":        setupClouds(overcast: true)
+        case "cloudy":          setupClouds(overcast: false, night: false)
+        case "cloudy-night":    setupClouds(overcast: false, night: true)
+        case "overcast":        setupClouds(overcast: true,  night: false)
+        case "overcast-night":  setupClouds(overcast: true,  night: true)
         default:                setupClearDay()
         }
     }
@@ -241,58 +245,93 @@ class WeatherScene: SKScene {
 
     // MARK: - Clouds
 
-    // 柔和羽化的云朵纹理 sprite——少量、靠上、低透明度缓慢飘移，避免「肥皂泡」观感
-    private func setupClouds(overcast: Bool) {
-        let count = overcast ? 5 : 3
-        for i in 0..<count {
-            let cloud = SKSpriteNode(texture: cloudTexture)
-            let w = CGFloat.random(in: 260...400)
-            cloud.size = CGSize(width: w, height: w * 0.55)
-            cloud.alpha = overcast ? CGFloat.random(in: 0.30...0.46)
-                                   : CGFloat.random(in: 0.16...0.28)
-            // 阴天偏灰、覆盖更靠下；多云偏白、集中在顶部
-            if overcast {
-                cloud.color = UIColor(white: 0.78, alpha: 1)
-                cloud.colorBlendFactor = 0.5
+    private func setupClouds(overcast: Bool, night: Bool) {
+        let tex = overcast ? overcastTex : cloudTex
+        // 3层深度：远（小慢）→ 近（大快），参照 PWA layerCfg
+        let layers: [(count: Int, wLo: CGFloat, wHi: CGFloat,
+                      alphaLo: CGFloat, alphaHi: CGFloat,
+                      yLo: CGFloat, yHi: CGFloat, vLo: CGFloat, vHi: CGFloat)] = overcast
+            ? [
+                (2, 260, 360, 0.55, 0.72, 0.68, 0.98, 20, 40),
+                (3, 300, 420, 0.62, 0.80, 0.60, 0.96, 35, 60),
+                (2, 340, 500, 0.55, 0.75, 0.52, 0.88, 55, 90),
+              ]
+            : [
+                (2, 200, 300, 0.35, 0.52, 0.72, 0.98, 15, 30),
+                (2, 260, 380, 0.42, 0.60, 0.65, 0.96, 25, 50),
+                (1, 320, 460, 0.38, 0.55, 0.58, 0.88, 40, 70),
+              ]
+
+        var zPos: CGFloat = 0
+        for layer in layers {
+            for _ in 0..<layer.count {
+                let cloud = SKSpriteNode(texture: tex)
+                let w = CGFloat.random(in: layer.wLo...layer.wHi)
+                cloud.size = CGSize(width: w, height: w * 0.50)
+                cloud.alpha = CGFloat.random(in: layer.alphaLo...layer.alphaHi)
+                // 夜间偏蓝灰
+                if night {
+                    cloud.color = UIColor(red: 0.45, green: 0.52, blue: 0.68, alpha: 1)
+                    cloud.colorBlendFactor = 0.55
+                }
+                let yFrac = CGFloat.random(in: layer.yLo...layer.yHi)
+                cloud.position = CGPoint(
+                    x: CGFloat.random(in: -(w * 0.25)...(size.width + w * 0.25)),
+                    y: size.height * yFrac
+                )
+                cloud.zPosition = zPos; zPos += 1
+                let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: layer.vLo...layer.vHi)
+                let dur = Double.random(in: 30...60)
+                cloud.run(SKAction.repeatForever(SKAction.sequence([
+                    SKAction.moveBy(x: dx, y: 0, duration: dur),
+                    SKAction.moveBy(x: -dx, y: 0, duration: dur)
+                ])))
+                addChild(cloud)
             }
-            let yBand: ClosedRange<CGFloat> = overcast ? 0.62...0.98 : 0.74...0.97
-            cloud.position = CGPoint(x: CGFloat.random(in: 0...size.width),
-                                     y: size.height * CGFloat.random(in: yBand))
-            cloud.zPosition = CGFloat(i)
-            let dx = (Bool.random() ? 1.0 : -1.0) * CGFloat.random(in: 30...60)
-            let dur = Double.random(in: 30...52)
-            cloud.run(SKAction.repeatForever(SKAction.sequence([
-                SKAction.moveBy(x: dx, y: 0, duration: dur),
-                SKAction.moveBy(x: -dx, y: 0, duration: dur)
-            ])))
-            addChild(cloud)
         }
-        if isNight { addMoon() }
+        if night { addMoon() }
     }
 
-    /// 由多个重叠柔和径向渐变拼出一朵羽化云（边缘自然渐隐，无硬边）
-    private func makeCloudTexture() -> SKTexture {
-        let s = CGSize(width: 256, height: 140)
-        let renderer = UIGraphicsImageRenderer(size: s)
-        let img = renderer.image { ctx in
-            let cg = ctx.cgContext
-            // (中心x比例, 中心y比例, 半径占高比例)
-            let puffs: [(CGFloat, CGFloat, CGFloat)] = [
-                (0.30, 0.52, 0.40), (0.45, 0.40, 0.50), (0.58, 0.52, 0.46),
-                (0.50, 0.60, 0.42), (0.70, 0.58, 0.34), (0.26, 0.60, 0.30),
-            ]
-            for (fx, fy, fr) in puffs {
-                let center = CGPoint(x: s.width * fx, y: s.height * fy)
-                let radius = s.height * fr
-                let colors = [UIColor(white: 1, alpha: 0.85).cgColor,
-                              UIColor(white: 1, alpha: 0).cgColor]
-                let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                      colors: colors as CFArray, locations: [0, 1])!
-                cg.drawRadialGradient(grad, startCenter: center, startRadius: 0,
-                                      endCenter: center, endRadius: radius, options: [])
+    /// 预烘焙云朵纹理：画实心积云轮廓（平底圆顶）再用 CIGaussianBlur 统一模糊，
+    /// 各泡边缘自然融合——对应 PWA 的 canvas ctx.filter=blur() 效果
+    private func buildCloudTex(overcast: Bool) -> SKTexture {
+        let W: CGFloat = 340, H: CGFloat = 148
+        let pad: CGFloat = 28          // 模糊溢出预留
+        let full = CGSize(width: W + pad*2, height: H + pad*2)
+
+        // 平底圆顶积云泡（UIKit 坐标：y 向下）
+        let blobs: [(CGFloat, CGFloat, CGFloat)] = [
+            (pad + W*0.08, pad + H*0.78, H*0.30),
+            (pad + W*0.24, pad + H*0.62, H*0.42),
+            (pad + W*0.42, pad + H*0.52, H*0.47),
+            (pad + W*0.60, pad + H*0.58, H*0.43),
+            (pad + W*0.76, pad + H*0.67, H*0.35),
+            (pad + W*0.90, pad + H*0.74, H*0.27),
+            (pad + W*0.50, pad + H*0.80, H*0.37),  // 中央底部加宽
+        ]
+        // 实心轮廓亮度：白天多云偏亮，阴天偏灰
+        let fill = UIColor(white: overcast ? 0.72 : 0.90, alpha: 1)
+
+        let renderer = UIGraphicsImageRenderer(size: full)
+        let silhouette = renderer.image { _ in
+            fill.setFill()
+            for (cx, cy, r) in blobs {
+                UIBezierPath(ovalIn: CGRect(x: cx-r, y: cy-r, width: r*2, height: r*2)).fill()
             }
         }
-        return SKTexture(image: img)
+
+        // CIGaussianBlur：先将实心轮廓整体模糊，使泡泡边界自然融合
+        guard let ci = CIImage(image: silhouette),
+              let blurred = CIFilter(name: "CIGaussianBlur", parameters: [
+                  kCIInputImageKey: ci,
+                  kCIInputRadiusKey: NSNumber(value: Float(16))
+              ])?.outputImage,
+              let cg = CIContext(options: [.useSoftwareRenderer: false])
+                  .createCGImage(blurred, from: ci.extent)
+        else {
+            return dotTexture  // 降级：用圆点纹理（不会崩溃）
+        }
+        return SKTexture(image: UIImage(cgImage: cg))
     }
 
     // MARK: - Moon timer (refresh every 10 min)
@@ -312,9 +351,9 @@ class WeatherScene: SKScene {
         if text.contains("雷") { return "thunder" }
         if text.contains("雨") { return "rain" }
         if text.contains("雪") { return "snow" }
-        if text.contains("雾") || text.contains("霾") { return "fog" }
-        if text.contains("阴") { return "overcast" }
-        if text.contains("多云") || text.contains("间") { return "cloudy" }
+        if text.contains("雾") || text.contains("霾") || text.contains("沙") || text.contains("尘") { return "fog" }
+        if text.contains("阴") { return night ? "overcast-night" : "overcast" }
+        if text.contains("多云") || text.contains("间") { return night ? "cloudy-night" : "cloudy" }
         return night ? "clear-night" : "clear-day"
     }
 
