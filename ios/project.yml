@@ -61,10 +61,13 @@ targets:
         UIStatusBarStyle: UIStatusBarStyleLightContent
         UIViewControllerBasedStatusBarAppearance: false
         NSLocationWhenInUseUsageDescription: 用于显示当前位置的天气
-        # 番禺气象台 www.tqyb.com.cn 为 HTTP，需放行明文加载（其余信源均 HTTPS）
+        # 番禺气象台 tqyb.com.cn 和中国天气网 d1.weather.com.cn 均为 HTTP，需放行明文加载
         NSAppTransportSecurity:
           NSExceptionDomains:
             tqyb.com.cn:
+              NSIncludesSubdomains: true
+              NSExceptionAllowsInsecureHTTPLoads: true
+            d1.weather.com.cn:
               NSIncludesSubdomains: true
               NSExceptionAllowsInsecureHTTPLoads: true
 
@@ -96,5 +99,8 @@ targets:
         NSAppTransportSecurity:
           NSExceptionDomains:
             tqyb.com.cn:
+              NSIncludesSubdomains: true
+              NSExceptionAllowsInsecureHTTPLoads: true
+            d1.weather.com.cn:
               NSIncludesSubdomains: true
               NSExceptionAllowsInsecureHTTPLoads: true
