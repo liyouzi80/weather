@@ -57,6 +57,8 @@ class CityViewModel {
         updatedAt = Date()
         // 刷新完成后，AQI 不全则后台静默补齐（服务站点页偶发抓取失败）
         if healthyAqiCount(air) < 2 { backfillAqi(token: token) }
+        // 天气信源有失败项则后台补齐
+        if results.contains(where: { !$0.hasData }) { backfillWeather(token: token) }
     }
 
     private func healthyAqiCount(_ a: [AqiResult]) -> Int { a.filter { $0.air != nil }.count }
@@ -77,6 +79,35 @@ class CityViewModel {
                     self.air = merged
                 }
             }
+        }
+    }
+
+    // 天气信源后台补齐：只重试失败项，成功后合并，不打断 UI。
+    private func backfillWeather(token: Int) {
+        Task { [weak self] in
+            guard let self else { return }
+            let expected = self.results.count
+            let delaysMs: [UInt64] = [3_000, 7_000, 13_000, 21_000]
+            for ms in delaysMs {
+                if self.results.filter({ $0.hasData }).count >= expected { return }
+                try? await Task.sleep(nanoseconds: ms * 1_000_000)
+                if token != self.refreshToken { return }
+                let fresh = await self.agg.fetchAll(loc: self.loc)
+                if token != self.refreshToken { return }
+                let merged = self.mergeResults(self.results, fresh)
+                if merged.filter({ $0.hasData }).count > self.results.filter({ $0.hasData }).count {
+                    self.results = merged
+                }
+            }
+        }
+    }
+
+    // 天气结果合并：保留原顺序，每源只升级「有数据」（新 > 旧），不降级。
+    private func mergeResults(_ prev: [ProviderResult], _ next: [ProviderResult]) -> [ProviderResult] {
+        prev.map { p in
+            guard !p.hasData else { return p }
+            guard let fresh = next.first(where: { $0.id == p.id }), fresh.hasData else { return p }
+            return fresh
         }
     }
 
