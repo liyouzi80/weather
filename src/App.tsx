@@ -835,7 +835,7 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
               key={r.providerId}
               {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
-              <span className="aqi-strip" style={{ background: col }} aria-hidden="true" />
+
               <div className="head">
                 <span className="dot" style={{ background: r.color }} />
                 <span className="name">{r.providerName}</span>

@@ -760,16 +760,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .aqi-section .cards { margin-top: 4px; }
 
 /* AQI 卡左侧等级色竖线：增强一眼扫描等级的能力 */
-.aqi-card { position: relative; }
-.aqi-strip {
-  position: absolute;
-  left: 0;
-  top: 14px;
-  bottom: 14px;
-  width: 3px;
-  border-radius: 999px;
-  transition: background 0.4s var(--spring);
-}
 /* AQI 等级颜色平滑过渡，跨等级刷新时不突变 */
 .aqi-cat { font-size: 13px; font-weight: 600; transition: color 0.4s var(--spring); }
 .aqi-section .temp { transition: color 0.4s var(--spring); }
