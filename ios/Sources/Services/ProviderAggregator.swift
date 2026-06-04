@@ -66,7 +66,7 @@ class ProviderAggregator {
             text: text,
             feelsLike: feels.isEmpty ? nil : (feels.reduce(0, +) / Double(feels.count)).rounded(),
             humidity: hums.isEmpty ? nil : (hums.reduce(0, +) / Double(hums.count)).rounded(),
-            pop: pops.isEmpty ? nil : (pops.reduce(0, +) / Double(pops.count)).rounded(),
+            pop: pops.isEmpty ? nil : pops.max()!.rounded(),
             uvIndex: uvs.isEmpty ? nil : uvs.reduce(0, +) / Double(uvs.count)
         )
     }

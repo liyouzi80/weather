@@ -965,7 +965,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
       avg, min, max, count: temps.length, text: majorityText,
       feelsLike: r1(avgOf(feels)),
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
-      pop: pops.length > 0 ? Math.round(pops.reduce((a, b) => a + b, 0) / pops.length) : undefined,
+      pop: pops.length > 0 ? Math.round(Math.max(...pops)) : undefined,
       uvIndex: r1(avgOf(uvs)),
     },
   }
