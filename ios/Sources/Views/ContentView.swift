@@ -16,15 +16,18 @@ struct ContentView: View {
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .ignoresSafeArea()
+                // 切城市触觉反馈（滑动 + 点击圆点都经由 currentPage 变化触发，避免重复）
+                .onChange(of: currentPage) { Haptics.light() }
 
-                // Page dots
+                // Page dots：活动点拉伸为胶囊 + 微发光（对齐 PWA .page-dot.active）
                 if vms.count > 1 {
                     HStack(spacing: 6) {
                         ForEach(0..<vms.count, id: \.self) { i in
-                            Circle()
-                                .fill(i == currentPage ? Color.white : Color.white.opacity(0.35))
-                                .frame(width: i == currentPage ? 7 : 5, height: i == currentPage ? 7 : 5)
-                                .animation(.spring(duration: 0.25), value: currentPage)
+                            Capsule()
+                                .fill(i == currentPage ? Color.white : Color.white.opacity(0.4))
+                                .frame(width: i == currentPage ? 20 : 5, height: 5)
+                                .shadow(color: i == currentPage ? Color.white.opacity(0.55) : .clear, radius: 4)
+                                .animation(.spring(response: 0.35, dampingFraction: 0.62), value: currentPage)
                                 .onTapGesture { withAnimation { currentPage = i } }
                         }
                     }

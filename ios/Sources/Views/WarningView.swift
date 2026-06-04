@@ -6,20 +6,41 @@ struct WarningView: View {
     var body: some View {
         let sorted = warnings.sorted { $0.severity > $1.severity }
         CenteredFlowLayout(spacing: 8) {
-            ForEach(sorted, id: \.title) { w in
-                Text("\(w.type)预警")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(warnColor(w.level))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 5)
-                    .background {
-                        Capsule()
-                            .fill(warnColor(w.level).opacity(0.15))
-                            .overlay(Capsule().stroke(warnColor(w.level).opacity(0.45), lineWidth: 0.5))
-                    }
+            ForEach(Array(sorted.enumerated()), id: \.element.title) { idx, w in
+                WarnChip(warning: w, delay: Double(idx) * 0.06)
             }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+// 预警 chip：scale 0.8 → 过冲 → 1 的弹性弹入，逐个错峰，传达「警报弹出」感（对齐 PWA chipPop）
+private struct WarnChip: View {
+    let warning: WeatherWarning
+    let delay: Double
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Text("\(warning.type)预警")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(warnColor(warning.level))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 5)
+            .background {
+                Capsule()
+                    .fill(warnColor(warning.level).opacity(0.15))
+                    .overlay(Capsule().stroke(warnColor(warning.level).opacity(0.45), lineWidth: 0.5))
+            }
+            .scaleEffect(shown ? 1 : 0.8)
+            .opacity(shown ? 1 : 0)
+            .onAppear {
+                guard !shown else { return }
+                if reduceMotion { shown = true; return }
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.55).delay(delay)) {
+                    shown = true
+                }
+            }
     }
 }
 

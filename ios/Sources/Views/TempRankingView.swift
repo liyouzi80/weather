@@ -47,25 +47,41 @@ struct TempRankingView: View {
                 .lineLimit(1)
                 .frame(width: 100, alignment: .leading)
 
-            GeometryReader { geo in
-                let range = maxTemp - minTemp
-                let frac = range > 0 ? (temp - minTemp) / range : 1.0
-                // 最短 14% 让最低温也有可见的条，其余按比例（对齐 PWA）
-                let barWidth = geo.size.width * CGFloat(0.14 + 0.86 * frac)
-                HStack(spacing: 0) {
-                    Capsule()
-                        .fill(color.opacity(0.85))
-                        .frame(width: barWidth, height: 3)
-                    Spacer(minLength: 0)
-                }
-                .frame(maxHeight: .infinity, alignment: .center)
-            }
-            .frame(height: 16)
+            RankBar(frac: maxTemp > minTemp ? (temp - minTemp) / (maxTemp - minTemp) : 1.0,
+                    color: color)
 
             Text("\(Int(temp.rounded()))°")
                 .font(.system(size: 16, weight: .bold).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.92))
                 .frame(width: 46, alignment: .trailing)
+        }
+    }
+}
+
+// 排行条：4pt 高 + 信源色横向渐变，入场时宽度从 0 弹性展开（对齐 PWA .rank-bar）
+private struct RankBar: View {
+    let frac: Double
+    let color: Color
+    @State private var grow = false
+
+    var body: some View {
+        GeometryReader { geo in
+            // 最短 14% 让最低温也有可见的条，其余按比例（对齐 PWA）
+            let full = geo.size.width * CGFloat(0.14 + 0.86 * frac)
+            HStack(spacing: 0) {
+                Capsule()
+                    .fill(LinearGradient(colors: [color.opacity(0.4), color],
+                                         startPoint: .leading, endPoint: .trailing))
+                    .frame(width: grow ? full : 0, height: 4)
+                Spacer(minLength: 0)
+            }
+            .frame(maxHeight: .infinity, alignment: .center)
+        }
+        .frame(height: 16)
+        .onAppear {
+            withAnimation(.spring(response: 0.7, dampingFraction: 0.82).delay(0.18)) {
+                grow = true
+            }
         }
     }
 }

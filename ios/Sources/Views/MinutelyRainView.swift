@@ -33,7 +33,7 @@ struct MinutelyRainView: View {
                             UnevenRoundedRectangle(
                                 topLeadingRadius: 2, bottomLeadingRadius: 0,
                                 bottomTrailingRadius: 0, topTrailingRadius: 2)
-                                .fill(barColor(m.precip))
+                                .fill(barGradient(m.precip))
                                 .frame(maxWidth: .infinity)
                                 .frame(height: max(3, CGFloat(m.precip / maxPrecip) * 46))
                         }
@@ -56,9 +56,14 @@ struct MinutelyRainView: View {
         }
     }
 
-    private func barColor(_ p: Double) -> Color {
-        guard p > 0 else { return Color.white.opacity(0.08) }
-        let t = min(p / maxPrecip, 1)
-        return Color(hex: "#0a84ff").opacity(0.55 + 0.4 * t) // 对齐 PWA 强度爬升 0.55→0.95
+    // 竖向渐变：柱顶浅蓝 → 柱底深蓝，强度越大整体越实（对齐 PWA .minutely-bar）
+    private func barGradient(_ p: Double) -> LinearGradient {
+        guard p > 0 else {
+            return LinearGradient(colors: [Color.white.opacity(0.08)], startPoint: .top, endPoint: .bottom)
+        }
+        let a = 0.55 + 0.4 * min(p / maxPrecip, 1) // 强度爬升 0.55→0.95
+        return LinearGradient(
+            colors: [Color(hex: "#5ac8fa").opacity(a), Color(hex: "#0a84ff").opacity(a)],
+            startPoint: .top, endPoint: .bottom)
     }
 }

@@ -142,6 +142,7 @@ struct CityPageView: View {
         .coordinateSpace(name: "cityScroll")
         .onPreferenceChange(ScrollOffsetKey.self) { scrollOffset = $0 }
         .refreshable {
+            Haptics.soft()
             await vm.refresh()
         }
     }
@@ -190,11 +191,11 @@ struct HeroSkeletonView: View {
     @State private var shimmer = false
     var body: some View {
         VStack(spacing: 12) {
-            RoundedRectangle(cornerRadius: 8).fill(shimmerGrad)
+            RoundedRectangle(cornerRadius: CardRadius.sm).fill(shimmerGrad)
                 .frame(width: 80, height: 20)
-            RoundedRectangle(cornerRadius: 12).fill(shimmerGrad)
+            RoundedRectangle(cornerRadius: CardRadius.regular).fill(shimmerGrad)
                 .frame(width: 130, height: 80)
-            RoundedRectangle(cornerRadius: 8).fill(shimmerGrad)
+            RoundedRectangle(cornerRadius: CardRadius.sm).fill(shimmerGrad)
                 .frame(width: 100, height: 22)
         }
         .padding(.vertical, 24)

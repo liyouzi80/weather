@@ -355,6 +355,8 @@ export default function App() {
         if (y <= 0) {
           const justArrived = !wasAtTop
           wasAtTop = true
+          // 回到顶部静止：撤掉 will-change，释放 GPU 合成层
+          if (justArrived) hero.style.willChange = 'auto'
           hero.style.opacity = '1'; hero.style.transform = ''
           if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
           if (condEl) condEl.style.opacity = ''
@@ -372,6 +374,8 @@ export default function App() {
           }
           return
         }
+        // 开始滚动：仅在刚离开顶部时挂上 will-change（滚动中持续受益于 GPU 合成层）
+        if (wasAtTop) hero.style.willChange = 'opacity, transform'
         wasAtTop = false
         // Phase 1 (0–80px): 城市名 + 天气状况 + 高低温淡出
         const t1 = Math.min(y / 80, 1)
@@ -734,10 +738,11 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
           const Tag = r.url ? 'a' : 'div'
           return (
             <Tag
-              className={'card' + (r.url ? ' card-link' : '')}
+              className={'card aqi-card' + (r.url ? ' card-link' : '')}
               key={r.providerId}
               {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
             >
+              <span className="aqi-strip" style={{ background: col }} aria-hidden="true" />
               <div className="head">
                 <span className="dot" style={{ background: r.color }} />
                 <span className="name">{r.providerName}</span>
@@ -841,7 +846,7 @@ const TempRanking = memo(function TempRanking({ results }: { results: Annotated[
             <span className="dot" style={{ background: color }} />
             <span className="rank-name">{r.providerName}</span>
             <span className="rank-bar">
-              <span className="rank-bar-fill" style={{ width: `${pct}%`, background: color }} />
+              <span className="rank-bar-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}66, ${color})` }} />
             </span>
             <span className="rank-temp">{Math.round(c.temp)}°</span>
           </div>
