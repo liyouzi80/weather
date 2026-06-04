@@ -588,10 +588,6 @@ export default function App() {
       <div className="app-content hero-section" key={cityIdx}>
         <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <h1 className="hero-city">{city.name}</h1>
-          {loading && results.length > 0
-            ? <span className="hero-updated refreshing">数据更新中…</span>
-            : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
-          }
           {stats ? (
             <>
               <div
@@ -600,16 +596,20 @@ export default function App() {
               >
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
-              <div className="hero-cond" aria-hidden="true">{stats.text}</div>
+              <div className="hero-cond" aria-hidden="true">
+                {stats.text}
+                {stats.feelsLike != null && (
+                  <span style={{ color: feelsLevel(stats.feelsLike).color }}>{' · '}体感 {Math.round(stats.feelsLike)}°</span>
+                )}
+              </div>
               <div className="hero-hilo" aria-hidden="true">
                 <span>↑ {Math.round(stats.max)}°</span>
                 <span>↓ {Math.round(stats.min)}°</span>
               </div>
-              {stats.feelsLike != null && (
-                <div className="hero-feels" style={{ color: feelsLevel(stats.feelsLike).color }} aria-hidden="true">
-                  体感 {Math.round(stats.feelsLike)}°
-                </div>
-              )}
+              {loading && results.length > 0
+                ? <span className="hero-updated refreshing">数据更新中…</span>
+                : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
+              }
             </>
           ) : (
             <>
@@ -873,6 +873,17 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
 })
 
 const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const io = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { el.classList.add('in-view'); io.disconnect() } },
+      { threshold: 0.05 }
+    )
+    io.observe(el)
+    return () => io.disconnect()
+  }, [])
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
@@ -890,7 +901,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   }
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
   return (
-    <div className={cls}>
+    <div ref={cardRef} className={cls}>
       <div className="head">
         <span className="dot" style={{ background: color }} />
         <span className="name">{r.providerName}</span>
@@ -1025,9 +1036,9 @@ function feelsLevel(t: number): Level {
 }
 function humidLevel(h: number): Level {
   if (h < 30)  return { color: '#ffd60a', level: '偏干' }
-  if (h <= 70) return { color: NORMAL, level: '适宜' }
-  if (h <= 85) return { color: '#ffd60a', level: '偏湿' }
-  if (h <= 90) return { color: '#ff9f0a', level: '闷湿' }
+  if (h <= 80) return { color: NORMAL, level: '适宜' }
+  if (h <= 88) return { color: '#ffd60a', level: '偏湿' }
+  if (h <= 93) return { color: '#ff9f0a', level: '闷湿' }
   return { color: '#ff453a', level: '潮湿' }
 }
 function aqiLevel(aqi: number): Level {
@@ -1047,30 +1058,30 @@ function uvLevel(uv: number): Level {
 }
 function popLevel(p: number): Level {
   if (p <= 20) return { color: NORMAL, level: '晴好' }
-  if (p <= 40) return { color: '#5ac8fa', level: '小概率' }
-  if (p <= 70) return { color: '#0a84ff', level: '中等' }
-  return { color: '#409cff', level: '较大' }
+  if (p <= 40) return { color: '#ffd60a', level: '小概率' }
+  if (p <= 70) return { color: '#ff9f0a', level: '中等' }
+  return { color: '#ff453a', level: '较大' }
 }
 
 // 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
 // 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
 const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const cols: { key: string; value: string; label: string; color: string }[] = []
+  const cols: { key: string; value: string; dim: string; level: string; color: string }[] = []
   if (stats.humidity != null) {
     const a = humidLevel(stats.humidity)
-    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: `湿度 · ${a.level}`, color: a.color })
+    cols.push({ key: 'humid', value: `${stats.humidity}%`, dim: '湿度', level: a.level, color: a.color })
   }
   if (stats.pop != null) {
     const a = popLevel(stats.pop)
-    cols.push({ key: 'pop', value: `${stats.pop}%`, label: `降水 · ${a.level}`, color: a.color })
+    cols.push({ key: 'pop', value: `${stats.pop}%`, dim: '降水', level: a.level, color: a.color })
   }
   if (avgAqi != null) {
     const a = aqiLevel(avgAqi)
-    cols.push({ key: 'aqi', value: `${avgAqi}`, label: `空气 · ${a.level}`, color: a.color })
+    cols.push({ key: 'aqi', value: `${avgAqi}`, dim: '空气', level: a.level, color: a.color })
   }
   if (stats.uvIndex != null) {
     const a = uvLevel(stats.uvIndex)
-    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, label: `紫外线 · ${a.level}`, color: a.color })
+    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, dim: '紫外线', level: a.level, color: a.color })
   }
   if (cols.length === 0) return null
   return (
@@ -1078,7 +1089,10 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
       {cols.map((c, i) => (
         <div className="metric-col" key={c.key} style={{ animationDelay: `${i * 0.06}s` }}>
           <span className="mc-value" style={{ color: c.color }}>{c.value}</span>
-          <span className="mc-label">{c.label}</span>
+          <div className="mc-label">
+            <span className="mc-dim">{c.dim}</span>
+            <span className="mc-level">{c.level}</span>
+          </div>
         </div>
       ))}
     </div>

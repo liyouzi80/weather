@@ -426,7 +426,7 @@ html[data-sky='fog'] body::before {
 .notice-card {
   background: var(--glass);
   border: 0.5px solid var(--glass-border);
-  border-top: 1.5px solid rgba(168, 85, 247, 0.35);
+  border-top: 1.5px solid rgba(255, 255, 255, 0.20);
   border-radius: var(--radius);
   padding: 14px 16px;
   margin-bottom: 20px;
@@ -515,13 +515,26 @@ html[data-sky='fog'] body::before {
   animation: riseIn 0.5s var(--spring) both;
 }
 .mc-value {
-  font-size: 19px;
+  font-size: 21px;
   font-weight: 600;
   line-height: 1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 .mc-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.mc-dim {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+  opacity: 0.65;
+}
+.mc-level {
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -550,7 +563,7 @@ html[data-sky='fog'] body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 0 52px;
+  padding: 8px 0 clamp(16px, 10svh, 52px);
   animation: riseIn 0.55s var(--spring) both;
   /* will-change 由滚动逻辑按需挂载/撤除（见 App.tsx onScroll），不常驻以释放 GPU 层 */
 }
@@ -568,9 +581,9 @@ html[data-sky='fog'] body::before {
 /* 更新时间：弱色辅助文字；后台刷新中时轻微脉动 */
 .hero-updated {
   font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.6);
-  margin-bottom: 16px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 12px;
 }
 .hero-updated.refreshing {
   animation: heroUpdPulse 1.1s ease-in-out infinite;
@@ -602,34 +615,26 @@ html[data-sky='fog'] body::before {
   .hero-temp, .hero-deg { font-weight: 300; }
 }
 .hero-cond {
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 17px;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.90);
   margin-top: 12px;
 }
 .hero-hilo {
   display: flex;
   justify-content: center;
-  gap: 16px;
+  gap: 10px;
   font-size: 14px;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.58);
   margin-top: 5px;
   letter-spacing: 0.01em;
 }
-.hero-feels {
-  font-size: 14px;
-  font-weight: 500;
-  margin-top: 8px;
-  letter-spacing: -0.01em;
-}
-
 /* Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
    保证在浅色天空主题（晴天/雪）+ 飘动粒子下仍清晰可读（对齐苹果天气）。 */
 .hero-temp,
 .hero-cond,
 .hero-hilo,
-.hero-feels,
 .hero-updated {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
 }
@@ -670,7 +675,12 @@ html[data-sky='fog'] body::before {
     inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast),
     border-color var(--transition-fast);
+  /* 初始暂停；IntersectionObserver 添加 .in-view 后才播放入场动画 */
   animation: cardIn 0.55s var(--spring) both;
+  animation-play-state: paused;
+}
+.cards .card.in-view {
+  animation-play-state: running;
 }
 .card:hover {
   transform: translateY(-2px);
@@ -679,14 +689,6 @@ html[data-sky='fog'] body::before {
     inset 0 0.5px 0 rgba(255, 255, 255, 0.08);
   border-color: var(--glass-border-hover);
 }
-.card:nth-child(1) { animation-delay: 0.05s; }
-.card:nth-child(2) { animation-delay: 0.1s; }
-.card:nth-child(3) { animation-delay: 0.15s; }
-.card:nth-child(4) { animation-delay: 0.2s; }
-.card:nth-child(5) { animation-delay: 0.25s; }
-.card:nth-child(6) { animation-delay: 0.3s; }
-.card:nth-child(7) { animation-delay: 0.35s; }
-.card:nth-child(8) { animation-delay: 0.4s; }
 
 @keyframes cardIn {
   from {
