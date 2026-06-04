@@ -40,12 +40,24 @@ export const caiyunProvider: WeatherProvider = {
     const token = getKey('caiyun')
     if (!token) throw new Error('未配置彩云天气令牌')
     // 彩云经纬度顺序为 lon,lat
-    const url = `${BASE}/v2.6/${token}/${loc.lon.toFixed(4)},${loc.lat.toFixed(4)}/realtime`
-    const res = await fetch(url)
+    const base = `${BASE}/v2.6/${token}/${loc.lon.toFixed(4)},${loc.lat.toFixed(4)}`
+    const [res, dailyRes] = await Promise.all([
+      fetch(`${base}/realtime`),
+      fetch(`${base}/daily?dailysteps=1`).catch(() => null),
+    ])
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data = await res.json()
     if (data.status !== 'ok') throw new Error(`接口返回 status=${data.status}`)
     const r = data.result.realtime
+
+    // 今日降水概率：daily.precipitation[0].probability（0–1），转百分比
+    let pop: number | undefined
+    if (dailyRes?.ok) {
+      const dData = await dailyRes.json().catch(() => null)
+      const prob = dData?.result?.daily?.precipitation?.[0]?.probability
+      if (typeof prob === 'number') pop = Math.round(prob * 100)
+    }
+
     return {
       temp: Math.round(r.temperature * 10) / 10,
       feelsLike: Math.round(r.apparent_temperature * 10) / 10,
@@ -59,6 +71,7 @@ export const caiyunProvider: WeatherProvider = {
         : undefined,
       // server_time 为 UTC 时间戳；+8h 转北京墙上时间后写入 UTC 字段，前端按 UTC 原样显示
       observedAt: data.server_time ? new Date((data.server_time + 8 * 3600) * 1000).toISOString() : undefined,
+      ...(pop != null && { pop }),
     }
   },
 }
