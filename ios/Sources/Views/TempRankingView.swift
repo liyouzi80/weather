@@ -34,7 +34,7 @@ struct TempRankingView: View {
         return HStack(spacing: 10) {
             Text("\(idx + 1)")
                 .font(.system(size: 12, weight: .bold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.35))
+                .foregroundStyle(.white.opacity(0.5))
                 .frame(width: 14, alignment: .center)
 
             Circle()
@@ -62,7 +62,7 @@ struct TempRankingView: View {
             }
             .frame(height: 16)
 
-            Text(String(format: "%.1f", temp) + "°")
+            Text("\(Int(temp.rounded()))°")
                 .font(.system(size: 16, weight: .bold).monospacedDigit())
                 .foregroundStyle(.white.opacity(0.92))
                 .frame(width: 46, alignment: .trailing)

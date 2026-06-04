@@ -550,7 +550,7 @@ html[data-sky='fog'] body::before {
 .hero-updated {
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.45);
+  color: rgba(255, 255, 255, 0.6);
   margin-bottom: 16px;
 }
 .hero-updated.refreshing {
@@ -594,9 +594,22 @@ html[data-sky='fog'] body::before {
   gap: 16px;
   font-size: 14px;
   font-weight: 400;
-  color: rgba(255, 255, 255, 0.42);
+  color: rgba(255, 255, 255, 0.58);
   margin-top: 5px;
   letter-spacing: 0.01em;
+}
+
+/* Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
+   保证在浅色天空主题（晴天/雪）+ 飘动粒子下仍清晰可读（对齐苹果天气）。 */
+.hero-temp,
+.hero-cond,
+.hero-hilo,
+.hero-updated {
+  text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
+}
+/* 城市名用 background-clip:text，text-shadow 无效，改用 drop-shadow 滤镜 */
+.hero-city {
+  filter: drop-shadow(0 1px 10px rgba(0, 0, 0, 0.28));
 }
 
 /* Hero 骨架屏（加载中占位，结构与真实 hero 对齐） */
@@ -762,7 +775,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 }
 .card .row span b { color: var(--text); font-weight: 600; }
 .card .obs {
-  color: var(--text-dim);
+  color: rgba(255, 255, 255, 0.5);
   font-size: 11px;
   margin-top: auto;
   padding-top: 10px;

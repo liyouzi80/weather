@@ -14,28 +14,24 @@ struct MetricStripView: View {
     private var cols: [MetricCol] {
         var result: [MetricCol] = []
         if let f = stats.feelsLike {
-            let a = feelsAlert(f)
-            result.append(MetricCol(id: "feels", value: "\(Int(f))°",
-                                    label: a != nil ? "体感 · \(a!.level)" : "体感",
-                                    alertColor: a?.color))
+            let a = feelsLevel(f)
+            result.append(MetricCol(id: "feels", value: "\(Int(f.rounded()))°",
+                                    label: "体感 · \(a.level)", alertColor: a.color))
         }
         if let h = stats.humidity {
-            let a = humidAlert(h)
-            result.append(MetricCol(id: "humid", value: "\(Int(h))%",
-                                    label: a != nil ? "湿度 · \(a!.level)" : "湿度",
-                                    alertColor: a?.color))
+            let a = humidLevel(h)
+            result.append(MetricCol(id: "humid", value: "\(Int(h.rounded()))%",
+                                    label: "湿度 · \(a.level)", alertColor: a.color))
         }
         if let aqi = avgAqi {
-            let a = aqiAlert(aqi)
+            let a = aqiLevel(aqi)
             result.append(MetricCol(id: "aqi", value: "\(aqi)",
-                                    label: a != nil ? "空气 · \(a!.level)" : "空气",
-                                    alertColor: a?.color))
+                                    label: "空气 · \(a.level)", alertColor: a.color))
         }
         if let uv = stats.uvIndex {
-            let a = uvAlert(uv)
+            let a = uvLevel(uv)
             result.append(MetricCol(id: "uv", value: "\(Int(uv.rounded()))",
-                                    label: a != nil ? "紫外线 · \(a!.level)" : "紫外线",
-                                    alertColor: a?.color))
+                                    label: "紫外线 · \(a.level)", alertColor: a.color))
         }
         return result
     }

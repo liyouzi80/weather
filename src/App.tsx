@@ -797,7 +797,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
         <span className="name">{r.providerName}</span>
         {r.isMax && <span className="tag tag-hot">最高</span>}
         {r.isMin && <span className="tag tag-cold">最低</span>}
-        <span className="temp">{c.temp.toFixed(1)}°</span>
+        <span className="temp">{Math.round(c.temp)}°</span>
       </div>
       <div className="row">
         {c.text !== '—' && (
@@ -806,7 +806,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
             <b>{c.text}</b>
           </span>
         )}
-        {c.feelsLike != null && <span>体感 <b>{c.feelsLike.toFixed(1)}°</b></span>}
+        {c.feelsLike != null && <span>体感 <b>{Math.round(c.feelsLike)}°</b></span>}
         {c.humidity != null && <span>湿度 <b>{Math.round(c.humidity)}%</b></span>}
         {c.windDir && (
           <span className="wx-wind">
@@ -843,7 +843,7 @@ const TempRanking = memo(function TempRanking({ results }: { results: Annotated[
             <span className="rank-bar">
               <span className="rank-bar-fill" style={{ width: `${pct}%`, background: color }} />
             </span>
-            <span className="rank-temp">{c.temp.toFixed(1)}°</span>
+            <span className="rank-temp">{Math.round(c.temp)}°</span>
           </div>
         )
       })}
@@ -942,29 +942,34 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 指标条「警示色」：正常范围返回 undefined（不着色），仅异常/极端时返回颜色 + 等级文字
-type Alert = { color: string; level: string } | undefined
-function feelsAlert(t: number): Alert {
+// 指标条等级：每项恒返回 颜色 + 等级文字（常驻显示，信息密度优先）。
+// 正常区间用柔和绿/黄，逐级升到橙/红/紫等警示色。
+type Level = { color: string; level: string }
+function feelsLevel(t: number): Level {
   if (t <= 10) return { color: '#64d2ff', level: '偏冷' }
-  if (t >= 38) return { color: '#ff453a', level: '酷热' }
-  if (t >= 32) return { color: '#ff9f0a', level: '较热' }
-  return undefined
+  if (t <= 26) return { color: '#34c759', level: '舒适' }
+  if (t < 32)  return { color: '#ffd60a', level: '偏热' }
+  if (t < 38)  return { color: '#ff9f0a', level: '较热' }
+  return { color: '#ff453a', level: '酷热' }
 }
-function humidAlert(h: number): Alert {
-  if (h < 30) return { color: '#ffd60a', level: '偏干' }
-  if (h > 90) return { color: '#ff453a', level: '潮湿' }
-  if (h > 85) return { color: '#ff9f0a', level: '闷湿' }
-  return undefined
+function humidLevel(h: number): Level {
+  if (h < 30)  return { color: '#ffd60a', level: '偏干' }
+  if (h <= 70) return { color: '#34c759', level: '适宜' }
+  if (h <= 85) return { color: '#ffd60a', level: '偏湿' }
+  if (h <= 90) return { color: '#ff9f0a', level: '闷湿' }
+  return { color: '#ff453a', level: '潮湿' }
 }
-function aqiAlert(aqi: number): Alert {
-  if (aqi <= 100) return undefined
+function aqiLevel(aqi: number): Level {
+  if (aqi <= 50)  return { color: '#34c759', level: '优' }
+  if (aqi <= 100) return { color: '#ffd60a', level: '良' }
   if (aqi <= 150) return { color: '#ff9f0a', level: '轻度污染' }
   if (aqi <= 200) return { color: '#ff453a', level: '中度污染' }
   if (aqi <= 300) return { color: '#af52de', level: '重度污染' }
   return { color: '#a1304e', level: '严重污染' }
 }
-function uvAlert(uv: number): Alert {
-  if (uv <= 4) return undefined
+function uvLevel(uv: number): Level {
+  if (uv <= 2) return { color: '#34c759', level: '弱' }
+  if (uv <= 4) return { color: '#ffd60a', level: '中等' }
   if (uv <= 6) return { color: '#ff9f0a', level: '较强' }
   if (uv <= 9) return { color: '#ff453a', level: '强' }
   return { color: '#bf5af2', level: '极强' }
@@ -973,29 +978,29 @@ function uvAlert(uv: number): Alert {
 // 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
 // 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
 const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const cols: { key: string; value: string; label: string; color?: string }[] = []
+  const cols: { key: string; value: string; label: string; color: string }[] = []
   if (stats.feelsLike != null) {
-    const a = feelsAlert(stats.feelsLike)
-    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, label: a ? `体感 · ${a.level}` : '体感', color: a?.color })
+    const a = feelsLevel(stats.feelsLike)
+    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, label: `体感 · ${a.level}`, color: a.color })
   }
   if (stats.humidity != null) {
-    const a = humidAlert(stats.humidity)
-    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: a ? `湿度 · ${a.level}` : '湿度', color: a?.color })
+    const a = humidLevel(stats.humidity)
+    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: `湿度 · ${a.level}`, color: a.color })
   }
   if (avgAqi != null) {
-    const a = aqiAlert(avgAqi)
-    cols.push({ key: 'aqi', value: `${avgAqi}`, label: a ? `空气 · ${a.level}` : '空气', color: a?.color })
+    const a = aqiLevel(avgAqi)
+    cols.push({ key: 'aqi', value: `${avgAqi}`, label: `空气 · ${a.level}`, color: a.color })
   }
   if (stats.uvIndex != null) {
-    const a = uvAlert(stats.uvIndex)
-    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, label: a ? `紫外线 · ${a.level}` : '紫外线', color: a?.color })
+    const a = uvLevel(stats.uvIndex)
+    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, label: `紫外线 · ${a.level}`, color: a.color })
   }
   if (cols.length === 0) return null
   return (
     <div className="metric-strip">
       {cols.map((c, i) => (
         <div className="metric-col" key={c.key} style={{ animationDelay: `${i * 0.06}s` }}>
-          <span className="mc-value" style={c.color ? { color: c.color } : undefined}>{c.value}</span>
+          <span className="mc-value" style={{ color: c.color }}>{c.value}</span>
           <span className="mc-label">{c.label}</span>
         </div>
       ))}

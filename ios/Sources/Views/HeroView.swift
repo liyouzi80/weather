@@ -21,7 +21,7 @@ struct HeroView: View {
             if let updatedAt {
                 Text(updatedLabel(updatedAt))
                     .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.white.opacity(0.6))
                     .padding(.top, 3)
             }
 
@@ -41,11 +41,14 @@ struct HeroView: View {
                 Text("↓ \(Int(stats.min.rounded()))°")
             }
             .font(.system(size: 14, weight: .regular))
-            .foregroundStyle(.white.opacity(0.42))
+            .foregroundStyle(.white.opacity(0.58))
             .padding(.top, 5)
         }
         .padding(.top, 20)
         .padding(.bottom, 12)
+        // Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
+        // 保证在浅色天空 + 飘动粒子下仍清晰可读（对齐苹果天气）。
+        .shadow(color: .black.opacity(0.22), radius: 10, y: 1)
     }
 
     // 相对时间：刚刚 / X 分钟前 / X 小时前

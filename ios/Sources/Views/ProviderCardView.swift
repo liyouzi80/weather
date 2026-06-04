@@ -27,7 +27,7 @@ struct ProviderCardView: View {
                             .foregroundStyle(Color(hex: "#40c8e0"))
                     }
                     Spacer()
-                    Text(String(format: "%.1f", w.temp) + "°")
+                    Text("\(Int(w.temp.rounded()))°")
                         .font(.system(size: 26, weight: .bold).monospacedDigit())
                         .foregroundStyle(.white)
                 }
@@ -45,7 +45,7 @@ struct ProviderCardView: View {
                         }
                     }
                     if let fl = w.feelsLike {
-                        metric("体感", String(format: "%.1f", fl) + "°")
+                        metric("体感", "\(Int(fl.rounded()))°")
                     }
                     if let hum = w.humidity {
                         metric("湿度", "\(Int(hum.rounded()))%")
@@ -67,7 +67,7 @@ struct ProviderCardView: View {
                 if let obs = w.observedAt {
                     Text("观测 \(fmtTime(obs))")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.32))
+                        .foregroundStyle(.white.opacity(0.5))
                 }
             }
             .padding(.vertical, 16)
