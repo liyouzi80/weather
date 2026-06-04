@@ -780,6 +780,15 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   if (r.error || !r.current) return null   // 失败/无数据信源静默隐藏
 
   const c = r.current
+  // GZQX 从缓存恢复时，预报可能在两次刷新间隙过期：此时 text='—'、无预警，
+  // NoticeCard 不渲染任何内容，故同样静默隐藏本卡片。
+  if (r.providerId === 'gzqx' && c.text === '—' && !c.warnings?.length) {
+    const hasFc = !!c.forecast && (
+      /\d{1,2}时到\d{1,2}时/.test(c.forecast) ||
+      /注意|防范|防御|局部|短时强|冰雹|建议/.test(c.forecast)
+    )
+    if (!hasFc || !isForecastCurrent(c.forecast, c.forecastIssuedAt)) return null
+  }
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
   return (
     <div className={cls}>
@@ -791,10 +800,12 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
         <span className="temp">{c.temp.toFixed(1)}°</span>
       </div>
       <div className="row">
-        <span className="wx">
-          <WeatherIcon text={c.text} size={17} className="wx-icon" />
-          <b>{c.text}</b>
-        </span>
+        {c.text !== '—' && (
+          <span className="wx">
+            <WeatherIcon text={c.text} size={17} className="wx-icon" />
+            <b>{c.text}</b>
+          </span>
+        )}
         {c.feelsLike != null && <span>体感 <b>{c.feelsLike.toFixed(1)}°</b></span>}
         {c.humidity != null && <span>湿度 <b>{Math.round(c.humidity)}%</b></span>}
         {c.windDir && (

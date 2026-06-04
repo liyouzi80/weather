@@ -61,8 +61,16 @@ struct GZQXProvider: WeatherProvider {
 
         // 基本站实况没有天气现象描述（rt.text 恒为 nil）；若短时预报也不在时效内、
         // 且无生效预警，这张信源卡无实质内容（仅温度/湿度/风），与 PWA 一致：静默隐藏。
-        // 注意：预警/预报会经 current 透传给独立卡片，故有任一时仍需保留 current。
-        if rt.text == nil && forecast == nil && (warnings?.isEmpty ?? true) {
+        // 注意：预报须包含「X时到Y时」时间窗口或注意事项关键词，
+        // 才能让 NoticeCardView 实际渲染，否则等同于无内容。
+        let hasForecastContent: Bool
+        if let fc = forecast {
+            hasForecastContent = fc.range(of: "\\d{1,2}时到\\d{1,2}时", options: .regularExpression) != nil ||
+                fc.range(of: "注意|防范|防御|局部|短时强|冰雹|建议", options: .regularExpression) != nil
+        } else {
+            hasForecastContent = false
+        }
+        if rt.text == nil && !hasForecastContent && (warnings?.isEmpty ?? true) {
             throw FetchError.noData
         }
 
