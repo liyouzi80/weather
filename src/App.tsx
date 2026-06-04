@@ -822,7 +822,6 @@ function aqiCategory(aqi: number): string {
 const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
   return (
     <div className="aqi-section">
-      <div className="ranking-title">空气质量 · 美国 AQI</div>
       <div className="cards">
         {air.map((r) => {
           if (r.error || !r.air) {

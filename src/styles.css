@@ -53,7 +53,7 @@
 /* Vibrancy（振动）：玻璃卡上的次要文字用 plus-lighter 与底色叠加，
    透出背景亮度，避免在不同天空配色下灰字「消失」。深色界面下只提亮不压暗。 */
 @supports (mix-blend-mode: plus-lighter) {
-  .mc-label, .ranking-title, .notice-issued,
+  .mc-label, .notice-issued,
   .notice-detail, .notice-note {
     mix-blend-mode: plus-lighter;
   }
@@ -770,8 +770,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .tag-hot { color: var(--hot); }
 .tag-cold { color: var(--cold); }
 
-.aqi-section { margin-top: 20px; }
-.aqi-section .cards { margin-top: 4px; }
+.aqi-section { margin-top: 10px; }
 
 /* AQI 卡左侧等级色竖线：增强一眼扫描等级的能力 */
 /* AQI 等级颜色平滑过渡，跨等级刷新时不突变 */
