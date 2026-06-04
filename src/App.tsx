@@ -673,34 +673,54 @@ const SNOW_SVG = (
   </svg>
 )
 function MinutelyRainCard({ data }: { data: MinutelyRain }) {
-  const bars = data.minutely.slice(0, 12)
-  const maxPrecip = Math.max(...bars.map(b => b.precip), 0.5)
-  const isSnow = bars.some(b => b.type === 'snow' && b.precip > 0)
+  const pts = data.minutely.slice(0, 12)
+  const maxPrecip = Math.max(...pts.map(b => b.precip), 0.1)
+  const isSnow = pts.some(b => b.type === 'snow' && b.precip > 0)
+
+  // SVG geometry — viewBox 300×56; floor at 88% for zero-rain baseline
+  const W = 300, H = 56
+  const floor = H * 0.88
+  const ys = pts.map(b =>
+    b.precip > 0
+      ? Math.max(H * 0.04, floor - (b.precip / maxPrecip) * (floor - H * 0.04))
+      : floor
+  )
+  const xs = pts.map((_, i) => (i / (pts.length - 1)) * W)
+
+  let linePath = `M ${xs[0]} ${ys[0]}`
+  for (let i = 1; i < xs.length; i++) {
+    const dx = (xs[i] - xs[i - 1]) * 0.4
+    linePath += ` C ${xs[i - 1] + dx} ${ys[i - 1]}, ${xs[i] - dx} ${ys[i]}, ${xs[i]} ${ys[i]}`
+  }
+  const areaPath = `${linePath} L ${W} ${H} L 0 ${H} Z`
+
   return (
     <div className="minutely-card">
       <div className="minutely-head">
         {isSnow ? SNOW_SVG : RAIN_SVG}
-        <span className="minutely-label">未来一小时</span>
+        <span className="minutely-label">下一小时降水量</span>
       </div>
-      <div className="minutely-chart" aria-hidden="true">
-        {bars.map((b, i) => {
-          const h = b.precip > 0 ? Math.max(8, (b.precip / maxPrecip) * 100) : 4
-          const opacity = b.precip > 0 ? 0.55 + (b.precip / maxPrecip) * 0.4 : 0.18
-          return (
-            <div
-              key={i}
-              className="minutely-bar"
-              style={{ height: `${h}%`, opacity }}
-            />
-          )
-        })}
-      </div>
+      {data.summary && <p className="minutely-title">{data.summary}</p>}
+      <svg viewBox={`0 0 ${W} ${H}`} className="minutely-svg"
+           preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="mly-fill" x1="0" y1="0" x2="0" y2={H}
+                          gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor="#5ac8fa" stopOpacity="0.70" />
+            <stop offset="100%" stopColor="#0a84ff" stopOpacity="0.08" />
+          </linearGradient>
+        </defs>
+        {[0.25, 0.50, 0.75].map((frac, i) => (
+          <line key={i} x1="0" y1={frac * H} x2={W} y2={frac * H}
+                stroke="rgba(255,255,255,0.10)" strokeWidth="0.8" strokeDasharray="3 3" />
+        ))}
+        <path d={areaPath} fill="url(#mly-fill)" />
+        <path d={linePath} fill="none" stroke="rgba(90,200,250,0.85)"
+              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
       <div className="minutely-time-row" aria-hidden="true">
-        <span>现在</span>
-        <span>30分钟</span>
-        <span>1小时</span>
+        <span>现在</span><span>15分钟</span><span>30分钟</span><span>45分钟</span><span>1小时</span>
       </div>
-      {data.summary && <p className="minutely-summary">{data.summary}</p>}
     </div>
   )
 }

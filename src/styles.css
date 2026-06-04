@@ -388,29 +388,31 @@ html[data-sky='fog'] body::before {
 .minutely-head {
   display: flex;
   align-items: center;
-  gap: 6px;
-  color: #0a84ff;
-  margin-bottom: 10px;
+  gap: 5px;
+  margin-bottom: 4px;
 }
+.minutely-head svg { color: rgba(90, 200, 250, 0.75); }
 .minutely-label {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: rgba(255, 255, 255, 0.40);
 }
-.minutely-chart {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 44px;
-  margin-bottom: 5px;
+/* summary 作为卡片标题，大号粗体，仿 Apple Weather */
+.minutely-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  margin: 0 0 12px;
 }
-.minutely-bar {
-  flex: 1;
-  min-height: 3px;
-  border-radius: 2px 2px 0 0;
-  /* 竖向渐变：柱顶浅蓝 → 柱底深蓝，强化降水强度的视觉表现 */
-  background: linear-gradient(180deg, #5ac8fa, #0a84ff);
+/* 平滑面积图 SVG */
+.minutely-svg {
+  display: block;
+  width: 100%;
+  height: 68px;
+  margin-bottom: 6px;
 }
 .minutely-time-row {
   display: flex;
@@ -418,14 +420,6 @@ html[data-sky='fog'] body::before {
   font-size: 10px;
   color: var(--text-dim);
   font-weight: 500;
-  margin-bottom: 8px;
-}
-.minutely-summary {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin: 0;
-  font-weight: 500;
-  line-height: 1.4;
 }
 
 /* 番禺区气象台短时预报卡（仅有提示时展示） */
