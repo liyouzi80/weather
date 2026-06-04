@@ -12,6 +12,8 @@ class CityViewModel {
 
     let loc: GeoLocation
     private let agg = ProviderAggregator.shared
+    // 每次刷新自增；后台补齐任务据此判断是否已被新刷新取代
+    private var refreshToken = 0
 
     init(loc: GeoLocation) {
         self.loc = loc
@@ -44,6 +46,8 @@ class CityViewModel {
     @MainActor
     func refresh() async {
         loading = true
+        refreshToken += 1
+        let token = refreshToken
         async let weather = agg.fetchAll(loc: loc)
         async let aqiData = agg.fetchAqi(loc: loc)
         results = await weather
@@ -51,5 +55,41 @@ class CityViewModel {
         loading = false
         initialLoad = false
         updatedAt = Date()
+        // 刷新完成后，AQI 不全则后台静默补齐（服务站点页偶发抓取失败）
+        if healthyAqiCount(air) < 2 { backfillAqi(token: token) }
+    }
+
+    private func healthyAqiCount(_ a: [AqiResult]) -> Int { a.filter { $0.air != nil }.count }
+
+    // 后台补齐 AQI：退避重试，仅在仍属当前刷新时合并，不打断 UI（不动 loading）。
+    private func backfillAqi(token: Int) {
+        Task { [weak self] in
+            guard let self else { return }
+            let delaysMs: [UInt64] = [2_500, 5_000, 9_000, 15_000]
+            for ms in delaysMs {
+                if self.healthyAqiCount(self.air) >= 2 { return } // 已补齐
+                try? await Task.sleep(nanoseconds: ms * 1_000_000)
+                if token != self.refreshToken { return }          // 已被新刷新取代
+                let fresh = await self.agg.fetchAqi(loc: self.loc)
+                if token != self.refreshToken { return }
+                let merged = self.mergeAqi(self.air, fresh)
+                if self.healthyAqiCount(merged) > self.healthyAqiCount(self.air) {
+                    self.air = merged
+                }
+            }
+        }
+    }
+
+    // 按 id 合并：保留原顺序，每源优先取「有数据」的版本（新 > 旧）。
+    private func mergeAqi(_ prev: [AqiResult], _ next: [AqiResult]) -> [AqiResult] {
+        var ids = prev.map { $0.id }
+        for s in next where !ids.contains(s.id) { ids.append(s.id) }
+        return ids.compactMap { id in
+            let fresh = next.first { $0.id == id }
+            let old = prev.first { $0.id == id }
+            if fresh?.air != nil { return fresh }
+            if old?.air != nil { return old }
+            return fresh ?? old
+        }
     }
 }

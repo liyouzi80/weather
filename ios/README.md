@@ -83,7 +83,7 @@ Sources/
 - [x] 预警信号 chips
 - [x] SpriteKit 天气动效（雨 / 雷 / 雪 / 雾 / 晴日 / 晴夜 / 多云 / 阴）
 - [x] 月相 + 月球位置（Meeus 算法）
-- [x] 下拉刷新（原生 `.refreshable`）
+- [x] 下拉刷新（原生 `.refreshable`）+ AQI 后台补齐（缺失时退避重试合并，不打断 UI）
 - [x] 横滑切城市 + 页码点
 - [x] iPhone / iPad 自适应
 - [x] 120fps ProMotion 支持

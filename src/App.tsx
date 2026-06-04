@@ -44,6 +44,22 @@ function readCache(idx: number): { results: ProviderResult[]; air: AqiResult[]; 
   } catch { return null }
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+// 按 providerId 合并 AQI：保留原顺序，每个源优先取「有数据」的版本（新>旧），用于后台补齐。
+function mergeAqi(prev: AqiResult[], next: AqiResult[]): AqiResult[] {
+  const ids = prev.map((s) => s.providerId)
+  for (const s of next) if (!ids.includes(s.providerId)) ids.push(s.providerId)
+  return ids.map((id) => {
+    const fresh = next.find((s) => s.providerId === id)
+    const old = prev.find((s) => s.providerId === id)
+    if (fresh?.air) return fresh
+    if (old?.air) return old
+    return fresh ?? old
+  }).filter((s): s is AqiResult => s != null)
+}
+const aqiHealthy = (air: AqiResult[]) => air.filter((s) => s.air).length
+
 export default function App() {
   const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
@@ -58,6 +74,27 @@ export default function App() {
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
 
+  // 后台补齐：刷新完成后若 AQI 仍缺失（服务端抓站点页偶发失败），静默重试合并，不打断 UI。
+  // 与 refreshIdRef 绑定——切城市或再次刷新会让进行中的补齐自动作废。
+  const backfill = useCallback(async (id: number, idx: number, loc: GeoLocation, air0: AqiResult[]) => {
+    let air = air0
+    const EXPECTED = 2 // 两源：在意空气 + IQAir
+    const delays = [2500, 5000, 9000, 15000]
+    for (const delay of delays) {
+      if (aqiHealthy(air) >= EXPECTED) return // 已补齐
+      await sleep(delay)
+      if (id !== refreshIdRef.current) return // 已被新刷新/切城市取代
+      const r = await fetchAllAqi(loc)
+      if (id !== refreshIdRef.current) return
+      const merged = mergeAqi(air, r.sources)
+      if (aqiHealthy(merged) > aqiHealthy(air)) {
+        air = merged
+        setAir(merged)
+        writeCache(idx, resultsRef.current, merged)
+      }
+    }
+  }, [])
+
   const refresh = useCallback(async () => {
     const id = ++refreshIdRef.current
     setLoading(true)
@@ -69,13 +106,15 @@ export default function App() {
       setAir(aqi.sources)
       setUpdatedAt(new Date())
       writeCache(cityIdx, weather, aqi.sources)
+      // 刷新成功后，AQI 不全则后台继续补齐
+      if (aqiHealthy(aqi.sources) < 2) void backfill(id, cityIdx, loc, aqi.sources)
     } finally {
       if (id === refreshIdRef.current) {
         setLoading(false)
         setInitialLoad(false)
       }
     }
-  }, [cityIdx])
+  }, [cityIdx, backfill])
 
   useEffect(() => {
     const cached = readCache(cityIdxRef.current)
@@ -143,6 +182,7 @@ export default function App() {
   const refreshRef = useRef(refresh)
   const selectCityRef = useRef(selectCity)
   const cityIdxRef = useRef(cityIdx)
+  const resultsRef = useRef(results)
   const PULL_MAX = 64
   const PULL_TRIGGER = 46
   const SWIPE_TRIGGER = 45
@@ -151,7 +191,8 @@ export default function App() {
     refreshRef.current = refresh
     selectCityRef.current = selectCity
     cityIdxRef.current = cityIdx
-  }, [loading, refresh, selectCity, cityIdx])
+    resultsRef.current = results
+  }, [loading, refresh, selectCity, cityIdx, results])
   useEffect(() => {
     const el = appRef.current
     if (!el) return
