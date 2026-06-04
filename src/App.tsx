@@ -165,6 +165,7 @@ export default function App() {
     setAir([])
     setUpdatedAt(null)
     setInitialLoad(true)
+    cityIdxRef.current = i  // 立即更新 ref，避免 cache-loading effect 读到旧城市的缓存
     setCityIdx(i)
     // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
     window.scrollTo(0, 0)
@@ -873,17 +874,6 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
 })
 
 const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
-  const cardRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
-    const el = cardRef.current
-    if (!el) return
-    const io = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { el.classList.add('in-view'); io.disconnect() } },
-      { threshold: 0.05 }
-    )
-    io.observe(el)
-    return () => io.disconnect()
-  }, [])
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
@@ -901,7 +891,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   }
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
   return (
-    <div ref={cardRef} className={cls}>
+    <div className={cls}>
       <div className="head">
         <span className="dot" style={{ background: color }} />
         <span className="name">{r.providerName}</span>
