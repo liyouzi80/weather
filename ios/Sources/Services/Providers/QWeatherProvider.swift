@@ -16,6 +16,7 @@ struct QWeatherProvider: WeatherProvider {
         async let uvResp: QUVResp?       = try? fetchJSON(qurl("\(base)/indices/1d?type=5", loc: locStr, key: key))
         async let warnResp: QWarnResp?   = try? fetchJSON(qurl("\(base)/warning/now", loc: locStr, key: key))
         async let rainResp: QRainResp?   = try? fetchJSON(qurl("\(base)/minutely/5m", loc: locStr, key: key))
+        async let dailyResp: QDailyResp? = try? fetchJSON(qurl("\(base)/weather/3d", loc: locStr, key: key))
 
         let now = try await nowResp
         guard let n = now.now else { throw FetchError.noData }
@@ -23,6 +24,7 @@ struct QWeatherProvider: WeatherProvider {
         let uv    = try? await uvResp
         let warn  = try? await warnResp
         let rain  = try? await rainResp
+        let daily = try? await dailyResp
 
         let warnings: [WeatherWarning]? = warn?.warning?.map {
             WeatherWarning(title: $0.title ?? "", type: $0.typeName ?? $0.type ?? "", level: $0.level ?? "蓝色")
@@ -36,6 +38,8 @@ struct QWeatherProvider: WeatherProvider {
             return MinutelyRain(summary: r.summary ?? "", minutely: items)
         }
 
+        let pop = daily?.daily?.first?.pop.flatMap { Double($0) }
+
         return CurrentWeather(
             temp: Double(n.temp ?? "0") ?? 0,
             feelsLike: Double(n.feelsLike ?? ""),
@@ -47,7 +51,8 @@ struct QWeatherProvider: WeatherProvider {
             forecast: nil, forecastIssuedAt: nil,
             uvIndex: Double(uv?.daily?.first?.value ?? ""),
             warnings: warnings,
-            minutelyRain: minutelyRain
+            minutelyRain: minutelyRain,
+            pop: pop
         )
     }
 
@@ -78,5 +83,9 @@ struct QWeatherProvider: WeatherProvider {
         let summary: String?
         let minutely: [QMinutely]?
         struct QMinutely: Decodable { let fxTime: String; let precip: String; let type: String }
+    }
+    private struct QDailyResp: Decodable {
+        let daily: [QDaily]?
+        struct QDaily: Decodable { let pop: String? }
     }
 }

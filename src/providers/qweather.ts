@@ -18,10 +18,11 @@ export const qweatherProvider: WeatherProvider = {
     // QWeather 经纬度顺序为 lon,lat
     const locStr = `${loc.lon.toFixed(2)},${loc.lat.toFixed(2)}`
     // 实况 + 预警 + 分钟级降水并行请求，后两者失败不影响实况展示
-    const [weatherRes, warningRes, minutelyRes] = await Promise.all([
+    const [weatherRes, warningRes, minutelyRes, dailyRes] = await Promise.all([
       fetch(`${BASE}/v7/weather/now?location=${locStr}&key=${key}`),
       fetch(`${BASE}/v7/warning/now?location=${locStr}&key=${key}`).catch(() => null),
       fetch(`${BASE}/v7/minutely/5m?location=${locStr}&key=${key}`).catch(() => null),
+      fetch(`${BASE}/v7/weather/3d?location=${locStr}&key=${key}`).catch(() => null),
     ])
     if (!weatherRes.ok) throw new Error(`HTTP ${weatherRes.status}`)
     const data = await weatherRes.json()
@@ -41,6 +42,16 @@ export const qweatherProvider: WeatherProvider = {
             warnings.push({ title: w.title ?? `${type}${level}预警信号`, type, level })
           }
         }
+      }
+    }
+
+    // 解析今日降水概率（3d daily[0].pop）
+    let pop: number | undefined
+    if (dailyRes?.ok) {
+      const dData = await dailyRes.json().catch(() => null)
+      if (dData?.code === '200' && Array.isArray(dData.daily) && dData.daily.length > 0) {
+        const v = Number(dData.daily[0].pop)
+        if (!isNaN(v)) pop = v
       }
     }
 
@@ -72,6 +83,7 @@ export const qweatherProvider: WeatherProvider = {
       observedAt: now.obsTime ? `${now.obsTime.slice(0, 16)}:00Z` : undefined,
       ...(warnings.length > 0 && { warnings }),
       ...(minutelyRain && { minutelyRain }),
+      ...(pop != null && { pop }),
     }
   },
 }

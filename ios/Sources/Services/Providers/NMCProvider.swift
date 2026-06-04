@@ -54,7 +54,7 @@ struct NMCProvider: WeatherProvider {
             // publish_time 形如「2026-05-31 10:00」（北京时），原样写入 UTC 字段，前端按 UTC 显示
             observedAt: real.publish_time.map { "\($0.replacingOccurrences(of: " ", with: "T").prefix(16)):00Z" },
             forecast: nil, forecastIssuedAt: nil,
-            uvIndex: nil, warnings: nil, minutelyRain: nil
+            uvIndex: nil, warnings: nil, minutelyRain: nil, pop: nil
         )
     }
 

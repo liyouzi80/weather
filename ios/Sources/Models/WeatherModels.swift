@@ -29,6 +29,7 @@ struct CurrentWeather {
     let uvIndex: Double?
     let warnings: [WeatherWarning]?
     let minutelyRain: MinutelyRain?
+    let pop: Double?
 }
 
 struct WeatherWarning {
@@ -91,6 +92,7 @@ struct WeatherStats {
     let text: String
     let feelsLike: Double?
     let humidity: Double?
+    let pop: Double?
     let uvIndex: Double?
 }
 

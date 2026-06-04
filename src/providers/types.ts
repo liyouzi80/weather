@@ -37,6 +37,8 @@ export interface CurrentWeather {
   warnings?: WeatherWarning[]
   /** 分钟级降水（未来一小时），可选 */
   minutelyRain?: MinutelyRain
+  /** 今日降水概率（0–100%），可选 */
+  pop?: number
 }
 
 /** 气象台预警信号 */

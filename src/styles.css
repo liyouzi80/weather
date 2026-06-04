@@ -45,7 +45,7 @@
 
 /* 连续圆角（squircle）：支持的浏览器用超椭圆，其余回退普通圆角 */
 @supports (corner-shape: superellipse(2)) {
-  .notice-card, .warn-card, .ranking, .card, .page-dots {
+  .notice-card, .warn-card, .card, .page-dots {
     corner-shape: superellipse(2.2);
   }
 }
@@ -641,70 +641,6 @@ html[data-sky='fog'] body::before {
 .hskel-cond  { width: 80px;  height: 18px; margin-top: 14px; }
 .hskel-hilo  { width: 148px; height: 17px; margin-top: 7px; }
 
-/* ── Temperature Ranking ── */
-.ranking {
-  background: var(--glass);
-  border: 0.5px solid var(--glass-border);
-  border-radius: var(--radius);
-  padding: 20px 22px 14px;
-  margin-bottom: 20px;
-  backdrop-filter: var(--mat-regular-blur);
-  -webkit-backdrop-filter: var(--mat-regular-blur);
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.06);
-}
-.ranking-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-dim);
-  letter-spacing: 0.04em;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-.rank-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 6px;
-  border-radius: 10px;
-  margin: 0 -6px;
-}
-/* 仅鼠标悬停时显示高亮，触屏点击不残留选中态 */
-@media (hover: hover) {
-  .rank-row:hover { background: var(--glass-hover); }
-}
-.rank-no {
-  width: 18px;
-  text-align: center;
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-dim);
-  font-variant-numeric: tabular-nums;
-}
-.rank-name { font-size: 14px; min-width: 100px; font-weight: 500; }
-.rank-bar {
-  flex: 1;
-  height: 4px;
-  background: var(--fill-2);
-  border-radius: 999px;
-  overflow: hidden;
-}
-.rank-bar-fill {
-  display: block;
-  height: 100%;
-  border-radius: 999px;
-  opacity: 0.9;
-  transition: width 0.6s var(--spring);
-}
-.rank-temp {
-  font-size: 17px;
-  font-weight: 700;
-  width: 50px;
-  text-align: right;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
 /* ── Provider Cards ── */
 .cards {
   display: flex;
@@ -897,7 +833,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .hero-hilo { font-size: 16px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }
-  .rank-name { min-width: 80px; font-size: 13px; }
 }
 
 /* ── Motion / 动效 ── */
@@ -912,25 +847,13 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 .loc-header { animation: fadeIn 0.45s ease both; }
 .hero-city { animation: riseIn 0.5s var(--spring) both; }
-.ranking { animation: riseIn 0.5s 0.06s var(--spring) both; }
-
-/* 排行行依次入场 */
-.rank-row { animation: riseIn 0.45s both; }
-.rank-row:nth-child(2) { animation-delay: 0.04s; }
-.rank-row:nth-child(3) { animation-delay: 0.08s; }
-.rank-row:nth-child(4) { animation-delay: 0.12s; }
-.rank-row:nth-child(5) { animation-delay: 0.16s; }
-.rank-row:nth-child(6) { animation-delay: 0.20s; }
-.rank-row:nth-child(7) { animation-delay: 0.24s; }
-.rank-row:nth-child(8) { animation-delay: 0.28s; }
 
 /* 触摸反馈仅给真正可点的卡（AQI 外链卡 .card-link，见上方 :active 规则）；
    普通信源卡不可点，不做按压回弹，避免误导「可点」的暗示 */
 
-/* 数值 / 进度条平滑过渡 */
+/* 数值平滑过渡 */
 .hero-temp,
-.card .temp,
-.rank-temp { transition: color var(--transition-fast); }
+.card .temp { transition: color var(--transition-fast); }
 
 /* 城市切换：整个内容区淡入，避免硬切 */
 @keyframes pageIn {

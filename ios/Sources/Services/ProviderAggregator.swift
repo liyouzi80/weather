@@ -51,6 +51,7 @@ class ProviderAggregator {
         let temps = ok.compactMap { $0.current?.temp }
         let feels = ok.compactMap { $0.current?.feelsLike }
         let hums  = ok.compactMap { $0.current?.humidity }
+        let pops  = ok.compactMap { $0.current?.pop }
         let uvs   = ok.compactMap { $0.current?.uvIndex }
 
         let avg = temps.reduce(0, +) / Double(temps.count)
@@ -65,6 +66,7 @@ class ProviderAggregator {
             text: text,
             feelsLike: feels.isEmpty ? nil : (feels.reduce(0, +) / Double(feels.count)).rounded(),
             humidity: hums.isEmpty ? nil : (hums.reduce(0, +) / Double(hums.count)).rounded(),
+            pop: pops.isEmpty ? nil : (pops.reduce(0, +) / Double(pops.count)).rounded(),
             uvIndex: uvs.isEmpty ? nil : uvs.reduce(0, +) / Double(uvs.count)
         )
     }

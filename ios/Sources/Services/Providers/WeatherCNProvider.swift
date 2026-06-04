@@ -77,7 +77,8 @@ struct WeatherCNProvider: WeatherProvider {
             forecastIssuedAt: nil,
             uvIndex: nil,
             warnings: nil,
-            minutelyRain: nil
+            minutelyRain: nil,
+            pop: nil
         )
     }
 }

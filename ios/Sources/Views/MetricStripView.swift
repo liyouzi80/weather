@@ -23,6 +23,11 @@ struct MetricStripView: View {
             result.append(MetricCol(id: "humid", value: "\(Int(h.rounded()))%",
                                     label: "湿度 · \(a.level)", alertColor: a.color))
         }
+        if let p = stats.pop {
+            let a = popLevel(p)
+            result.append(MetricCol(id: "pop", value: "\(Int(p.rounded()))%",
+                                    label: "降水 · \(a.level)", alertColor: a.color))
+        }
         if let aqi = avgAqi {
             let a = aqiLevel(aqi)
             result.append(MetricCol(id: "aqi", value: "\(aqi)",

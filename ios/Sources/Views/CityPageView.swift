@@ -109,14 +109,6 @@ struct CityPageView: View {
                         .riseIn(0.12)
                 }
 
-                // 温度排行（信源卡片之前）
-                if vm.annotated.filter({ $0.base.hasData }).count >= 2 {
-                    TempRankingView(results: vm.annotated)
-                        .padding(.horizontal, 16)
-                        .padding(.bottom, 12)
-                        .riseIn(0.14)
-                }
-
                 // 信源卡片（iPad 横屏两列）—— 逐卡错峰入场
                 LazyVGrid(columns: providerColumns, spacing: 10) {
                     ForEach(Array(vm.annotated.enumerated()), id: \.element.id) { idx, item in

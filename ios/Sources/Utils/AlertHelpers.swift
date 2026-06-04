@@ -35,6 +35,13 @@ func aqiLevel(_ aqi: Int) -> AlertStyle {
     return AlertStyle(color: Color(hex: "#a1304e"), level: "严重污染")
 }
 
+func popLevel(_ p: Double) -> AlertStyle {
+    if p <= 20 { return AlertStyle(color: metricNormal, level: "晴好") }
+    if p <= 40 { return AlertStyle(color: Color(hex: "#5ac8fa"), level: "小概率") }
+    if p <= 70 { return AlertStyle(color: Color(hex: "#0a84ff"), level: "中等") }
+    return AlertStyle(color: Color(hex: "#409cff"), level: "较大")
+}
+
 func uvLevel(_ uv: Double) -> AlertStyle {
     if uv <= 2 { return AlertStyle(color: metricNormal, level: "弱") }
     if uv <= 4 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "中等") }

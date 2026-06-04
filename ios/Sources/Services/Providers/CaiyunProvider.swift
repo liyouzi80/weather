@@ -34,7 +34,7 @@ struct CaiyunProvider: WeatherProvider {
             observedAt: nil,
             forecast: nil, forecastIssuedAt: nil,
             uvIndex: r.life_index?.ultraviolet?.index,
-            warnings: nil, minutelyRain: nil
+            warnings: nil, minutelyRain: nil, pop: nil
         )
     }
 

@@ -635,7 +635,6 @@ export default function App() {
 
         {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
-        {stats && stats.count >= 2 && <TempRanking results={annotated} />}
       </div>
 
       <div className="app-content" key={`cards-${cityIdx}`}>
@@ -919,40 +918,9 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   )
 })
 
-const TempRanking = memo(function TempRanking({ results }: { results: Annotated[] }) {
-  const ranked = results
-    .filter((r) => r.current)
-    .sort((a, b) => b.current!.temp - a.current!.temp)
-  if (ranked.length < 2) return null
-  const hi = ranked[0].current!.temp
-  const lo = ranked[ranked.length - 1].current!.temp
-  const span = hi - lo || 1
-  return (
-    <div className="ranking">
-      <div className="ranking-title">温度排行</div>
-      {ranked.map((r, i) => {
-        const c = r.current!
-        const color = PROVIDERS.find((p) => p.id === r.providerId)?.color ?? '#0a84ff'
-        const pct = 14 + ((c.temp - lo) / span) * 86
-        return (
-          <div className="rank-row" key={r.providerId}>
-            <span className="rank-no">{i + 1}</span>
-            <span className="dot" style={{ background: color }} />
-            <span className="rank-name">{r.providerName}</span>
-            <span className="rank-bar">
-              <span className="rank-bar-fill" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${color}66, ${color})` }} />
-            </span>
-            <span className="rank-temp">{Math.round(c.temp)}°</span>
-          </div>
-        )
-      })}
-    </div>
-  )
-})
-
 interface Stats {
   avg: number; min: number; max: number; count: number; text: string
-  feelsLike?: number; humidity?: number; uvIndex?: number
+  feelsLike?: number; humidity?: number; pop?: number; uvIndex?: number
 }
 
 function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
@@ -978,6 +946,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
   const feels = ok.map((r) => r.current!.feelsLike).filter((n): n is number => n != null)
   const hums = ok.map((r) => r.current!.humidity).filter((n): n is number => n != null)
   const humAvg = avgOf(hums)
+  const pops = ok.map((r) => r.current!.pop).filter((n): n is number => n != null)
   const uvs = ok.map((r) => r.current!.uvIndex).filter((n): n is number => n != null)
 
   const annotated: Annotated[] = results.map((r) => {
@@ -996,6 +965,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
       avg, min, max, count: temps.length, text: majorityText,
       feelsLike: r1(avgOf(feels)),
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
+      pop: pops.length > 0 ? Math.round(pops.reduce((a, b) => a + b, 0) / pops.length) : undefined,
       uvIndex: r1(avgOf(uvs)),
     },
   }
@@ -1074,6 +1044,12 @@ function uvLevel(uv: number): Level {
   if (uv <= 9) return { color: '#ff453a', level: '强' }
   return { color: '#bf5af2', level: '极强' }
 }
+function popLevel(p: number): Level {
+  if (p <= 20) return { color: NORMAL, level: '晴好' }
+  if (p <= 40) return { color: '#5ac8fa', level: '小概率' }
+  if (p <= 70) return { color: '#0a84ff', level: '中等' }
+  return { color: '#409cff', level: '较大' }
+}
 
 // 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
 // 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
@@ -1086,6 +1062,10 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
   if (stats.humidity != null) {
     const a = humidLevel(stats.humidity)
     cols.push({ key: 'humid', value: `${stats.humidity}%`, label: `湿度 · ${a.level}`, color: a.color })
+  }
+  if (stats.pop != null) {
+    const a = popLevel(stats.pop)
+    cols.push({ key: 'pop', value: `${stats.pop}%`, label: `降水 · ${a.level}`, color: a.color })
   }
   if (avgAqi != null) {
     const a = aqiLevel(avgAqi)

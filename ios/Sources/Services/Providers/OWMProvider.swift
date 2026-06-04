@@ -26,7 +26,7 @@ struct OWMProvider: WeatherProvider {
                 return fmt.string(from: Date(timeIntervalSince1970: TimeInterval(dt) + 8 * 3600))
             },
             forecast: nil, forecastIssuedAt: nil,
-            uvIndex: nil, warnings: nil, minutelyRain: nil
+            uvIndex: nil, warnings: nil, minutelyRain: nil, pop: nil
         )
     }
 
