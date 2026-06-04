@@ -617,12 +617,19 @@ html[data-sky='fog'] body::before {
   margin-top: 5px;
   letter-spacing: 0.01em;
 }
+.hero-feels {
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 8px;
+  letter-spacing: -0.01em;
+}
 
 /* Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
    保证在浅色天空主题（晴天/雪）+ 飘动粒子下仍清晰可读（对齐苹果天气）。 */
 .hero-temp,
 .hero-cond,
 .hero-hilo,
+.hero-feels,
 .hero-updated {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
 }

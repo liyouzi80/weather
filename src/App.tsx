@@ -605,6 +605,11 @@ export default function App() {
                 <span>↑ {Math.round(stats.max)}°</span>
                 <span>↓ {Math.round(stats.min)}°</span>
               </div>
+              {stats.feelsLike != null && (
+                <div className="hero-feels" style={{ color: feelsLevel(stats.feelsLike).color }} aria-hidden="true">
+                  体感 {Math.round(stats.feelsLike)}°
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -1051,10 +1056,6 @@ function popLevel(p: number): Level {
 // 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
 const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
   const cols: { key: string; value: string; label: string; color: string }[] = []
-  if (stats.feelsLike != null) {
-    const a = feelsLevel(stats.feelsLike)
-    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, label: `体感 · ${a.level}`, color: a.color })
-  }
   if (stats.humidity != null) {
     const a = humidLevel(stats.humidity)
     cols.push({ key: 'humid', value: `${stats.humidity}%`, label: `湿度 · ${a.level}`, color: a.color })

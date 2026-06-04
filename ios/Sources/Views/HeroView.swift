@@ -43,6 +43,13 @@ struct HeroView: View {
             .font(.system(size: 14, weight: .regular))
             .foregroundStyle(.white.opacity(0.58))
             .padding(.top, 5)
+
+            if let f = stats.feelsLike {
+                Text("体感 \(Int(f.rounded()))°")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(feelsLevel(f).color)
+                    .padding(.top, 8)
+            }
         }
         .padding(.top, 20)
         .padding(.bottom, 12)

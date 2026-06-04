@@ -13,11 +13,6 @@ struct MetricStripView: View {
 
     private var cols: [MetricCol] {
         var result: [MetricCol] = []
-        if let f = stats.feelsLike {
-            let a = feelsLevel(f)
-            result.append(MetricCol(id: "feels", value: "\(Int(f.rounded()))°",
-                                    label: "体感 · \(a.level)", alertColor: a.color))
-        }
         if let h = stats.humidity {
             let a = humidLevel(h)
             result.append(MetricCol(id: "humid", value: "\(Int(h.rounded()))%",
