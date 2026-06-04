@@ -533,17 +533,19 @@ html[data-sky='fog'] body::before {
 .spin { animation: spin 0.7s linear infinite; }
 
 /* ── Hero：浮在天空背景上，无玻璃卡 ── */
-/* Hero（温度总揽）：城市名居顶、大温度居中，与吸顶栏合计约占首屏上半。
-   min-height 用 dvh 适配移动端动态视口，垂直居中整组内容。 */
+
+/* 首屏容器：min-height = 100svh - loc-header实际高度（由JS注入 --loc-h）。
+   hero 在其中 flex:1 撑开，metric-strip 自然落在视口底部，零硬编码偏移量。 */
+.hero-section {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100svh - var(--loc-h, 60px));
+}
+
 .hero {
   text-align: center;
-  /*
-   * 自适应高度：100svh 减去首屏固定元素高度，svh = URL 栏显示时的小视口，Safari 首屏一致。
-   * 140px = loc-header非inset部分(44) + metric-strip含margin(96)
-   * 兜底 min-height 给不支持 svh/env 的旧浏览器。
-   */
-  min-height: 44svh;
-  min-height: clamp(280px, calc(100svh - env(safe-area-inset-top, 0px) - 140px), 65svh);
+  flex: 1 0 auto; /* 填满 hero-section 中 metric-strip 以外的剩余空间 */
+  min-height: 44svh; /* JS 未就绪前的兜底 */
   display: flex;
   flex-direction: column;
   align-items: center;

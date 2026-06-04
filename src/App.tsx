@@ -169,11 +169,10 @@ export default function App() {
     // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
     window.scrollTo(0, 0)
     setScrolled(false)
-    // 重置 hero 视差 + 高度（切城市后重新量测）
+    // 重置 hero 视差（切城市后清除滚动变换）
     if (heroRef.current) {
       heroRef.current.style.opacity = '1'
       heroRef.current.style.transform = ''
-      heroRef.current.style.minHeight = ''
     }
     if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
   }, [cityIdx])
@@ -209,6 +208,7 @@ export default function App() {
   const pullSvgRef = useRef<SVGSVGElement>(null)
   const pullCircleRef = useRef<SVGCircleElement>(null)
   const swipeWrapRef = useRef<HTMLElement>(null)
+  const locHeaderRef = useRef<HTMLElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
   const selectCityRef = useRef(selectCity)
@@ -526,21 +526,16 @@ export default function App() {
     document.documentElement.dataset.sky = sky
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', SKY_THEME[sky] ?? '#0b1426')
   }, [stats, night])
-  // Hero 高度自适应：量测第4个排行行的实际底部位置，压缩 hero 让它刚好落在视口底部。
-  // CSS calc() 仅适配「无公告卡」场景；JS 量测处理公告卡、预警等可变内容。
+  // 量测 loc-header 实际高度 → CSS 变量 --loc-h，供 .hero-section min-height 自适应使用
   useEffect(() => {
-    const raf = requestAnimationFrame(() => {
-      const hero = heroRef.current
-      const rows = document.querySelectorAll<HTMLElement>('.rank-row')
-      if (!hero || rows.length < 4) return
-      const row4Bottom = rows[3].getBoundingClientRect().bottom
-      const target = window.innerHeight - 24  // 第4行距底部留 24px，5th row 微露
-      if (row4Bottom <= target) return        // 已在视口内，CSS calc 已够用
-      const overflow = row4Bottom - target
-      hero.style.minHeight = `${Math.max(160, hero.getBoundingClientRect().height - overflow)}px`
-    })
-    return () => cancelAnimationFrame(raf)
-  }, [results])
+    const header = locHeaderRef.current
+    if (!header) return
+    const update = () => document.documentElement.style.setProperty('--loc-h', `${header.offsetHeight}px`)
+    const ro = new ResizeObserver(update)
+    ro.observe(header)
+    update()
+    return () => ro.disconnect()
+  }, [])
 
   // 实时天气动效类型（全屏背景层）
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
@@ -570,6 +565,7 @@ export default function App() {
         </svg>
       </div>
       <header
+        ref={locHeaderRef}
         className={'loc-header' + (scrolled ? ' scrolled' : '')}
         onClick={scrolled ? () => window.scrollTo({ top: 0, behavior: 'smooth' }) : undefined}
         aria-label={scrolled ? '回到顶部' : undefined}
@@ -589,7 +585,7 @@ export default function App() {
         className={'swipe-wrap' + (dragging ? ' dragging' : '')}
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
-      <div className="app-content" key={cityIdx}>
+      <div className="app-content hero-section" key={cityIdx}>
         <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <h1 className="hero-city">{city.name}</h1>
           {loading && results.length > 0
