@@ -49,10 +49,13 @@ export const qweatherProvider: WeatherProvider = {
     let pop: number | undefined
     if (dailyRes?.ok) {
       const dData = await dailyRes.json().catch(() => null)
+      console.log('[qweather] 3d response:', dData?.code, dData?.daily?.[0])
       if (dData?.code === '200' && Array.isArray(dData.daily) && dData.daily.length > 0) {
         const v = Number(dData.daily[0].pop)
         if (!isNaN(v)) pop = v
       }
+    } else {
+      console.log('[qweather] 3d fetch failed or not ok:', dailyRes?.status)
     }
 
     // 解析分钟级降水（取前 12 条 = 未来 60 分钟，有实际降水时才保留）
