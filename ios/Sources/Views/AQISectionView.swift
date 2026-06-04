@@ -5,11 +5,6 @@ struct AQISectionView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("空气质量 · 美国 AQI")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.50))
-                .padding(.horizontal, 4)
-
             ForEach(air) { r in
                 if let a = r.air {
                     AQICardView(result: r, air: a)
@@ -87,14 +82,6 @@ private struct AQICardView: View {
                         .foregroundStyle(.white.opacity(0.32))
                 }
             }
-        }
-        .overlay(alignment: .leading) {
-            // 左侧等级色竖线：强化一眼扫描 AQI 等级（对齐 PWA .aqi-strip）
-            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
-                .fill(aqiColor(air.aqi))
-                .frame(width: 3)
-                .padding(.vertical, 14)
-                .animation(.easeInOut(duration: 0.4), value: air.aqi)
         }
     }
 

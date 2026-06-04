@@ -36,7 +36,7 @@ struct HeroView: View {
                 .foregroundStyle(.white.opacity(0.90))
                 .padding(.top, 12)
 
-            HStack(spacing: 16) {
+            HStack(spacing: 10) {
                 Text("↑ \(Int(stats.max.rounded()))°")
                 Text("↓ \(Int(stats.min.rounded()))°")
             }

@@ -50,12 +50,14 @@ export const caiyunProvider: WeatherProvider = {
     if (data.status !== 'ok') throw new Error(`接口返回 status=${data.status}`)
     const r = data.result.realtime
 
-    // 今日降水概率：daily.precipitation[0].probability（0–1），转百分比
+    // 今日降水概率：daily.precipitation[0].probability 文档为 0–1，但实测有时返回 0–100
     let pop: number | undefined
     if (dailyRes?.ok) {
       const dData = await dailyRes.json().catch(() => null)
       const prob = dData?.result?.daily?.precipitation?.[0]?.probability
-      if (typeof prob === 'number') pop = Math.round(prob * 100)
+      if (typeof prob === 'number' && prob >= 0) {
+        pop = Math.min(100, Math.round(prob <= 1 ? prob * 100 : prob))
+      }
     }
 
     return {
