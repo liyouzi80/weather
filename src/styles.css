@@ -538,12 +538,12 @@ html[data-sky='fog'] body::before {
 .hero {
   text-align: center;
   /*
-   * 自适应高度：100dvh 减去首屏需要露出的固定元素高度，让第4个排行信源恰好落在视口底部。
-   * 328px = loc-header非inset部分(44) + metric-strip含margin(93) + ranking卡4行(191)
-   * 兜底 min-height 给不支持 dvh/env 的旧浏览器。
+   * 自适应高度：100svh 减去首屏固定元素高度，svh = URL 栏显示时的小视口，Safari 首屏一致。
+   * 140px = loc-header非inset部分(44) + metric-strip含margin(96)
+   * 兜底 min-height 给不支持 svh/env 的旧浏览器。
    */
-  min-height: 44vh;
-  min-height: clamp(200px, calc(100dvh - env(safe-area-inset-top, 0px) - 328px), 70dvh);
+  min-height: 44svh;
+  min-height: clamp(280px, calc(100svh - env(safe-area-inset-top, 0px) - 140px), 65svh);
   display: flex;
   flex-direction: column;
   align-items: center;

@@ -409,6 +409,7 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
 
     const resize = () => {
       const Wn = window.innerWidth, Hn = window.innerHeight
+      const widthChanged = Wn !== W_prev
       dpr = Math.min(window.devicePixelRatio || 1, 2)
       canvas.width  = Wn * dpr; canvas.height = Hn * dpr
       canvas.style.width  = Wn + 'px'; canvas.style.height = Hn + 'px'
@@ -466,8 +467,8 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
         }
       }
 
-      // Clouds: rebuild on real resize (sprites are dpr/size-baked)
-      if (rescale && isCloudKind(kind)) buildCloudScene()
+      // Clouds: rebuild only when width changes — height-only resize (Safari URL-bar) must not re-randomize positions
+      if (rescale && isCloudKind(kind) && widthChanged) buildCloudScene()
     }
 
     resize()
