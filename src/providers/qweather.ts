@@ -18,11 +18,11 @@ export const qweatherProvider: WeatherProvider = {
     // QWeather 经纬度顺序为 lon,lat
     const locStr = `${loc.lon.toFixed(2)},${loc.lat.toFixed(2)}`
     // 实况 + 预警 + 分钟级降水并行请求，后两者失败不影响实况展示
-    const [weatherRes, warningRes, minutelyRes, dailyRes] = await Promise.all([
+    const [weatherRes, warningRes, minutelyRes, hourlyRes] = await Promise.all([
       fetch(`${BASE}/v7/weather/now?location=${locStr}&key=${key}`),
       fetch(`${BASE}/v7/warning/now?location=${locStr}&key=${key}`).catch(() => null),
       fetch(`${BASE}/v7/minutely/5m?location=${locStr}&key=${key}`).catch(() => null),
-      fetch(`${BASE}/v7/weather/3d?location=${locStr}&key=${key}`).catch(() => null),
+      fetch(`${BASE}/v7/weather/24h?location=${locStr}&key=${key}`).catch(() => null),
     ])
     if (!weatherRes.ok) throw new Error(`HTTP ${weatherRes.status}`)
     const data = await weatherRes.json()
@@ -45,17 +45,16 @@ export const qweatherProvider: WeatherProvider = {
       }
     }
 
-    // 解析今日降水概率（3d daily[0].pop）
+    // 解析降水概率：取未来 12 小时小时预报 pop 的最大值（反映"今天有无雨"最直觉）
     let pop: number | undefined
-    if (dailyRes?.ok) {
-      const dData = await dailyRes.json().catch(() => null)
-      console.log('[qweather] 3d response:', dData?.code, dData?.daily?.[0])
-      if (dData?.code === '200' && Array.isArray(dData.daily) && dData.daily.length > 0) {
-        const v = Number(dData.daily[0].pop)
-        if (!isNaN(v)) pop = v
+    if (hourlyRes?.ok) {
+      const hData = await hourlyRes.json().catch(() => null)
+      if (hData?.code === '200' && Array.isArray(hData.hourly)) {
+        const pops = hData.hourly.slice(0, 12)
+          .map((h: Record<string, string>) => Number(h.pop))
+          .filter((v: number) => !isNaN(v) && v >= 0)
+        if (pops.length > 0) pop = Math.max(...pops)
       }
-    } else {
-      console.log('[qweather] 3d fetch failed or not ok:', dailyRes?.status)
     }
 
     // 解析分钟级降水（取前 12 条 = 未来 60 分钟，有实际降水时才保留）
