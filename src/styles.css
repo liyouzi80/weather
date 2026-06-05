@@ -103,7 +103,7 @@ body::before {
   inset: 0;
   background:
     radial-gradient(ellipse 80% 50% at 50% -10%, #1c2541 0%, transparent 55%),
-    linear-gradient(180deg, #0a0f1a 0%, #05080f 36%, #000 72%);
+    linear-gradient(180deg, #0a0f1a 0%, #05080f 36%, #0b1426 100%);
   z-index: -1;
 }
 
@@ -140,38 +140,38 @@ html[data-sky='clear-day'] body::before {
   background:
     radial-gradient(ellipse 60% 42% at 84% -6%, rgba(255, 184, 92, 0.30) 0%, transparent 48%),
     radial-gradient(ellipse 80% 50% at 50% -10%, #244a82 0%, transparent 56%),
-    linear-gradient(180deg, #163465 0%, #0a1428 42%, #000 74%);
+    linear-gradient(180deg, #163465 0%, #0a1428 42%, #0c1a36 100%);
 }
 html[data-sky='clear-night'] body::before {
   background:
     radial-gradient(ellipse 55% 38% at 82% 4%, rgba(150, 180, 255, 0.14) 0%, transparent 46%),
     radial-gradient(ellipse 80% 50% at 50% -10%, #16244a 0%, transparent 56%),
-    linear-gradient(180deg, #0a1430 0%, #070d1c 44%, #000 74%);
+    linear-gradient(180deg, #0a1430 0%, #070d1c 44%, #08101f 100%);
 }
 html[data-sky='cloudy'] body::before {
   background:
     radial-gradient(ellipse 90% 52% at 50% -10%, #2b3852 0%, transparent 60%),
-    linear-gradient(180deg, #1d2842 0%, #11192a 44%, #000 74%);
+    linear-gradient(180deg, #1d2842 0%, #11192a 44%, #131c30 100%);
 }
 html[data-sky='overcast'] body::before {
   background:
     radial-gradient(ellipse 92% 55% at 50% -12%, #323847 0%, transparent 60%),
-    linear-gradient(180deg, #242b39 0%, #151a24 44%, #000 74%);
+    linear-gradient(180deg, #242b39 0%, #151a24 44%, #171b26 100%);
 }
 html[data-sky='rain'] body::before {
   background:
     radial-gradient(ellipse 90% 50% at 50% -10%, #203850 0%, transparent 60%),
-    linear-gradient(180deg, #172a3e 0%, #0e1822 44%, #000 74%);
+    linear-gradient(180deg, #172a3e 0%, #0e1822 44%, #101b27 100%);
 }
 html[data-sky='snow'] body::before {
   background:
     radial-gradient(ellipse 92% 55% at 50% -10%, #36445f 0%, transparent 60%),
-    linear-gradient(180deg, #293751 0%, #18202e 44%, #000 74%);
+    linear-gradient(180deg, #293751 0%, #18202e 44%, #19212f 100%);
 }
 html[data-sky='fog'] body::before {
   background:
     radial-gradient(ellipse 92% 55% at 50% -10%, #363941 0%, transparent 60%),
-    linear-gradient(180deg, #2b2e36 0%, #1a1c20 44%, #000 74%);
+    linear-gradient(180deg, #2b2e36 0%, #1a1c20 44%, #1a1c22 100%);
 }
 
 .app {
@@ -961,6 +961,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   transition: background var(--transition-fast), box-shadow var(--transition-fast);
   margin-bottom: 0;
 }
+.cards-summary + .cards-summary { margin-top: 8px; }
 .cards-summary:hover { background: rgba(255,255,255,0.07); }
 .cards-summary:active { transform: scale(0.99); }
 .cards-summary-label {
