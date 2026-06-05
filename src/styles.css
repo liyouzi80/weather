@@ -836,6 +836,78 @@ a.card { text-decoration: none; color: inherit; display: block; }
   animation: pageIn 0.32s var(--spring) both;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   iOS 26 / 现代浏览器新特性（渐进增强，不支持的浏览器安全回退到原样式）
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Glassmorphism：backdrop-filter 动态模糊（Safari / iOS 全面 Metal 加速）──
+   支持时覆盖 CSS 变量，让所有使用 var(--mat-*) 的卡片自动获得玻璃质感。
+   背景透明度降低（0.52 → 0.36）使模糊透出的天空渐变更明显，效果接近 SwiftUI .ultraThinMaterial。 */
+@supports (backdrop-filter: blur(1px)) {
+  :root {
+    --mat-regular-bg: rgba(12, 15, 26, 0.36);
+    --mat-regular-blur: blur(24px) saturate(1.6);
+    --mat-thick-bg: rgba(16, 19, 32, 0.48);
+    --mat-thick-blur: blur(32px) saturate(1.8);
+    --glass: var(--mat-regular-bg);
+  }
+}
+
+/* ── 2. text-wrap：平衡换行 & 消除孤行字（iOS 26 / Safari 18 支持）── */
+/* 短标题/标签：balance 让各行等长，避免最后一行只剩 1-2 字 */
+.hero-cond,
+.warn-chip,
+.notice-when,
+.mc-dim {
+  text-wrap: balance;
+}
+/* 正文段落：pretty 仅消除孤行字（性能优于 balance，适合稍长文本） */
+.minutely-title,
+.notice-note {
+  text-wrap: pretty;
+}
+
+/* ── 3. Scroll-driven animations：卡片随滚动入场（iOS 26 / Chrome 115+）──
+   `.card` 在视口中进入时播放 cardIn 动画，替代固定延迟触发方案。
+   animation-duration: auto 让浏览器以滚动进度驱动动画（不再需要毫秒时长）。
+   animation-range: entry 0% entry 30% 表示元素进入视口前 30% 时动画播完。 */
+@supports (animation-timeline: view()) {
+  .card {
+    animation-name: cardIn;
+    animation-fill-mode: both;
+    animation-timing-function: ease-out;
+    animation-duration: auto;
+    animation-timeline: view();
+    animation-range: entry 0% entry 32%;
+  }
+  /* 滚动驱动下 nth-child 时间延迟无意义（改为滚动位置控制），清零避免干扰 */
+  .card:nth-child(1), .card:nth-child(2), .card:nth-child(3),
+  .card:nth-child(4), .card:nth-child(5), .card:nth-child(6),
+  .card:nth-child(7), .card:nth-child(8) { animation-delay: 0s; }
+}
+
+/* ── 4. View Transitions API：城市切换全页渐变转场（iOS 18+ / Chrome 111+）──
+   当 App.tsx 调用 document.startViewTransition() 切换城市时，
+   浏览器捕获新旧两帧并用下方动画平滑过渡，像原生 App 的页面转场。 */
+@keyframes vtSlideOut {
+  from { opacity: 1; transform: scale(1) translateY(0); }
+  to   { opacity: 0; transform: scale(0.96) translateY(-8px); }
+}
+@keyframes vtSlideIn {
+  from { opacity: 0; transform: scale(1.02) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+::view-transition-old(root) {
+  animation: vtSlideOut 0.30s ease-in both;
+}
+::view-transition-new(root) {
+  animation: vtSlideIn 0.36s var(--spring) both;
+}
+/* WeatherFX canvas 在转场期间保持不动（天空渐变跨城市不抖动） */
+::view-transition-group(.weather-fx) {
+  animation-duration: 0s;
+}
+
 /* 尊重系统「减弱动态效果」 */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

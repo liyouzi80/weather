@@ -1,4 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, MinutelyRain, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
@@ -160,22 +161,29 @@ export default function App() {
 
   const selectCity = useCallback((i: number) => {
     if (i === cityIdx) return
-    haptic(8) // 切城市轻触觉，与下拉刷新反馈保持一致
-    setResults([])
-    setAir([])
-    setUpdatedAt(null)
-    setInitialLoad(true)
-    cityIdxRef.current = i  // 立即更新 ref，避免 cache-loading effect 读到旧城市的缓存
-    setCityIdx(i)
-    // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
-    window.scrollTo(0, 0)
-    setScrolled(false)
-    // 重置 hero 视差（切城市后清除滚动变换）
-    if (heroRef.current) {
-      heroRef.current.style.opacity = '1'
-      heroRef.current.style.transform = ''
+    haptic(8)
+    cityIdxRef.current = i
+
+    const doSwitch = () => {
+      flushSync(() => {
+        setResults([])
+        setAir([])
+        setUpdatedAt(null)
+        setInitialLoad(true)
+        setCityIdx(i)
+        setScrolled(false)
+      })
+      window.scrollTo(0, 0)
+      if (heroRef.current) { heroRef.current.style.opacity = '1'; heroRef.current.style.transform = '' }
+      if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
     }
-    if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
+
+    // View Transitions API：在新旧城市内容之间做全页渐变转场（iOS 18+ / Chrome 111+）。
+    if (typeof document.startViewTransition === 'function') {
+      document.startViewTransition(doSwitch)
+    } else {
+      doSwitch()
+    }
   }, [cityIdx])
 
   // 首次加载完成后显示下拉提示 4 秒，之后自动隐藏

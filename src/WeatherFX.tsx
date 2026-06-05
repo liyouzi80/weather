@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { RainFXGPU, hasWebGPU } from './RainFXGPU'
+import { SnowFXGPU } from './SnowFXGPU'
+import { ThunderFXGPU } from './ThunderFXGPU'
 
 export type FxKind =
   | 'rain' | 'thunder' | 'snow' | 'fog'
@@ -228,9 +230,10 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
   // Stable dep so the effect only rebuilds when the tint meaningfully changes
   const tintKey = tint ? `${tint.r},${tint.g},${tint.b},${tint.warmth.toFixed(2)}` : ''
 
-  // 雨天优先走 WebGPU（GPU compute 粒子，更丝滑）；取设备失败时 onFallback 翻转，落回 Canvas 2D。
+  // 雨/雷/雪优先走 WebGPU（GPU compute 粒子，更丝滑）；取设备失败时 onFallback 翻转，落回 Canvas 2D。
   const [gpuFailed, setGpuFailed] = useState(false)
-  const useGPU = !gpuFailed && kind === 'rain' && hasWebGPU() && !prefersReduced()
+  const gpuKind = kind === 'rain' || kind === 'thunder' || kind === 'snow'
+  const useGPU = !gpuFailed && gpuKind && hasWebGPU() && !prefersReduced()
 
   useEffect(() => {
     const canvas = ref.current
@@ -820,9 +823,12 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
     }
   }, [kind, tintKey, lat, lon, gpuFailed])
 
-  // useGPU 时渲染 WebGPU 画布（上面的 Canvas effect 因 ref 为空自动 no-op）；
-  // 否则用原 Canvas 2D。canvas 元素的 context 类型终身锁定，故两路径用各自的 canvas。
-  return useGPU
-    ? <RainFXGPU onFallback={() => setGpuFailed(true)} />
-    : <canvas ref={ref} className="weather-fx" aria-hidden="true" />
+  // useGPU 时渲染 WebGPU 画布（Canvas effect 因 ref 为空自动 no-op）；canvas context 类型终身锁定，故分路径用各自 canvas。
+  if (useGPU) {
+    const fallback = () => setGpuFailed(true)
+    if (kind === 'rain')    return <RainFXGPU    onFallback={fallback} />
+    if (kind === 'thunder') return <ThunderFXGPU onFallback={fallback} />
+    if (kind === 'snow')    return <SnowFXGPU    onFallback={fallback} />
+  }
+  return <canvas ref={ref} className="weather-fx" aria-hidden="true" />
 }

@@ -1,113 +1,97 @@
 import { useEffect, useRef } from 'react'
 
-export function hasWebGPU(): boolean {
-  return typeof navigator !== 'undefined' && 'gpu' in navigator
-}
+// 雪花：每粒存 pos=(x,y,radius,layer) + vel=(vx_base,vy,sway_amplitude,phase)。
+// Compute shader 每帧累积 phase，用 sin 生成横向摆动（对齐 Canvas 版 sway 逻辑）。
+// 渲染用 instanced quad + SDF 圆形裁切，边缘抗锯齿，三层透明度（远→近 0.35/0.65/0.92）。
 
-function makeDrops(W: number, H: number): Float32Array {
+function makeFlakes(W: number, H: number): Float32Array {
   const area = W * H
-  const cfg = [
-    { n: Math.min(90,  area / 6000),  lenMin: 8,  lenMax: 18, vyMin: 200, vyMax: 380 },
-    { n: Math.min(130, area / 4200),  lenMin: 16, lenMax: 28, vyMin: 380, vyMax: 580 },
-    { n: Math.min(55,  area / 10000), lenMin: 28, lenMax: 48, vyMin: 580, vyMax: 800 },
-  ]
+  const n = Math.round(Math.min(220, area / 5500))
+  const TAU = Math.PI * 2
   const rnd = (a: number, b: number) => a + Math.random() * (b - a)
   const out: number[] = []
-  for (let li = 0; li < 3; li++) {
-    const c = cfg[li]
-    for (let i = 0; i < Math.round(c.n); i++) {
-      const vy = rnd(c.vyMin, c.vyMax)
-      out.push(rnd(0, W), rnd(0, H), rnd(c.lenMin, c.lenMax), li, -vy * 0.28, vy, 0, 0)
-    }
+  for (let i = 0; i < n; i++) {
+    const t = i / n
+    let rMin: number, rMax: number, vyMin: number, vyMax: number, layer: number
+    if (t < 0.6)      { rMin = 0.8; rMax = 1.6; vyMin = 10;  vyMax = 24; layer = 0 }
+    else if (t < 0.9) { rMin = 1.8; rMax = 3.4; vyMin = 26;  vyMax = 55; layer = 1 }
+    else              { rMin = 3.6; rMax = 5.5; vyMin = 55;  vyMax = 88; layer = 2 }
+    // pos: (x, y, radius, layer)   vel: (vx_base, vy, sway_amplitude, phase)
+    out.push(
+      rnd(0, W), rnd(0, H), rnd(rMin, rMax), layer,
+      rnd(-8, 8), rnd(vyMin, vyMax), rnd(8, 30), rnd(0, TAU),
+    )
   }
   return new Float32Array(out)
 }
 
 const COMPUTE_WGSL = /* wgsl */`
-struct Drop { pos: vec4f, vel: vec4f };
-struct U { res: vec2f, dt: f32, frame: f32 };
-@group(0) @binding(0) var<storage, read_write> drops: array<Drop>;
+struct Flake { pos: vec4f, vel: vec4f };
+struct U { res: vec2f, dt: f32, _pad: f32 };
+@group(0) @binding(0) var<storage, read_write> flakes: array<Flake>;
 @group(0) @binding(1) var<uniform> u: U;
 
 fn hash(n: u32) -> f32 {
   var x = n;
-  x = (x ^ 61u) ^ (x >> 16u);
-  x = x * 9u;
-  x = x ^ (x >> 4u);
-  x = x * 0x27d4eb2du;
-  x = x ^ (x >> 15u);
-  return f32(x & 0xffffffu) / f32(0xffffffu);
+  x ^= x << 13u; x ^= x >> 17u; x ^= x << 5u;
+  return f32(x & 0xffffffu) / 16777216.0;
 }
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) gid: vec3u) {
   let i = gid.x;
-  if (i >= arrayLength(&drops)) { return; }
-  var d = drops[i];
-  d.pos.x += d.vel.x * u.dt;
-  d.pos.y += d.vel.y * u.dt;
-  let len = d.pos.z;
-  if (d.pos.y > u.res.y + len) {
-    d.pos.y = -len;
-    d.pos.x = hash(i + u32(u.frame) * 2654435761u) * u.res.x;
+  if (i >= arrayLength(&flakes)) { return; }
+  var f = flakes[i];
+  f.vel.w += u.dt * 1.4;
+  let sway = f.vel.z * sin(f.vel.w);
+  f.pos.x += (f.vel.x + sway) * u.dt;
+  f.pos.y += f.vel.y * u.dt;
+  let r = f.pos.z;
+  if (f.pos.y > u.res.y + r) {
+    f.pos.y = -r;
+    f.pos.x = hash(i * 2654435761u ^ u32(f.vel.w * 100.0 + 1000.0)) * u.res.x;
   }
-  if (d.pos.x < -50.0) { d.pos.x += u.res.x + 100.0; }
-  if (d.pos.x > u.res.x + 50.0) { d.pos.x -= u.res.x + 100.0; }
-  drops[i] = d;
+  if (f.pos.x > u.res.x + 20.0) { f.pos.x -= u.res.x + 40.0; }
+  if (f.pos.x < -20.0)           { f.pos.x += u.res.x + 40.0; }
+  flakes[i] = f;
 }
 `
 
 const RENDER_WGSL = /* wgsl */`
-struct Drop { pos: vec4f, vel: vec4f };
-struct U { res: vec2f, dt: f32, frame: f32 };
-@group(0) @binding(0) var<storage, read> drops: array<Drop>;
+struct Flake { pos: vec4f, vel: vec4f };
+struct U { res: vec2f, dt: f32, _pad: f32 };
+@group(0) @binding(0) var<storage, read> flakes: array<Flake>;
 @group(0) @binding(1) var<uniform> u: U;
 
 struct VOut {
   @builtin(position) pos: vec4f,
-  @location(0) color: vec4f,
-  @location(1) edge: f32,
+  @location(0) uv: vec2f,
+  @location(1) opacity: f32,
 };
 
 @vertex
 fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> VOut {
-  let d = drops[ii];
-  let p0 = d.pos.xy;
-  let len = d.pos.z;
-  let layer = d.pos.w;
-  let dir = normalize(d.vel.xy);
-  let perp = vec2f(-dir.y, dir.x);
-
-  var halfW = 0.9f;
-  var color = vec4f(174.0/255.0, 208.0/255.0, 242.0/255.0, 0.28);
-  if (layer > 1.5) {
-    halfW = 2.0; color = vec4f(200.0/255.0, 225.0/255.0, 252.0/255.0, 0.76);
-  } else if (layer > 0.5) {
-    halfW = 1.3; color = vec4f(174.0/255.0, 208.0/255.0, 242.0/255.0, 0.52);
-  }
-
-  var alongs = array<f32,6>(0.0, 0.0, 1.0, 1.0, 0.0, 1.0);
-  var sides  = array<f32,6>(-1.0, 1.0, -1.0, -1.0, 1.0, 1.0);
-  let a = alongs[vi]; let s = sides[vi];
-  let world = p0 + dir * (len * a) + perp * (halfW * s);
+  let f = flakes[ii];
+  let cx = f.pos.x; let cy = f.pos.y; let r = f.pos.z; let layer = f.pos.w;
+  var ux = array<f32,6>(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
+  var uy = array<f32,6>(-1.0, -1.0, 1.0, -1.0, 1.0, 1.0);
+  let lx = ux[vi]; let ly = uy[vi];
+  let world = vec2f(cx + lx * r, cy + ly * r);
   let clip = vec2f(world.x / u.res.x * 2.0 - 1.0, 1.0 - world.y / u.res.y * 2.0);
-
-  var o: VOut;
-  o.pos = vec4f(clip, 0.0, 1.0);
-  o.color = color;
-  o.edge = s;
-  return o;
+  var op = 0.35f;
+  if (layer > 1.5f) { op = 0.92f; } else if (layer > 0.5f) { op = 0.65f; }
+  return VOut(vec4f(clip, 0.0, 1.0), vec2f(lx, ly), op);
 }
 
 @fragment
 fn fs(in: VOut) -> @location(0) vec4f {
-  let aa = 1.0 - smoothstep(0.4, 1.0, abs(in.edge));
-  let a = in.color.a * aa;
-  return vec4f(in.color.rgb * a, a);
+  let d = length(in.uv);
+  let alpha = (1.0 - smoothstep(0.82, 1.0, d)) * in.opacity;
+  return vec4f(alpha, alpha, alpha, alpha);
 }
 `
 
-function initRain(canvas: HTMLCanvasElement, device: any, gpu: any): () => void {
+function initSnow(canvas: HTMLCanvasElement, device: any, gpu: any): () => void {
   const BU = (globalThis as any).GPUBufferUsage
   const ctx = canvas.getContext('webgpu') as any
   const format = gpu.getPreferredCanvasFormat()
@@ -130,7 +114,7 @@ function initRain(canvas: HTMLCanvasElement, device: any, gpu: any): () => void 
   })
 
   let W = 0, H = 0, count = 0
-  let dropBuf: any = null, computeBG: any = null, renderBG: any = null
+  let flakeBuf: any = null, computeBG: any = null, renderBG: any = null
 
   const build = () => {
     W = window.innerWidth; H = window.innerHeight
@@ -138,29 +122,29 @@ function initRain(canvas: HTMLCanvasElement, device: any, gpu: any): () => void 
     canvas.width  = Math.max(1, Math.floor(W * dpr))
     canvas.height = Math.max(1, Math.floor(H * dpr))
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
-    const data = makeDrops(W, H)
+    const data = makeFlakes(W, H)
     count = data.length / 8
-    dropBuf?.destroy?.()
-    dropBuf = device.createBuffer({ size: Math.max(32, data.byteLength), usage: BU.STORAGE | BU.COPY_DST })
-    device.queue.writeBuffer(dropBuf, 0, data)
+    flakeBuf?.destroy?.()
+    flakeBuf = device.createBuffer({ size: Math.max(32, data.byteLength), usage: BU.STORAGE | BU.COPY_DST })
+    device.queue.writeBuffer(flakeBuf, 0, data)
     computeBG = device.createBindGroup({
       layout: computePipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: dropBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
+      entries: [{ binding: 0, resource: { buffer: flakeBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
     })
     renderBG = device.createBindGroup({
       layout: renderPipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: dropBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
+      entries: [{ binding: 0, resource: { buffer: flakeBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
     })
   }
   build()
   window.addEventListener('resize', build)
 
-  let raf = 0, last = 0, frame = 0
+  let raf = 0, last = 0
   const tick = (now: number) => {
     const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016
-    last = now; frame++
+    last = now
     if (count > 0) {
-      device.queue.writeBuffer(uniformBuf, 0, new Float32Array([W, H, dt, frame]))
+      device.queue.writeBuffer(uniformBuf, 0, new Float32Array([W, H, dt, 0]))
       const enc = device.createCommandEncoder()
       const cp = enc.beginComputePass()
       cp.setPipeline(computePipeline); cp.setBindGroup(0, computeBG)
@@ -186,16 +170,13 @@ function initRain(canvas: HTMLCanvasElement, device: any, gpu: any): () => void 
     cancelAnimationFrame(raf)
     window.removeEventListener('resize', build)
     document.removeEventListener('visibilitychange', onVis)
-    dropBuf?.destroy?.(); uniformBuf?.destroy?.()
+    flakeBuf?.destroy?.(); uniformBuf?.destroy?.()
     device.destroy?.()
   }
 }
 
-// 可复用 hook，供 ThunderFXGPU 共享同一套 GPU 雨滴逻辑。
-export function useRainGPU(
-  ref: React.RefObject<HTMLCanvasElement | null>,
-  onFallback: () => void,
-) {
+export function SnowFXGPU({ onFallback }: { onFallback: () => void }) {
+  const ref = useRef<HTMLCanvasElement>(null)
   const fallbackRef = useRef(onFallback)
   fallbackRef.current = onFallback
 
@@ -211,17 +192,13 @@ export function useRainGPU(
         if (!adapter) throw new Error('no adapter')
         const device = await adapter.requestDevice()
         if (cancelled) { device.destroy?.(); return }
-        cleanup = initRain(canvas, device, gpu)
+        cleanup = initSnow(canvas, device, gpu)
       } catch {
         if (!cancelled) fallbackRef.current()
       }
     })()
     return () => { cancelled = true; cleanup() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-}
 
-export function RainFXGPU({ onFallback }: { onFallback: () => void }) {
-  const ref = useRef<HTMLCanvasElement>(null)
-  useRainGPU(ref, onFallback)
   return <canvas ref={ref} className="weather-fx" aria-hidden="true" />
 }
