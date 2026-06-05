@@ -609,9 +609,9 @@ export default function App() {
           )}
         </div>
 
-        {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
-
         {warnings.length > 0 && <WarningInline warnings={warnings} />}
+
+        {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
         {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 

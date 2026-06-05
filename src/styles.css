@@ -342,6 +342,7 @@ html[data-sky='fog'] body::before {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
+  margin: 0 0 22px;
 }
 /* 预警 chip 弹入：scale 0.8 → 过冲 → 1，逐个错峰，传达「警报弹出」的紧迫感 */
 @keyframes chipPop {
