@@ -9,20 +9,7 @@ struct MinutelyRainView: View {
     var body: some View {
         GlassCard(topAccent: hasRain ? Color(hex: "#0a84ff").opacity(0.5) : nil) {
             VStack(alignment: .leading, spacing: 0) {
-                // 小标头：图标 + 标签（对齐 Apple Weather 子标题风格）
-                HStack(spacing: 5) {
-                    Image(systemName: hasRain ? "cloud.rain.fill" : "cloud.fill")
-                        .font(.system(size: 11))
-                        .foregroundStyle(Color(hex: "#5ac8fa").opacity(0.75))
-                    Text("下一小时降水量")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.40))
-                        .kerning(0.3)
-                    Spacer()
-                }
-                .padding(.bottom, 4)
-
-                // summary 作为主标题（大号粗体，仿 Apple Weather）
+                // summary 作为卡片主标题（无小标题，与其他卡片一致；大号粗体，仿 Apple Weather）
                 if !rain.summary.isEmpty {
                     Text(rain.summary)
                         .font(.system(size: 17, weight: .bold))
