@@ -1092,8 +1092,8 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
 function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
   const { timeLabel, note } = parseForecast(text)
   const issued = fmtIssuedAt(issuedAt)
-  // 时间窗口和注意事项都没有时不渲染
-  if (!timeLabel && !note) return null
+  // 卡片价值在于「注意/防范」提示；只有时间窗口、无实质内容时不渲染（避免空卡片）
+  if (!note) return null
   return (
     <div className="notice-card">
       <div className="notice-head">

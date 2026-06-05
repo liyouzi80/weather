@@ -62,7 +62,9 @@ export const qweatherProvider: WeatherProvider = {
     if (minutelyRes?.ok) {
       const mData = await minutelyRes.json().catch(() => null)
       if (mData?.code === '200' && Array.isArray(mData.minutely)) {
-        const items = mData.minutely.slice(0, 12).map((m: Record<string, string>) => ({
+        // 保留完整未来 2 小时数据判断是否有降水（与 iOS 一致）；
+        // 图表只画前 60 分钟，但降水可能在 60 分钟后才开始（summary 会说明），不能提前 slice 漏判
+        const items = mData.minutely.map((m: Record<string, string>) => ({
           fxTime: m.fxTime,
           precip: Number(m.precip),
           type: m.type === 'snow' ? 'snow' as const : 'rain' as const,

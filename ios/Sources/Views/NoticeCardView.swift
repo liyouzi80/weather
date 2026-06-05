@@ -11,7 +11,8 @@ struct NoticeCardView: View {
 
     var body: some View {
         let (timeLabel, note) = parsed
-        if !timeLabel.isEmpty || !note.isEmpty {
+        // 卡片价值在于「注意/防范」提示；只有时间窗口、无实质内容时不渲染（避免空卡片）
+        if !note.isEmpty {
             GlassCard(topAccent: Color(hex: "#a855f7").opacity(0.75)) {
                 VStack(alignment: .leading, spacing: 8) {
                     // Header row
