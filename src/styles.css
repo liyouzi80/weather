@@ -947,6 +947,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-top: 12px;
   padding: 13px 18px;
   border-radius: var(--radius);
   background: var(--glass);
@@ -961,7 +962,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
   transition: background var(--transition-fast), box-shadow var(--transition-fast);
   margin-bottom: 0;
 }
-.cards-summary + .cards-summary { margin-top: 8px; }
 .cards-summary:hover { background: rgba(255,255,255,0.07); }
 .cards-summary:active { transform: scale(0.99); }
 .cards-summary-label {
