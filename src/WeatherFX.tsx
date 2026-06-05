@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { RainFXGPU, hasWebGPU } from './RainFXGPU'
 
 export type FxKind =
   | 'rain' | 'thunder' | 'snow' | 'fog'
@@ -226,6 +227,10 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
   const ref = useRef<HTMLCanvasElement>(null)
   // Stable dep so the effect only rebuilds when the tint meaningfully changes
   const tintKey = tint ? `${tint.r},${tint.g},${tint.b},${tint.warmth.toFixed(2)}` : ''
+
+  // 雨天优先走 WebGPU（GPU compute 粒子，更丝滑）；取设备失败时 onFallback 翻转，落回 Canvas 2D。
+  const [gpuFailed, setGpuFailed] = useState(false)
+  const useGPU = !gpuFailed && kind === 'rain' && hasWebGPU() && !prefersReduced()
 
   useEffect(() => {
     const canvas = ref.current
@@ -552,11 +557,8 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
     let nextShoot = rnd(8, 22)
     let dayT = 0
 
-    // 帧率节流：首屏环境动效（晴空/多云）随屏幕刷新率全速渲染，保持丝滑；
-    // 仅对粒子密集的雨/雪/雷/雾限速 30fps 省电（其差异肉眼几乎不可察）
-    const FAST_MS = 1000 / 30
-    const isAmbient = kind === 'clear-night' || kind === 'clear-day' || isCloudKind(kind)
-    const FRAME_MS = isAmbient ? 0 : FAST_MS
+    // 不锁帧：所有特效随屏幕刷新率全速渲染（ProMotion 机型可达 120fps），保持最大丝滑度。
+    const FRAME_MS = 0
     let raf = 0, last = 0
 
     const frame = (now: number) => {
@@ -816,7 +818,11 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       document.removeEventListener('visibilitychange', onVis)
       window.removeEventListener('resize', resize)
     }
-  }, [kind, tintKey, lat, lon])
+  }, [kind, tintKey, lat, lon, gpuFailed])
 
-  return <canvas ref={ref} className="weather-fx" aria-hidden="true" />
+  // useGPU 时渲染 WebGPU 画布（上面的 Canvas effect 因 ref 为空自动 no-op）；
+  // 否则用原 Canvas 2D。canvas 元素的 context 类型终身锁定，故两路径用各自的 canvas。
+  return useGPU
+    ? <RainFXGPU onFallback={() => setGpuFailed(true)} />
+    : <canvas ref={ref} className="weather-fx" aria-hidden="true" />
 }
