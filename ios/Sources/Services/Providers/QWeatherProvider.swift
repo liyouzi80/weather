@@ -26,8 +26,13 @@ struct QWeatherProvider: WeatherProvider {
         let rain  = try? await rainResp
         let hourly = try? await hourlyResp
 
-        let warnings: [WeatherWarning]? = warn?.warning?.map {
-            WeatherWarning(title: $0.title ?? "", type: $0.typeName ?? $0.type ?? "", level: $0.level ?? "蓝色")
+        let warnings: [WeatherWarning]? = warn?.warning?.compactMap {
+            // typeName 部分类型（如「其他预警」）自带「预警」后缀；统一去掉，由展示层补回。
+            // 「其他」类无实质内容，过滤掉。
+            let rawType = $0.typeName ?? $0.type ?? ""
+            let type = rawType.hasSuffix("预警") ? String(rawType.dropLast(2)) : rawType
+            guard !type.isEmpty, type != "其他" else { return nil }
+            return WeatherWarning(title: $0.title ?? "", type: type, level: $0.level ?? "蓝色")
         }
 
         let minutelyRain: MinutelyRain? = rain.flatMap { r in

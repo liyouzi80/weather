@@ -38,8 +38,9 @@ export const qweatherProvider: WeatherProvider = {
           if (w.status === 'cancel') continue
           const level = qwLevel(w.level ?? '')
           // typeName 部分类型（如「其他预警」）自带「预警」后缀；统一去掉，由展示层补回，避免重复。
+          // 「其他」类无实质内容，过滤掉。
           const type = (w.typeName ?? '').replace(/预警$/, '')
-          if (type && level) {
+          if (type && type !== '其他' && level) {
             warnings.push({ title: w.title ?? `${type}${level}预警信号`, type, level })
           }
         }
