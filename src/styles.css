@@ -340,9 +340,6 @@ html[data-sky='fog'] body::before {
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
 
-/* 风险提示区块：气象预警（一行文字）+ 分钟级降水，统一跟在 hero 之后 */
-.hazard-block { display: flex; flex-direction: column; gap: 10px; margin-bottom: 24px; }
-
 /* 预警 chip 行 */
 .warn-inline {
   display: flex;

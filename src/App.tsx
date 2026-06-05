@@ -609,21 +609,17 @@ export default function App() {
           )}
         </div>
 
-        {/* 气象预警 + 分钟级降水：统一放在 hero 下方，视觉上构成「风险提示」区块 */}
-        {(warnings.length > 0 || minutelyRain) && (
-          <div className="hazard-block">
-            {warnings.length > 0 && <WarningInline warnings={warnings} />}
-            {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
-          </div>
-        )}
-
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
+
+        {warnings.length > 0 && <WarningInline warnings={warnings} />}
+
+        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
+
+        {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
 
         {showPullHint && !initialLoad && (
           <div className="pull-hint" aria-hidden="true">↓ 下拉更新</div>
         )}
-
-        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
       </div>
 
