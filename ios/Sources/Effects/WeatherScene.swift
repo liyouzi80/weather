@@ -200,11 +200,17 @@ class WeatherScene: SKScene {
     // MARK: - Fog
 
     private func setupFog() {
+        // 全屏底层薄幕：白色雾气打底
+        let veil = SKSpriteNode(color: UIColor(white: 0.88, alpha: 0.28), size: size)
+        veil.position = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
+        veil.zPosition = -1
+        addChild(veil)
+
         for i in 0..<6 {
-            let fog = SKSpriteNode(color: UIColor(white: 0.9, alpha: 0.14 + Double(i) * 0.025),
-                                   size: CGSize(width: size.width * 1.8, height: size.height * 0.18))
+            let fog = SKSpriteNode(color: UIColor(white: 0.90, alpha: 0.32 + Double(i) * 0.04),
+                                   size: CGSize(width: size.width * 1.8, height: size.height * 0.20))
             fog.position = CGPoint(x: size.width * 0.5,
-                                   y: size.height * (0.15 + Double(i) * 0.15))
+                                   y: size.height * (0.12 + Double(i) * 0.15))
             let dx = (i % 2 == 0 ? 1.0 : -1.0) * size.width * 0.6
             let dur = Double.random(in: 8...14)
             fog.run(SKAction.repeatForever(SKAction.sequence([
@@ -221,7 +227,7 @@ class WeatherScene: SKScene {
         let hazeColor = UIColor(red: 0.66, green: 0.61, blue: 0.50, alpha: 1)
 
         // 全屏灰黄薄幕（垫底）
-        let veil = SKSpriteNode(color: hazeColor.withAlphaComponent(0.13), size: size)
+        let veil = SKSpriteNode(color: hazeColor.withAlphaComponent(0.28), size: size)
         veil.position = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
         veil.zPosition = -1
         addChild(veil)
@@ -229,7 +235,7 @@ class WeatherScene: SKScene {
         // 横向霾层：越靠下（低 y）越浓，模拟近地面/地平线能见度更低
         for i in 0..<7 {
             let t = Double(i) / 6.0
-            let band = SKSpriteNode(color: hazeColor.withAlphaComponent(0.10 + (1 - t) * 0.15),
+            let band = SKSpriteNode(color: hazeColor.withAlphaComponent(0.22 + (1 - t) * 0.28),
                                     size: CGSize(width: size.width * 1.8, height: size.height * 0.20))
             band.position = CGPoint(x: size.width * 0.5,
                                     y: size.height * (0.06 + Double(i) * 0.13))
@@ -252,8 +258,8 @@ class WeatherScene: SKScene {
         dust.particleSpeedRange = 9
         dust.emissionAngle = 0
         dust.emissionAngleRange = .pi * 2
-        dust.particleAlpha = 0.20
-        dust.particleAlphaRange = 0.12
+        dust.particleAlpha = 0.42
+        dust.particleAlphaRange = 0.18
         dust.particleScale = 0.12
         dust.particleScaleRange = 0.08
         dust.particleColor = hazeColor
