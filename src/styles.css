@@ -378,20 +378,7 @@ html[data-sky='fog'] body::before {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   animation: riseIn 0.5s var(--spring) both;
 }
-.minutely-head {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-bottom: 4px;
-}
-.minutely-head svg { color: rgba(90, 200, 250, 0.75); }
-.minutely-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  color: rgba(255, 255, 255, 0.40);
-}
-/* summary 作为卡片标题，大号粗体，仿 Apple Weather */
+/* summary 作为卡片主标题，大号粗体，仿 Apple Weather */
 .minutely-title {
   font-size: 17px;
   font-weight: 700;

@@ -713,28 +713,9 @@ function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
 }
 
 // 分钟级降水卡（和风天气 minutely/5m）
-const RAIN_SVG = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="8" y1="19" x2="8" y2="21" /><line x1="8" y1="13" x2="8" y2="15" />
-    <line x1="16" y1="19" x2="16" y2="21" /><line x1="16" y1="13" x2="16" y2="15" />
-    <line x1="12" y1="21" x2="12" y2="23" /><line x1="12" y1="15" x2="12" y2="17" />
-    <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
-  </svg>
-)
-const SNOW_SVG = (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="12" y1="2" x2="12" y2="22" />
-    <path d="m17 7-5-5-5 5" /><path d="m7 17 5 5 5-5" />
-    <line x1="2" y1="12" x2="22" y2="12" />
-    <path d="m7 7-5 5 5 5" /><path d="m17 7 5 5-5 5" />
-  </svg>
-)
 function MinutelyRainCard({ data }: { data: MinutelyRain }) {
   const pts = data.minutely.slice(0, 12)
   const maxPrecip = Math.max(...pts.map(b => b.precip), 0.1)
-  const isSnow = pts.some(b => b.type === 'snow' && b.precip > 0)
 
   // SVG geometry — viewBox 300×56; floor at 88% for zero-rain baseline
   const W = 300, H = 56
@@ -755,10 +736,6 @@ function MinutelyRainCard({ data }: { data: MinutelyRain }) {
 
   return (
     <div className="minutely-card">
-      <div className="minutely-head">
-        {isSnow ? SNOW_SVG : RAIN_SVG}
-        <span className="minutely-label">下一小时降水量</span>
-      </div>
       {data.summary && <p className="minutely-title">{data.summary}</p>}
       <svg viewBox={`0 0 ${W} ${H}`} className="minutely-svg"
            preserveAspectRatio="none" aria-hidden="true">
