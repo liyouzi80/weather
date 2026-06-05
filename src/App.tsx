@@ -609,7 +609,9 @@ export default function App() {
                     <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
                   )}
                   {stats.feelsLike != null && stats.humidity != null && <span className="hero-comfort-sep">·</span>}
-                  {stats.humidity != null && <span>湿度 {stats.humidity}%</span>}
+                  {stats.humidity != null && (
+                    <span style={{ color: humidLevel(stats.humidity).color }}>湿度 {stats.humidity}%</span>
+                  )}
                 </div>
               )}
               <div className="hero-hilo" aria-hidden="true">
@@ -1013,6 +1015,7 @@ const SKY_THEME: Record<string, string> = {
   rain: '#172a3e',
   snow: '#293751',
   fog: '#2b2e36',
+  haze: '#34302a',
 }
 
 // 太阳时相：按北京时（番禺/安福均在 UTC+8）算昼夜 + 日出/日落暖色染色。
@@ -1037,7 +1040,8 @@ function skyKey(text: string | undefined, night: boolean): string {
   if (text) {
     if (/雷|雨/.test(text)) return 'rain'
     if (/雪/.test(text)) return 'snow'
-    if (/雾|霾|沙|尘/.test(text)) return 'fog'
+    if (/霾|沙|尘/.test(text)) return 'haze'
+    if (/雾/.test(text)) return 'fog'
     if (/阴/.test(text)) return 'overcast'
     if (/多云|间/.test(text)) return 'cloudy'
   }
@@ -1054,6 +1058,14 @@ function feelsLevel(t: number): Level {
   if (t < 32)  return { color: '#ffd60a', level: '偏热' }
   if (t < 38)  return { color: '#ff9f0a', level: '较热' }
   return { color: '#ff453a', level: '酷热' }
+}
+// 湿度舒适度：30–70% 中性，过干偏黄、过湿逐级橙/红（南方梅雨/回南天常态高湿）
+function humidLevel(h: number): Level {
+  if (h < 30)  return { color: '#ffd60a', level: '偏干' }
+  if (h <= 70) return { color: NORMAL, level: '舒适' }
+  if (h <= 85) return { color: '#ffd60a', level: '偏湿' }
+  if (h <= 92) return { color: '#ff9f0a', level: '潮湿' }
+  return { color: '#ff453a', level: '闷湿' }
 }
 function aqiLevel(aqi: number): Level {
   if (aqi <= 50)  return { color: NORMAL, level: '优' }

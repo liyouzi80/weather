@@ -129,9 +129,10 @@ html[data-sky='overcast'] { background-color: #171b26; }
 html[data-sky='rain'] { background-color: #101b27; }
 html[data-sky='snow'] { background-color: #19212f; }
 html[data-sky='fog'] { background-color: #1a1c22; }
+html[data-sky='haze'] { background-color: #211e18; }
 
-/* 偏亮的天空主题（多云/雾/雪/阴）：上调次要文字色，保证 ≥AA 对比度 */
-html[data-sky='cloudy'], html[data-sky='fog'],
+/* 偏亮的天空主题（多云/雾/雪/阴/霾）：上调次要文字色，保证 ≥AA 对比度 */
+html[data-sky='cloudy'], html[data-sky='fog'], html[data-sky='haze'],
 html[data-sky='snow'], html[data-sky='overcast'] {
   --text-dim: #b0b0b6;
 }
@@ -173,6 +174,12 @@ html[data-sky='fog'] body::before {
     radial-gradient(ellipse 92% 55% at 50% -10%, #363941 0%, transparent 60%),
     linear-gradient(180deg, #2b2e36 0%, #1a1c20 44%, #1a1c22 100%);
 }
+/* 霾：灰黄脏空气，地平线方向（底部）最浓 */
+html[data-sky='haze'] body::before {
+  background:
+    radial-gradient(ellipse 92% 55% at 50% -8%, #45402f 0%, transparent 58%),
+    linear-gradient(180deg, #34302a 0%, #262219 46%, #211e18 100%);
+}
 
 .app {
   max-width: 560px;
@@ -197,8 +204,13 @@ html[data-sky='fog'] body::before {
   /* pan-y：浏览器只接管垂直滚动，JS 可拦截水平滑动并调用 preventDefault() */
   touch-action: pan-y;
 }
-/* 统计卡片块用 auto 外边距钉到首屏底部；内容溢出时 auto 自动归零，恢复正常滚动 */
-.swipe-wrap > .app-content:last-child { margin-top: auto; }
+/* 首屏多余高度全部交给 hero 区吸收（见 .hero flex:1）：metric/降水/信源/空气
+   所有卡片成组紧贴、整体沉底，卡片之间不再出现空洞。内容溢出时 hero 收回到自然高度，正常滚动。 */
+.swipe-wrap > .app-content:first-child {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
 .swipe-wrap.dragging {
   transition: none;
   /* 仅拖动期间提升 GPU 合成层，空闲时不占显存 */
@@ -543,13 +555,16 @@ html[data-sky='fog'] body::before {
 
 /* ── Hero：浮在天空背景上，无玻璃卡 ── */
 
-/* 内容自然高度，紧凑堆在顶部（对齐 iOS），metric-strip 紧随其后，不撑满视口留空隙 */
+/* hero 吸收首屏多余高度（flex:1）：内容居中分布，让温度区域自适应撑开，
+   下方卡片成组贴底。内容溢出一屏时 flex 收回自然高度，正常滚动。 */
 .hero {
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 0 24px;
+  justify-content: center;
+  flex: 1 0 auto;
+  padding: 24px 0;
   animation: riseIn 0.55s var(--spring) both;
   /* will-change 由滚动逻辑按需挂载/撤除（见 App.tsx onScroll），不常驻以释放 GPU 层 */
 }

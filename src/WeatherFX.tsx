@@ -9,7 +9,7 @@ const REDUCED = typeof matchMedia !== 'undefined'
 const prefersReduced = () => REDUCED
 
 export type FxKind =
-  | 'rain' | 'thunder' | 'snow' | 'fog'
+  | 'rain' | 'thunder' | 'snow' | 'fog' | 'haze'
   | 'clear-day' | 'clear-night'
   | 'cloudy' | 'cloudy-night'
   | 'overcast' | 'overcast-night'
@@ -19,7 +19,9 @@ export function fxKind(text: string | undefined, night: boolean): FxKind {
     if (/雷/.test(text)) return 'thunder'
     if (/雨/.test(text)) return 'rain'
     if (/雪/.test(text)) return 'snow'
-    if (/雾|霾|沙|尘/.test(text)) return 'fog'
+    // 霾/沙/尘是空气污染，走灰黄霾霭特效；雾是水汽，走白色雾气
+    if (/霾|沙|尘/.test(text)) return 'haze'
+    if (/雾/.test(text)) return 'fog'
     if (/阴/.test(text)) return night ? 'overcast-night' : 'overcast'
     if (/多云|间/.test(text)) return night ? 'cloudy-night' : 'cloudy'
   }
@@ -526,10 +528,13 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       }
       buildCloudScene()
 
-    } else if (kind === 'fog') {
-      // Horizontal drifting bands + slow volumetric blobs for depth
-      for (let i = 0; i < 9; i++)
-        fogBands.push({ y: rnd(0.06, 0.94) * H, ph: rnd(0, TAU), spd: rnd(0.3, 0.8), o: rnd(0.09, 0.19), h: rnd(60, 140) })
+    } else if (kind === 'fog' || kind === 'haze') {
+      // Horizontal drifting bands + slow volumetric blobs for depth.
+      // 霾时霾层更密、更偏地平线下方（能见度低、地面方向最浓）。
+      const haze = kind === 'haze'
+      const bandLo = haze ? 0.32 : 0.06
+      for (let i = 0; i < (haze ? 11 : 9); i++)
+        fogBands.push({ y: rnd(bandLo, 0.96) * H, ph: rnd(0, TAU), spd: rnd(0.3, 0.8), o: rnd(0.10, haze ? 0.22 : 0.19), h: rnd(60, 140) })
       const nb = Math.round(Math.min(7, area / 70000))
       for (let i = 0; i < nb; i++)
         motes.push({ x: rnd(0, W), y: rnd(0.1, 0.9) * H, r: rnd(H * 0.10, H * 0.20), vx: rnd(5, 16) * (Math.random() < 0.5 ? -1 : 1), vy: rnd(-3, 3), o: rnd(0.05, 0.11) })
@@ -718,6 +723,43 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
             bG.addColorStop(0.38, `rgba(215,220,230,${band.o})`)
             bG.addColorStop(0.62, `rgba(215,220,230,${band.o})`)
             bG.addColorStop(1,    'rgba(215,220,230,0)')
+            ctx.fillStyle = bG
+            ctx.fillRect(0, cy - band.h, W, band.h * 2)
+            if (!reduced) band.ph += dt * band.spd * 0.6
+          }
+          break
+        }
+
+        // ── Haze（霾/沙/尘）：灰黄霾霭薄幕 + 浮尘 + 偏地平线的横向霾层 ──────────
+        case 'haze': {
+          // 整屏薄幕：上浅下浓，模拟地平线方向能见度更低的脏空气
+          const veil = ctx.createLinearGradient(0, 0, 0, H)
+          veil.addColorStop(0,   'rgba(152,142,118,0.10)')
+          veil.addColorStop(0.5, 'rgba(150,138,112,0.17)')
+          veil.addColorStop(1,   'rgba(138,124,98,0.26)')
+          ctx.fillStyle = veil
+          ctx.fillRect(0, 0, W, H)
+          // 浮尘团（灰黄）
+          for (const m of motes) {
+            const g = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r)
+            g.addColorStop(0,   `rgba(178,166,138,${m.o})`)
+            g.addColorStop(0.6, `rgba(170,158,130,${m.o * 0.5})`)
+            g.addColorStop(1,   'rgba(162,150,122,0)')
+            ctx.fillStyle = g
+            ctx.beginPath(); ctx.arc(m.x, m.y, m.r, 0, TAU); ctx.fill()
+            if (!reduced) {
+              m.x += m.vx * dt; m.y += m.vy * dt
+              if (m.x - m.r > W) m.x = -m.r; else if (m.x + m.r < 0) m.x = W + m.r
+            }
+          }
+          // 横向霾层
+          for (const band of fogBands) {
+            const cy = band.y + Math.sin(band.ph) * 14
+            const bG = ctx.createLinearGradient(0, cy - band.h, 0, cy + band.h)
+            bG.addColorStop(0,   'rgba(168,156,128,0)')
+            bG.addColorStop(0.4, `rgba(168,156,128,${band.o})`)
+            bG.addColorStop(0.6, `rgba(168,156,128,${band.o})`)
+            bG.addColorStop(1,   'rgba(168,156,128,0)')
             ctx.fillStyle = bG
             ctx.fillRect(0, cy - band.h, W, band.h * 2)
             if (!reduced) band.ph += dt * band.spd * 0.6
