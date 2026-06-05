@@ -83,6 +83,7 @@ export default function App() {
     try { return !localStorage.getItem('pwr_hint_seen') } catch { return true }
   })
   const [cardsOpen, setCardsOpen] = useState(false)
+  const [aqiOpen, setAqiOpen] = useState(false)
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
 
@@ -174,6 +175,7 @@ export default function App() {
         setCityIdx(i)
         setScrolled(false)
         setCardsOpen(false)
+        setAqiOpen(false)
       })
       window.scrollTo(0, 0)
       if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
@@ -431,6 +433,7 @@ export default function App() {
         const tempEl = hero.querySelector<HTMLElement>('.hero-temp')
         const condEl = hero.querySelector<HTMLElement>('.hero-cond')
         const hiloEl = hero.querySelector<HTMLElement>('.hero-hilo')
+        const comfortEl = hero.querySelector<HTMLElement>('.hero-comfort')
         const cityEl = hero.querySelector<HTMLElement>('.hero-city')
 
         // 吸顶 scrolled：显示阈值 80px，隐藏阈值 60px（滞后区间防止边界反复闪烁）
@@ -443,6 +446,7 @@ export default function App() {
           if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
           if (condEl) condEl.style.opacity = ''
           if (hiloEl) hiloEl.style.opacity = ''
+          if (comfortEl) comfortEl.style.opacity = ''
           if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
           if (cityEl) {
             // 从滚动态回到顶部时：平滑淡入城市名，避免硬跳
@@ -465,6 +469,7 @@ export default function App() {
         if (cityEl) cityEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
+        if (comfortEl) comfortEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (tempEl) {
           // transform-origin: 50% 20% 令缩放从顶部折叠，translateY 让数字向上飞向吸顶栏
           const scale = (1 - 0.28 * t2).toFixed(3)
@@ -597,16 +602,20 @@ export default function App() {
               >
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
-              <div className="hero-cond" aria-hidden="true">
-                {stats.text}
-                {stats.feelsLike != null && (
-                  <span style={{ color: feelsLevel(stats.feelsLike).color }}>{' · '}体感 {Math.round(stats.feelsLike)}°</span>
-                )}
-              </div>
+              <div className="hero-cond" aria-hidden="true">{stats.text}</div>
               <div className="hero-hilo" aria-hidden="true">
                 <span>↑ {Math.round(stats.max)}°</span>
                 <span>↓ {Math.round(stats.min)}°</span>
               </div>
+              {(stats.feelsLike != null || stats.humidity != null) && (
+                <div className="hero-comfort" aria-hidden="true">
+                  {stats.feelsLike != null && (
+                    <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
+                  )}
+                  {stats.feelsLike != null && stats.humidity != null && <span className="hero-comfort-sep">·</span>}
+                  {stats.humidity != null && <span>湿度 {stats.humidity}%</span>}
+                </div>
+              )}
               {loading && results.length > 0
                 ? <span className="hero-updated refreshing">数据更新中…</span>
                 : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
@@ -625,9 +634,9 @@ export default function App() {
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
-        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
-
         {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
+
+        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
         {showPullHint && !initialLoad && (
           <div className="pull-hint" aria-hidden="true">↓ 下拉更新</div>
@@ -679,7 +688,34 @@ export default function App() {
           </>
         )}
 
-        {air.length > 0 && <AqiSection air={air} />}
+        {air.length > 0 && avgAqi != null && (
+          <>
+            <button
+              type="button"
+              className={'cards-summary' + (aqiOpen ? ' open' : '')}
+              onClick={() => setAqiOpen(o => !o)}
+              aria-expanded={aqiOpen}
+            >
+              <span className="cards-summary-label">
+                <span className="cards-summary-count">空气质量</span>
+                <span className="cards-summary-sep">·</span>
+                <span style={{ color: aqiColor(avgAqi) }}>AQI {avgAqi}</span>
+                <span className="cards-summary-sep">·</span>
+                <span style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
+              </span>
+              <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2.2"
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <div className={'cards-expand' + (aqiOpen ? ' open' : '')}>
+              <div className="cards-expand-inner">
+                <AqiSection air={air} />
+              </div>
+            </div>
+          </>
+        )}
 
         {isEmpty && (
           <div className="hint">
@@ -823,53 +859,47 @@ function aqiCategory(aqi: number): string {
 // memo：拖动/下拉手势会每帧更新 App 状态，记忆化避免数据未变时整列重渲染
 const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
   return (
-    <div className="aqi-section">
-      <div className="cards">
-        {air.map((r) => {
-          if (r.error || !r.air) {
-            return null   // AQI 源失败时静默跳过
-          }
-          const a = r.air
-          const col = aqiColor(a.aqi)
-          const Tag = r.url ? 'a' : 'div'
-          return (
-            <Tag
-              className={'card aqi-card' + (r.url ? ' card-link' : '')}
-              key={r.providerId}
-              {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-            >
-
-              <div className="head">
-                <span className="dot" style={{ background: r.color }} />
-                <span className="name">{r.providerName}</span>
-                {r.url && (
-                  <svg className="card-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                    <polyline points="15 3 21 3 21 9" />
-                    <line x1="10" y1="14" x2="21" y2="3" />
-                  </svg>
-                )}
-                <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
-                <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
-              </div>
-              {(a.dominant || a.pm25 != null) && (
-                <div className="row">
-                  {a.dominant === 'PM2.5' && a.pm25 != null ? (
-                    // 主要污染物就是 PM2.5 时合并成一条，避免「主要污染物 PM2.5」与「PM2.5 9」重复
-                    <span>主要污染物 <b>PM2.5</b> · {a.pm25} μg/m³</span>
-                  ) : (
-                    <>
-                      {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
-                      {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
-                    </>
-                  )}
-                </div>
+    <div className="cards">
+      {air.map((r) => {
+        if (r.error || !r.air) return null
+        const a = r.air
+        const col = aqiColor(a.aqi)
+        const Tag = r.url ? 'a' : 'div'
+        return (
+          <Tag
+            className={'card aqi-card' + (r.url ? ' card-link' : '')}
+            key={r.providerId}
+            {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
+          >
+            <div className="head">
+              <span className="dot" style={{ background: r.color }} />
+              <span className="name">{r.providerName}</span>
+              {r.url && (
+                <svg className="card-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
               )}
-              {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
-            </Tag>
-          )
-        })}
-      </div>
+              <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
+              <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
+            </div>
+            {(a.dominant || a.pm25 != null) && (
+              <div className="row">
+                {a.dominant === 'PM2.5' && a.pm25 != null ? (
+                  <span>主要污染物 <b>PM2.5</b> · {a.pm25} μg/m³</span>
+                ) : (
+                  <>
+                    {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
+                    {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
+                  </>
+                )}
+              </div>
+            )}
+            {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
+          </Tag>
+        )
+      })}
     </div>
   )
 })

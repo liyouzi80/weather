@@ -608,11 +608,24 @@ html[data-sky='fog'] body::before {
   margin-top: 5px;
   letter-spacing: 0.01em;
 }
+.hero-comfort {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.52);
+  margin-top: 6px;
+  letter-spacing: 0.01em;
+}
+.hero-comfort-sep { opacity: 0.45; }
 /* Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
    保证在浅色天空主题（晴天/雪）+ 飘动粒子下仍清晰可读（对齐苹果天气）。 */
 .hero-temp,
 .hero-cond,
 .hero-hilo,
+.hero-comfort,
 .hero-updated {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
 }
@@ -748,11 +761,9 @@ a.card { text-decoration: none; color: inherit; display: block; }
 .tag-hot { color: var(--hot); }
 .tag-cold { color: var(--cold); }
 
-.aqi-section { margin-top: 10px; }
-
 /* AQI 等级颜色平滑过渡，跨等级刷新时不突变 */
 .aqi-cat { font-size: 13px; font-weight: 600; transition: color 0.4s var(--spring); }
-.aqi-section .temp { transition: color 0.4s var(--spring); }
+.aqi-card .temp { transition: color 0.4s var(--spring); }
 .aqi-unit { font-size: 11px; font-weight: 600; opacity: 0.7; margin-left: 3px; letter-spacing: 0.02em; }
 
 /* ── Loading ── */
