@@ -505,7 +505,7 @@ export default function App() {
     if (temps.length < 2) return null
     const avg = temps.reduce((a, b) => a + b, 0) / temps.length
     const sd = Math.sqrt(temps.reduce((a, b) => a + (b - avg) ** 2, 0) / temps.length)
-    return { count: temps.length, avg: Math.round(avg), sd: sd.toFixed(1) }
+    return { count: temps.length, sd: sd.toFixed(1) }
   }, [results])
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
@@ -603,10 +603,6 @@ export default function App() {
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
-              <div className="hero-hilo" aria-hidden="true">
-                <span>↑ {Math.round(stats.max)}°</span>
-                <span>↓ {Math.round(stats.min)}°</span>
-              </div>
               {(stats.feelsLike != null || stats.humidity != null) && (
                 <div className="hero-comfort" aria-hidden="true">
                   {stats.feelsLike != null && (
@@ -616,6 +612,10 @@ export default function App() {
                   {stats.humidity != null && <span>湿度 {stats.humidity}%</span>}
                 </div>
               )}
+              <div className="hero-hilo" aria-hidden="true">
+                <span>↑ {Math.round(stats.max)}°</span>
+                <span>↓ {Math.round(stats.min)}°</span>
+              </div>
               {loading && results.length > 0
                 ? <span className="hero-updated refreshing">数据更新中…</span>
                 : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
@@ -663,8 +663,6 @@ export default function App() {
               >
                 <span className="cards-summary-label">
                   <span className="cards-summary-count">{sourceSummary.count} 个信源</span>
-                  <span className="cards-summary-sep">·</span>
-                  <span>均值 {sourceSummary.avg}°</span>
                   <span className="cards-summary-sep">·</span>
                   <span>偏差 ±{sourceSummary.sd}°</span>
                 </span>

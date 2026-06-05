@@ -182,15 +182,23 @@ html[data-sky='fog'] body::before {
   padding: 0 max(20px, env(safe-area-inset-right))
              max(72px, calc(44px + env(safe-area-inset-bottom)))
              max(20px, env(safe-area-inset-left));
-  min-height: 100%;
+  /* 全高 flex 列：首屏铺满视口，统计卡片可钉到底部，hero 区域吃掉余下空间 */
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 左右滑动切城市：内容容器随手指平移，松手平滑回弹 */
 .swipe-wrap {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
   transition: transform 0.32s var(--spring);
   /* pan-y：浏览器只接管垂直滚动，JS 可拦截水平滑动并调用 preventDefault() */
   touch-action: pan-y;
 }
+/* 统计卡片块用 auto 外边距钉到首屏底部；内容溢出时 auto 自动归零，恢复正常滚动 */
+.swipe-wrap > .app-content:last-child { margin-top: auto; }
 .swipe-wrap.dragging {
   transition: none;
   /* 仅拖动期间提升 GPU 合成层，空闲时不占显存 */
@@ -592,12 +600,24 @@ html[data-sky='fog'] body::before {
 @supports not (-webkit-touch-callout: none) {
   .hero-temp, .hero-deg { font-weight: 300; }
 }
+/* 天气状况 + 体感/湿度：同一视觉层级（统一字号/字重/颜色），紧贴排列在温度下方 */
 .hero-cond {
   font-size: 17px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.90);
   margin-top: 12px;
 }
+.hero-comfort {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  font-size: 17px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.90);
+  margin-top: 4px;
+}
+.hero-comfort-sep { opacity: 0.4; font-weight: 400; }
 .hero-hilo {
   display: flex;
   justify-content: center;
@@ -605,21 +625,9 @@ html[data-sky='fog'] body::before {
   font-size: 14px;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.58);
-  margin-top: 5px;
+  margin-top: 10px;
   letter-spacing: 0.01em;
 }
-.hero-comfort {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.52);
-  margin-top: 6px;
-  letter-spacing: 0.01em;
-}
-.hero-comfort-sep { opacity: 0.45; }
 /* Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
    保证在浅色天空主题（晴天/雪）+ 飘动粒子下仍清晰可读（对齐苹果天气）。 */
 .hero-temp,
@@ -820,7 +828,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
   .hero-city { font-size: 24px; }
   .hero-temp { font-size: 92px; }
-  .hero-cond { font-size: 19px; }
+  .hero-cond, .hero-comfort { font-size: 19px; }
   .hero-hilo { font-size: 16px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }
@@ -959,11 +967,10 @@ a.card { text-decoration: none; color: inherit; display: block; }
   color: var(--text);
   text-align: left;
   animation: riseIn 0.5s var(--spring) both;
-  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  transition: box-shadow var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
   margin-bottom: 0;
 }
-.cards-summary:hover { background: rgba(255,255,255,0.07); }
-.cards-summary:active { transform: scale(0.99); }
 .cards-summary-label {
   display: flex;
   align-items: center;
