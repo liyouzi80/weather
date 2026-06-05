@@ -20,10 +20,17 @@ func feelsLevel(_ t: Double) -> AlertStyle {
 
 func humidLevel(_ h: Double) -> AlertStyle {
     if h < 30  { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏干") }
-    if h <= 80 { return AlertStyle(color: metricNormal, level: "适宜") }
-    if h <= 88 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏湿") }
-    if h <= 93 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "闷湿") }
-    return AlertStyle(color: Color(hex: "#ff453a"), level: "潮湿")
+    if h <= 70 { return AlertStyle(color: metricNormal, level: "舒适") }
+    if h <= 85 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏湿") }
+    if h <= 92 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "潮湿") }
+    return AlertStyle(color: Color(hex: "#ff453a"), level: "闷湿")
+}
+
+func windLevel(_ v: Double) -> AlertStyle {
+    if v < 20 { return AlertStyle(color: metricNormal, level: "微风") }
+    if v < 40 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "中风") }
+    if v < 60 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "强风") }
+    return AlertStyle(color: Color(hex: "#ff453a"), level: "大风")
 }
 
 func aqiLevel(_ aqi: Int) -> AlertStyle {

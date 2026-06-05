@@ -94,6 +94,7 @@ struct WeatherStats {
     let humidity: Double?
     let pop: Double?
     let uvIndex: Double?
+    let windSpeed: Double?
 }
 
 struct AnnotatedResult: Identifiable {

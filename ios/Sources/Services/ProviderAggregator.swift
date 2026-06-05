@@ -53,6 +53,7 @@ class ProviderAggregator {
         let hums  = ok.compactMap { $0.current?.humidity }
         let pops  = ok.compactMap { $0.current?.pop }
         let uvs   = ok.compactMap { $0.current?.uvIndex }
+        let winds = ok.compactMap { $0.current?.windSpeed }
 
         let avg = temps.reduce(0, +) / Double(temps.count)
         // 排除「未知」（番禺基本站无天气现象描述），避免盖过其他源的真实天气
@@ -67,7 +68,8 @@ class ProviderAggregator {
             feelsLike: feels.isEmpty ? nil : (feels.reduce(0, +) / Double(feels.count)).rounded(),
             humidity: hums.isEmpty ? nil : (hums.reduce(0, +) / Double(hums.count)).rounded(),
             pop: pops.isEmpty ? nil : pops.max()!.rounded(),
-            uvIndex: uvs.isEmpty ? nil : uvs.reduce(0, +) / Double(uvs.count)
+            uvIndex: uvs.isEmpty ? nil : uvs.reduce(0, +) / Double(uvs.count),
+            windSpeed: winds.isEmpty ? nil : winds.reduce(0, +) / Double(winds.count)
         )
     }
 

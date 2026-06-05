@@ -17,14 +17,6 @@ struct HeroView: View {
                         startPoint: .top, endPoint: .bottom)
                 )
 
-            // 更新时间（对齐 PWA .hero-updated）
-            if let updatedAt {
-                Text(updatedLabel(updatedAt))
-                    .font(.system(size: 12, weight: .regular))
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(.top, 3)
-            }
-
             Text("\(Int(stats.avg.rounded()))°")
                 .font(.system(size: 100, weight: .ultraLight))
                 .foregroundStyle(.white)
@@ -36,19 +28,39 @@ struct HeroView: View {
                 .foregroundStyle(.white.opacity(0.90))
                 .padding(.top, 12)
 
+            // 体感 · 湿度：与天气状况同一信息层级（放大着色），紧贴其下（对齐 PWA .hero-comfort）
+            if stats.feelsLike != nil || stats.humidity != nil {
+                HStack(spacing: 7) {
+                    if let f = stats.feelsLike {
+                        Text("体感 \(Int(f.rounded()))°")
+                            .foregroundStyle(feelsLevel(f).color)
+                    }
+                    if stats.feelsLike != nil && stats.humidity != nil {
+                        Text("·").foregroundStyle(.white.opacity(0.4))
+                    }
+                    if let h = stats.humidity {
+                        Text("湿度 \(Int(h.rounded()))%")
+                            .foregroundStyle(humidLevel(h).color)
+                    }
+                }
+                .font(.system(size: 19, weight: .medium))
+                .padding(.top, 6)
+            }
+
             HStack(spacing: 10) {
                 Text("↑ \(Int(stats.max.rounded()))°")
                 Text("↓ \(Int(stats.min.rounded()))°")
             }
             .font(.system(size: 14, weight: .regular))
             .foregroundStyle(.white.opacity(0.58))
-            .padding(.top, 5)
+            .padding(.top, 10)
 
-            if let f = stats.feelsLike {
-                Text("体感 \(Int(f.rounded()))°")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(feelsLevel(f).color)
-                    .padding(.top, 8)
+            // 更新时间移到最底部（对齐 PWA .hero-updated 排序）
+            if let updatedAt {
+                Text(updatedLabel(updatedAt))
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.6))
+                    .padding(.top, 10)
             }
         }
         .padding(.top, 20)

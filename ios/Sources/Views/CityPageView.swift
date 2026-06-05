@@ -3,6 +3,8 @@ import SwiftUI
 struct CityPageView: View {
     @State var vm: CityViewModel
     @State private var scrollOffset: CGFloat = 0
+    @State private var cardsOpen = false
+    @State private var aqiOpen = false
     @Environment(\.horizontalSizeClass) private var hSize
 
     private var isNight: Bool {
@@ -109,21 +111,62 @@ struct CityPageView: View {
                         .riseIn(0.12)
                 }
 
-                // 信源卡片（iPad 横屏两列）—— 逐卡错峰入场
-                LazyVGrid(columns: providerColumns, spacing: 10) {
-                    ForEach(Array(vm.annotated.enumerated()), id: \.element.id) { idx, item in
-                        ProviderCardView(result: item)
-                            .riseIn(0.16 + Double(idx) * 0.05)
+                // 信源：默认折叠成摘要行（N 个信源 · 偏差 ±X°），点击展开全部信源卡
+                if let summary = vm.sourceSummary {
+                    CollapsibleSummary(isOpen: $cardsOpen) {
+                        HStack(spacing: 6) {
+                            Text("\(summary.count) 个信源").foregroundStyle(.white)
+                            Text("·").foregroundStyle(.white.opacity(0.45))
+                            Text("偏差 ±\(summary.sd)°").foregroundStyle(.white.opacity(0.75))
+                        }
+                        .font(.system(size: 14, weight: .medium))
                     }
-                }
-                .padding(.horizontal, 16)
+                    .padding(.horizontal, 16)
+                    .riseIn(0.16)
 
-                // AQI
-                if !vm.air.isEmpty {
-                    AQISectionView(air: vm.air)
+                    if cardsOpen {
+                        LazyVGrid(columns: providerColumns, spacing: 10) {
+                            ForEach(vm.annotated) { item in
+                                ProviderCardView(result: item)
+                            }
+                        }
                         .padding(.horizontal, 16)
-                        .padding(.top, 20)
-                        .riseIn(0.20)
+                        .padding(.top, 10)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
+                } else {
+                    // 不足 2 源：无可折叠摘要，直接平铺
+                    LazyVGrid(columns: providerColumns, spacing: 10) {
+                        ForEach(Array(vm.annotated.enumerated()), id: \.element.id) { idx, item in
+                            ProviderCardView(result: item)
+                                .riseIn(0.16 + Double(idx) * 0.05)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+
+                // AQI：默认折叠成摘要行（空气质量 · AQI N · 等级），点击展开各信源 AQI 卡
+                if !vm.air.isEmpty, let avgAqi = vm.avgAqi {
+                    CollapsibleSummary(isOpen: $aqiOpen) {
+                        HStack(spacing: 6) {
+                            Text("空气质量").foregroundStyle(.white)
+                            Text("·").foregroundStyle(.white.opacity(0.45))
+                            Text("AQI \(avgAqi)").foregroundStyle(aqiColor(avgAqi))
+                            Text("·").foregroundStyle(.white.opacity(0.45))
+                            Text(aqiCategory(avgAqi)).foregroundStyle(aqiColor(avgAqi))
+                        }
+                        .font(.system(size: 14, weight: .medium))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .riseIn(0.20)
+
+                    if aqiOpen {
+                        AQISectionView(air: vm.air)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
 
                 Spacer(minLength: 48)
@@ -176,6 +219,35 @@ struct ScrollOffsetKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = nextValue()
+    }
+}
+
+// 折叠摘要行：玻璃卡按钮，左侧自定义标签 + 右侧箭头；点击切换展开。
+// 用 .plain 按钮样式去掉默认按压高亮（对齐 PWA 去掉折叠卡的点击选中效果）。
+struct CollapsibleSummary<Label: View>: View {
+    @Binding var isOpen: Bool
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Button {
+            Haptics.soft()
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) { isOpen.toggle() }
+        } label: {
+            HStack(spacing: 10) {
+                label()
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .glassCard()
+        }
+        .buttonStyle(.plain)
     }
 }
 

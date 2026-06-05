@@ -12,13 +12,9 @@ struct MetricStripView: View {
         let alertColor: Color?
     }
 
+    // 体感/湿度已上移至 Hero 区，指标条聚焦「出行决策」：降水 / 空气 / 紫外线 / 风速
     private var cols: [MetricCol] {
         var result: [MetricCol] = []
-        if let h = stats.humidity {
-            let a = humidLevel(h)
-            result.append(MetricCol(id: "humid", value: "\(Int(h.rounded()))%",
-                                    dim: "湿度", level: a.level, alertColor: a.color))
-        }
         if let p = stats.pop {
             let a = popLevel(p)
             result.append(MetricCol(id: "pop", value: "\(Int(p.rounded()))%",
@@ -33,6 +29,11 @@ struct MetricStripView: View {
             let a = uvLevel(uv)
             result.append(MetricCol(id: "uv", value: "\(Int(uv.rounded()))",
                                     dim: "紫外线", level: a.level, alertColor: a.color))
+        }
+        if let w = stats.windSpeed {
+            let a = windLevel(w)
+            result.append(MetricCol(id: "wind", value: "\(Int(w.rounded()))",
+                                    dim: "风速", level: a.level, alertColor: a.color))
         }
         return result
     }

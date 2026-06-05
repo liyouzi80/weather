@@ -7,7 +7,9 @@ func weatherFXKind(_ text: String, night: Bool) -> String {
     if text.contains("雷") { return "thunder" }
     if text.contains("雨") { return "rain" }
     if text.contains("雪") { return "snow" }
-    if text.contains("雾") || text.contains("霾") || text.contains("沙") || text.contains("尘") { return "fog" }
+    // 霾/沙/尘是空气污染，走灰黄霾霭；雾是水汽，走白色雾气
+    if text.contains("霾") || text.contains("沙") || text.contains("尘") { return "haze" }
+    if text.contains("雾") { return "fog" }
     if text.contains("阴") { return night ? "overcast-night" : "overcast" }
     if text.contains("多云") || text.contains("间") { return night ? "cloudy-night" : "cloudy" }
     return night ? "clear-night" : "clear-day"
@@ -102,6 +104,7 @@ class WeatherScene: SKScene {
         case "rain", "thunder": setupRain(thunder: kind == "thunder")
         case "snow":            setupSnow()
         case "fog":             setupFog()
+        case "haze":            setupHaze()
         case "clear-day":       setupClearDay()
         case "clear-night":     setupClearNight()
         case "cloudy":          setupClouds(overcast: false, night: false)
@@ -210,6 +213,54 @@ class WeatherScene: SKScene {
             ])))
             addChild(fog)
         }
+    }
+
+    // MARK: - Haze（霾/沙/尘：灰黄脏空气，地平线方向最浓）
+
+    private func setupHaze() {
+        let hazeColor = UIColor(red: 0.66, green: 0.61, blue: 0.50, alpha: 1)
+
+        // 全屏灰黄薄幕（垫底）
+        let veil = SKSpriteNode(color: hazeColor.withAlphaComponent(0.13), size: size)
+        veil.position = CGPoint(x: size.width * 0.5, y: size.height * 0.5)
+        veil.zPosition = -1
+        addChild(veil)
+
+        // 横向霾层：越靠下（低 y）越浓，模拟近地面/地平线能见度更低
+        for i in 0..<7 {
+            let t = Double(i) / 6.0
+            let band = SKSpriteNode(color: hazeColor.withAlphaComponent(0.10 + (1 - t) * 0.15),
+                                    size: CGSize(width: size.width * 1.8, height: size.height * 0.20))
+            band.position = CGPoint(x: size.width * 0.5,
+                                    y: size.height * (0.06 + Double(i) * 0.13))
+            let dx = (i % 2 == 0 ? 1.0 : -1.0) * size.width * 0.5
+            let dur = Double.random(in: 10...16)
+            band.run(SKAction.repeatForever(SKAction.sequence([
+                SKAction.moveBy(x: dx, y: 0, duration: dur),
+                SKAction.moveBy(x: -dx, y: 0, duration: dur)
+            ])))
+            addChild(band)
+        }
+
+        // 缓慢漂浮的浮尘
+        let dust = SKEmitterNode()
+        dust.particleTexture = dotTexture
+        dust.particleBirthRate = 9
+        dust.particleLifetime = 12
+        dust.particleLifetimeRange = 5
+        dust.particleSpeed = 7
+        dust.particleSpeedRange = 9
+        dust.emissionAngle = 0
+        dust.emissionAngleRange = .pi * 2
+        dust.particleAlpha = 0.20
+        dust.particleAlphaRange = 0.12
+        dust.particleScale = 0.12
+        dust.particleScaleRange = 0.08
+        dust.particleColor = hazeColor
+        dust.particleColorBlendFactor = 1
+        dust.position = CGPoint(x: size.width * 0.5, y: size.height * 0.4)
+        dust.particlePositionRange = CGVector(dx: size.width, dy: size.height)
+        addChild(dust)
     }
 
     // MARK: - Clear day (god rays + dust)
