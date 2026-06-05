@@ -209,7 +209,6 @@ export default function App() {
   const pullSvgRef = useRef<SVGSVGElement>(null)
   const pullCircleRef = useRef<SVGCircleElement>(null)
   const swipeWrapRef = useRef<HTMLElement>(null)
-  const locHeaderRef = useRef<HTMLElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
   const selectCityRef = useRef(selectCity)
@@ -527,16 +526,6 @@ export default function App() {
     document.documentElement.dataset.sky = sky
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', SKY_THEME[sky] ?? '#0b1426')
   }, [stats, night])
-  // 量测 loc-header 实际高度 → CSS 变量 --loc-h，供 .hero-section min-height 自适应使用
-  useEffect(() => {
-    const header = locHeaderRef.current
-    if (!header) return
-    const update = () => document.documentElement.style.setProperty('--loc-h', `${header.offsetHeight}px`)
-    const ro = new ResizeObserver(update)
-    ro.observe(header)
-    update()
-    return () => ro.disconnect()
-  }, [])
 
   // 实时天气动效类型（全屏背景层）
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
@@ -566,7 +555,6 @@ export default function App() {
         </svg>
       </div>
       <header
-        ref={locHeaderRef}
         className={'loc-header' + (scrolled ? ' scrolled' : '')}
         onClick={scrolled ? () => window.scrollTo({ top: 0, behavior: 'smooth' }) : undefined}
         aria-label={scrolled ? '回到顶部' : undefined}
@@ -586,7 +574,7 @@ export default function App() {
         className={'swipe-wrap' + (dragging ? ' dragging' : '')}
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
-      <div className="app-content hero-section" key={cityIdx}>
+      <div className="app-content" key={cityIdx}>
         <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <h1 className="hero-city">{city.name}</h1>
           {stats ? (

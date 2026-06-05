@@ -547,23 +547,13 @@ html[data-sky='fog'] body::before {
 
 /* ── Hero：浮在天空背景上，无玻璃卡 ── */
 
-/* 首屏容器：min-height = 100svh - loc-header实际高度（由JS注入 --loc-h）。
-   hero 在其中 flex:1 撑开，metric-strip 自然落在视口底部，零硬编码偏移量。 */
-.hero-section {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100svh - var(--loc-h, 60px));
-}
-
+/* 内容自然高度，紧凑堆在顶部（对齐 iOS），metric-strip 紧随其后，不撑满视口留空隙 */
 .hero {
   text-align: center;
-  flex: 1 0 auto; /* 填满 hero-section 中 metric-strip 以外的剩余空间 */
-  min-height: 44svh; /* JS 未就绪前的兜底 */
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 8px 0 clamp(16px, 10svh, 52px);
+  padding: 12px 0 24px;
   animation: riseIn 0.55s var(--spring) both;
   /* will-change 由滚动逻辑按需挂载/撤除（见 App.tsx onScroll），不常驻以释放 GPU 层 */
 }
