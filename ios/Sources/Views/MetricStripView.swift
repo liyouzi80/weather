@@ -43,7 +43,7 @@ struct MetricStripView: View {
                 ForEach(cols) { col in
                     VStack(spacing: 5) {
                         Text(col.value)
-                            .font(.system(size: 19, weight: .semibold).monospacedDigit())
+                            .font(.system(size: 21, weight: .semibold).monospacedDigit())
                             .foregroundStyle(col.alertColor ?? .white)
                         VStack(spacing: 2) {
                             Text(col.dim)
@@ -51,7 +51,7 @@ struct MetricStripView: View {
                                 .foregroundStyle(.white.opacity(0.65))
                             Text(col.level)
                                 .font(.system(size: 11, weight: .medium))
-                                .foregroundStyle(col.alertColor ?? .white.opacity(0.60))
+                                .foregroundStyle(.white.opacity(0.60))
                         }
                     }
                     .frame(maxWidth: .infinity)

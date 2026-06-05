@@ -772,7 +772,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 .aqi-section { margin-top: 10px; }
 
-/* AQI 卡左侧等级色竖线：增强一眼扫描等级的能力 */
 /* AQI 等级颜色平滑过渡，跨等级刷新时不突变 */
 .aqi-cat { font-size: 13px; font-weight: 600; transition: color 0.4s var(--spring); }
 .aqi-section .temp { transition: color 0.4s var(--spring); }
