@@ -82,6 +82,7 @@ export default function App() {
   const [showPullHint, setShowPullHint] = useState(() => {
     try { return !localStorage.getItem('pwr_hint_seen') } catch { return true }
   })
+  const [cardsOpen, setCardsOpen] = useState(false)
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
 
@@ -172,15 +173,17 @@ export default function App() {
         setInitialLoad(true)
         setCityIdx(i)
         setScrolled(false)
+        setCardsOpen(false)
       })
       window.scrollTo(0, 0)
-      if (heroRef.current) { heroRef.current.style.opacity = '1'; heroRef.current.style.transform = '' }
       if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
     }
 
-    // View Transitions API：在新旧城市内容之间做全页渐变转场（iOS 18+ / Chrome 111+）。
+    // View Transitions：根据城市索引方向设置滑动方向（forward/back），让转场带有方向感。
     if (typeof document.startViewTransition === 'function') {
-      document.startViewTransition(doSwitch)
+      document.documentElement.dataset.vtDir = i > cityIdx ? 'forward' : 'back'
+      const vt = document.startViewTransition(doSwitch)
+      vt.finished.finally(() => { delete document.documentElement.dataset.vtDir })
     } else {
       doSwitch()
     }
@@ -437,9 +440,6 @@ export default function App() {
         if (y <= 0) {
           const justArrived = !wasAtTop
           wasAtTop = true
-          // 回到顶部静止：撤掉 will-change，释放 GPU 合成层
-          if (justArrived) hero.style.willChange = 'auto'
-          hero.style.opacity = '1'; hero.style.transform = ''
           if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
           if (condEl) condEl.style.opacity = ''
           if (hiloEl) hiloEl.style.opacity = ''
@@ -456,15 +456,12 @@ export default function App() {
           }
           return
         }
-        // 开始滚动：仅在刚离开顶部时挂上 will-change（滚动中持续受益于 GPU 合成层）
-        if (wasAtTop) hero.style.willChange = 'opacity, transform'
         wasAtTop = false
         // Phase 1 (0–80px): 城市名 + 天气状况 + 高低温淡出
+        // hero translateY + opacity 由 CSS scroll-driven 接管（@supports animation-timeline）
         const t1 = Math.min(y / 80, 1)
         // Phase 2 (80–180px): 温度数字缩小 + 向上飞出；吸顶温度交叉淡入
         const t2 = Math.max(0, Math.min((y - 80) / 100, 1))
-        hero.style.transform = `translateY(${(-y * 0.18).toFixed(1)}px)`
-        hero.style.opacity = `${Math.max(0, 1 - y / 200).toFixed(3)}`
         if (cityEl) cityEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
@@ -498,6 +495,13 @@ export default function App() {
   }, [updatedAt])
 
   const { annotated, stats } = useMemo(() => analyze(results), [results])
+  const sourceSummary = useMemo(() => {
+    const temps = results.filter(r => !r.error && r.current != null).map(r => r.current!.temp)
+    if (temps.length < 2) return null
+    const avg = temps.reduce((a, b) => a + b, 0) / temps.length
+    const sd = Math.sqrt(temps.reduce((a, b) => a + (b - avg) ** 2, 0) / temps.length)
+    return { count: temps.length, avg: Math.round(avg), sd: sd.toFixed(1) }
+  }, [results])
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
     return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
@@ -639,11 +643,40 @@ export default function App() {
             ))}
           </div>
         ) : (
-          <div className="cards">
-            {annotated.map((r) => (
-              <ProviderCard key={r.providerId} r={r} />
-            ))}
-          </div>
+          <>
+            {/* 信源摘要：默认收起，点击展开全部信源卡 */}
+            {sourceSummary && (
+              <button
+                type="button"
+                className={'cards-summary' + (cardsOpen ? ' open' : '')}
+                onClick={() => setCardsOpen(o => !o)}
+                aria-expanded={cardsOpen}
+              >
+                <span className="cards-summary-label">
+                  <span className="cards-summary-count">{sourceSummary.count} 个信源</span>
+                  <span className="cards-summary-sep">·</span>
+                  <span>均值 {sourceSummary.avg}°</span>
+                  <span className="cards-summary-sep">·</span>
+                  <span>偏差 ±{sourceSummary.sd}°</span>
+                </span>
+                <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" strokeWidth="2.2"
+                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            )}
+            {/* 展开区域：grid-template-rows 0fr→1fr 平滑撑开 */}
+            <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
+              <div className="cards-expand-inner">
+                <div className="cards">
+                  {annotated.map((r) => (
+                    <ProviderCard key={r.providerId} r={r} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </>
         )}
 
         {air.length > 0 && <AqiSection air={air} />}
@@ -706,7 +739,7 @@ function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
       {sorted.map((w) => (
         <span
           key={w.type + w.level}
-          className="warn-chip"
+          className={'warn-chip' + (/橙|红/.test(w.level) ? ' warn-chip-severe' : '')}
           style={{
             background: warnColorRgba(w.level, 0.15),
             borderColor: warnColorRgba(w.level, 0.45),
@@ -890,7 +923,7 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
 
 interface Stats {
   avg: number; min: number; max: number; count: number; text: string
-  feelsLike?: number; humidity?: number; pop?: number; uvIndex?: number
+  feelsLike?: number; humidity?: number; pop?: number; uvIndex?: number; windSpeed?: number
 }
 
 function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
@@ -918,6 +951,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
   const humAvg = avgOf(hums)
   const pops = ok.map((r) => r.current!.pop).filter((n): n is number => n != null)
   const uvs = ok.map((r) => r.current!.uvIndex).filter((n): n is number => n != null)
+  const winds = ok.map((r) => r.current!.windSpeed).filter((n): n is number => n != null)
 
   const annotated: Annotated[] = results.map((r) => {
     if (!r.current) return r
@@ -937,6 +971,7 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
       pop: pops.length > 0 ? Math.round(Math.max(...pops)) : undefined,
       uvIndex: r1(avgOf(uvs)),
+      windSpeed: r1(avgOf(winds)),
     },
   }
 }
@@ -992,13 +1027,6 @@ function feelsLevel(t: number): Level {
   if (t < 38)  return { color: '#ff9f0a', level: '较热' }
   return { color: '#ff453a', level: '酷热' }
 }
-function humidLevel(h: number): Level {
-  if (h < 30)  return { color: '#ffd60a', level: '偏干' }
-  if (h <= 80) return { color: NORMAL, level: '适宜' }
-  if (h <= 88) return { color: '#ffd60a', level: '偏湿' }
-  if (h <= 93) return { color: '#ff9f0a', level: '闷湿' }
-  return { color: '#ff453a', level: '潮湿' }
-}
 function aqiLevel(aqi: number): Level {
   if (aqi <= 50)  return { color: NORMAL, level: '优' }
   if (aqi <= 100) return { color: '#ffd60a', level: '良' }
@@ -1020,15 +1048,17 @@ function popLevel(p: number): Level {
   if (p <= 70) return { color: '#ff9f0a', level: '中等' }
   return { color: '#ff453a', level: '较大' }
 }
+function windLevel(v: number): Level {
+  if (v < 20) return { color: NORMAL,     level: '微风' }
+  if (v < 40) return { color: '#ffd60a',  level: '中风' }
+  if (v < 60) return { color: '#ff9f0a',  level: '强风' }
+  return       { color: '#ff453a',  level: '大风' }
+}
 
-// 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
-// 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
+// 关键指标条：降水概率 / 空气质量 / 紫外线 / 风速
+// 体感 + 湿度已在各信源卡内展示，此处聚焦「天气决策信息」（是否带伞/外出/防晒）
 const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
   const cols: { key: string; value: string; dim: string; level: string; color: string }[] = []
-  if (stats.humidity != null) {
-    const a = humidLevel(stats.humidity)
-    cols.push({ key: 'humid', value: `${stats.humidity}%`, dim: '湿度', level: a.level, color: a.color })
-  }
   if (stats.pop != null) {
     const a = popLevel(stats.pop)
     cols.push({ key: 'pop', value: `${stats.pop}%`, dim: '降水', level: a.level, color: a.color })
@@ -1040,6 +1070,10 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
   if (stats.uvIndex != null) {
     const a = uvLevel(stats.uvIndex)
     cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, dim: '紫外线', level: a.level, color: a.color })
+  }
+  if (stats.windSpeed != null) {
+    const a = windLevel(stats.windSpeed)
+    cols.push({ key: 'wind', value: `${Math.round(stats.windSpeed)}`, dim: 'km/h', level: a.level, color: a.color })
   }
   if (cols.length === 0) return null
   return (

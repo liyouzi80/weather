@@ -354,6 +354,14 @@ html[data-sky='fog'] body::before {
 .warn-chip:nth-child(3) { animation-delay: 0.12s; }
 .warn-chip:nth-child(4) { animation-delay: 0.18s; }
 .warn-chip:nth-child(n + 5) { animation-delay: 0.24s; }
+@keyframes chipPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+  50%       { box-shadow: 0 0 8px 2px currentColor; opacity: 0.82; }
+}
+.warn-chip-severe {
+  animation: chipPop 0.42s var(--spring-bounce) both,
+             chipPulse 2.2s ease-in-out 0.42s infinite;
+}
 .warn-chip {
   display: inline-flex;
   align-items: center;
@@ -537,10 +545,10 @@ html[data-sky='fog'] body::before {
   animation: riseIn 0.55s var(--spring) both;
   /* will-change 由滚动逻辑按需挂载/撤除（见 App.tsx onScroll），不常驻以释放 GPU 层 */
 }
-/* 城市名：hero 顶部居中 */
+/* 城市名：hero 顶部居中；轻字重让大温度数字成为视觉主角 */
 .hero-city {
   font-size: 28px;
-  font-weight: 600;
+  font-weight: 300;
   letter-spacing: -0.03em;
   background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
   -webkit-background-clip: text;
@@ -886,27 +894,96 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .card:nth-child(7), .card:nth-child(8) { animation-delay: 0s; }
 }
 
-/* ── 4. View Transitions API：城市切换全页渐变转场（iOS 18+ / Chrome 111+）──
-   当 App.tsx 调用 document.startViewTransition() 切换城市时，
-   浏览器捕获新旧两帧并用下方动画平滑过渡，像原生 App 的页面转场。 */
-@keyframes vtSlideOut {
-  from { opacity: 1; transform: scale(1) translateY(0); }
-  to   { opacity: 0; transform: scale(0.96) translateY(-8px); }
-}
-@keyframes vtSlideIn {
-  from { opacity: 0; transform: scale(1.02) translateY(8px); }
-  to   { opacity: 1; transform: scale(1) translateY(0); }
-}
-::view-transition-old(root) {
-  animation: vtSlideOut 0.30s ease-in both;
-}
-::view-transition-new(root) {
-  animation: vtSlideIn 0.36s var(--spring) both;
-}
+/* ── 4. View Transitions API：城市切换带方向感的滑动转场（iOS 18+ / Chrome 111+）──
+   App.tsx 在 startViewTransition 前设 data-vt-dir=forward/back，
+   CSS 据此选择左滑还是右滑，方向与手势一致。 */
+@keyframes vtToLeft    { to   { opacity: 0; transform: translateX(-22px) scale(0.97); } }
+@keyframes vtFromRight { from { opacity: 0; transform: translateX(22px)  scale(0.97); } }
+@keyframes vtToRight   { to   { opacity: 0; transform: translateX(22px)  scale(0.97); } }
+@keyframes vtFromLeft  { from { opacity: 0; transform: translateX(-22px) scale(0.97); } }
+/* 无方向（默认）：中性淡入淡出 */
+@keyframes vtFadeOut { to   { opacity: 0; transform: scale(0.97); } }
+@keyframes vtFadeIn  { from { opacity: 0; transform: scale(1.01); } }
+
+::view-transition-old(root) { animation: vtFadeOut 0.28s ease-in both; }
+::view-transition-new(root) { animation: vtFadeIn  0.34s var(--spring) both; }
+[data-vt-dir="forward"] ::view-transition-old(root) { animation-name: vtToLeft;    }
+[data-vt-dir="forward"] ::view-transition-new(root) { animation-name: vtFromRight; }
+[data-vt-dir="back"]    ::view-transition-old(root) { animation-name: vtToRight;   }
+[data-vt-dir="back"]    ::view-transition-new(root) { animation-name: vtFromLeft;  }
 /* WeatherFX canvas 在转场期间保持不动（天空渐变跨城市不抖动） */
-::view-transition-group(.weather-fx) {
-  animation-duration: 0s;
+::view-transition-group(.weather-fx) { animation-duration: 0s; }
+
+/* ── 5. Hero scroll-driven 视差（CSS 接管 translateY + opacity，主线程零参与）── */
+@supports (animation-timeline: scroll()) {
+  @keyframes heroParallax {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-36px); }
+  }
+  .hero {
+    animation: heroParallax linear both;
+    animation-duration: auto;
+    animation-timeline: scroll(root);
+    animation-range: 0px 200px;
+  }
 }
+
+/* ── 6. 信源卡折叠面板 ── */
+/* 摘要行：玻璃 pill 按钮，宽度铺满，左侧文字右侧箭头 */
+.cards-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 18px;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 0.5px solid var(--glass-border);
+  backdrop-filter: var(--mat-regular-blur);
+  -webkit-backdrop-filter: var(--mat-regular-blur);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.22), inset 0 0.5px 0 rgba(255,255,255,0.05);
+  cursor: pointer;
+  color: var(--text);
+  text-align: left;
+  animation: riseIn 0.5s var(--spring) both;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
+  margin-bottom: 0;
+}
+.cards-summary:hover { background: rgba(255,255,255,0.07); }
+.cards-summary:active { transform: scale(0.99); }
+.cards-summary-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.cards-summary-count { font-weight: 600; color: var(--text); }
+.cards-summary-sep   { color: var(--text-dim); opacity: 0.5; }
+/* 箭头：展开时旋转 180° */
+.cards-chevron {
+  flex-shrink: 0;
+  color: var(--text-dim);
+  transition: transform 0.36s var(--spring);
+}
+.cards-summary.open .cards-chevron { transform: rotate(180deg); }
+
+/* 展开区域：grid-template-rows 0fr→1fr 是性能最好的无高度动画方案 */
+.cards-expand {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.46s var(--spring);
+  /* 摘要与卡片列表之间的间距随展开自然撑开 */
+  margin-top: 0;
+  transition: grid-template-rows 0.46s var(--spring), margin-top 0.46s var(--spring);
+}
+.cards-expand.open {
+  grid-template-rows: 1fr;
+  margin-top: 10px;
+}
+.cards-expand-inner { overflow: hidden; }
 
 /* 尊重系统「减弱动态效果」 */
 @media (prefers-reduced-motion: reduce) {

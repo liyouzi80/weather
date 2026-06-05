@@ -107,7 +107,7 @@ export function ThunderFXGPU({ onFallback }: { onFallback: () => void }) {
   return (
     <>
       <canvas ref={rainRef} className="weather-fx" aria-hidden="true" />
-      <canvas ref={boltRef} className="weather-fx" aria-hidden="true" />
+      <canvas ref={boltRef} className="weather-fx" aria-hidden="true" style={{ zIndex: 1 }} />
     </>
   )
 }

@@ -3,6 +3,11 @@ import { RainFXGPU, hasWebGPU } from './RainFXGPU'
 import { SnowFXGPU } from './SnowFXGPU'
 import { ThunderFXGPU } from './ThunderFXGPU'
 
+// 模块级单次求值，避免每帧组件渲染重复调用 matchMedia
+const REDUCED = typeof matchMedia !== 'undefined'
+  && matchMedia('(prefers-reduced-motion: reduce)').matches
+const prefersReduced = () => REDUCED
+
 export type FxKind =
   | 'rain' | 'thunder' | 'snow' | 'fog'
   | 'clear-day' | 'clear-night'
@@ -25,9 +30,6 @@ const isCloudKind = (k: FxKind) =>
   k === 'cloudy' || k === 'cloudy-night' || k === 'overcast' || k === 'overcast-night'
 
 const TAU = Math.PI * 2
-const prefersReduced = () =>
-  typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
-
 interface Drop  { x: number; y: number; len: number; vy: number; vx: number }
 interface Flake { x: number; y: number; r: number; vy: number; vx: number; sway: number; ph: number; layer: number }
 interface Star  { x: number; y: number; r: number; ph: number; sp: number; bright: boolean }
