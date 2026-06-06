@@ -362,7 +362,7 @@ html[data-sky='haze'] body::before {
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 0 0 22px;
+  margin: 0 0 16px;
 }
 /* 预警 chip 弹入：scale 0.8 → 过冲 → 1，逐个错峰，传达「警报弹出」的紧迫感 */
 @keyframes chipPop {
@@ -401,6 +401,7 @@ html[data-sky='haze'] body::before {
   border-top: 1.5px solid rgba(10, 132, 255, 0.35);
   border-radius: var(--radius);
   padding: 14px 16px 12px;
+  margin-bottom: 16px;
   backdrop-filter: var(--mat-regular-blur);
   -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
@@ -437,7 +438,7 @@ html[data-sky='haze'] body::before {
   border-top: 1.5px solid rgba(255, 255, 255, 0.20);
   border-radius: var(--radius);
   padding: 14px 16px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   backdrop-filter: var(--mat-regular-blur);
   -webkit-backdrop-filter: var(--mat-regular-blur);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.22), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
@@ -507,7 +508,7 @@ html[data-sky='haze'] body::before {
   justify-content: space-around;
   align-items: stretch;
   gap: 6px;
-  margin: 4px 0 32px;
+  margin: 4px 0 16px;
   padding: 2px;
 }
 .metric-col {
@@ -970,7 +971,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-top: 12px;
+  margin-top: 0;
   padding: 13px 18px;
   border-radius: var(--radius);
   background: var(--glass);
@@ -1003,6 +1004,9 @@ a.card { text-decoration: none; color: inherit; display: block; }
   transition: transform 0.36s var(--spring);
 }
 .cards-summary.open .cards-chevron { transform: rotate(180deg); }
+
+/* AQI 摘要行紧跟在信源展开区之后，需要统一间距 */
+.cards-expand + .cards-summary { margin-top: 16px; }
 
 /* 展开区域：grid-template-rows 0fr→1fr 是性能最好的无高度动画方案 */
 .cards-expand {

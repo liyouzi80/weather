@@ -91,7 +91,7 @@ struct CityPageView: View {
                 if let stats = vm.stats {
                     MetricStripView(stats: stats, avgAqi: vm.avgAqi)
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 28)
+                        .padding(.bottom, 16)
                         .riseIn(0.06)
                 }
 
@@ -113,27 +113,28 @@ struct CityPageView: View {
 
                 // 信源：默认折叠成摘要行（N 个信源 · 偏差 ±X°），点击展开全部信源卡
                 if let summary = vm.sourceSummary {
-                    CollapsibleSummary(isOpen: $cardsOpen) {
-                        HStack(spacing: 6) {
-                            Text("\(summary.count) 个信源").foregroundStyle(.white)
-                            Text("·").foregroundStyle(.white.opacity(0.45))
-                            Text("偏差 ±\(summary.sd)°").foregroundStyle(.white.opacity(0.75))
+                    VStack(spacing: 0) {
+                        CollapsibleSummary(isOpen: $cardsOpen) {
+                            HStack(spacing: 6) {
+                                Text("\(summary.count) 个信源").foregroundStyle(.white)
+                                Text("·").foregroundStyle(.white.opacity(0.45))
+                                Text("偏差 ±\(summary.sd)°").foregroundStyle(.white.opacity(0.75))
+                            }
+                            .font(.system(size: 14, weight: .medium))
                         }
-                        .font(.system(size: 14, weight: .medium))
+                        if cardsOpen {
+                            LazyVGrid(columns: providerColumns, spacing: 10) {
+                                ForEach(vm.annotated) { item in
+                                    ProviderCardView(result: item)
+                                }
+                            }
+                            .padding(.top, 10)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
                     .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                     .riseIn(0.16)
-
-                    if cardsOpen {
-                        LazyVGrid(columns: providerColumns, spacing: 10) {
-                            ForEach(vm.annotated) { item in
-                                ProviderCardView(result: item)
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
                 } else {
                     // 不足 2 源：无可折叠摘要，直接平铺
                     LazyVGrid(columns: providerColumns, spacing: 10) {
@@ -143,30 +144,31 @@ struct CityPageView: View {
                         }
                     }
                     .padding(.horizontal, 16)
+                    .padding(.bottom, 16)
                 }
 
                 // AQI：默认折叠成摘要行（空气质量 · AQI N · 等级），点击展开各信源 AQI 卡
                 if !vm.air.isEmpty, let avgAqi = vm.avgAqi {
-                    CollapsibleSummary(isOpen: $aqiOpen) {
-                        HStack(spacing: 6) {
-                            Text("空气质量").foregroundStyle(.white)
-                            Text("·").foregroundStyle(.white.opacity(0.45))
-                            Text("AQI \(avgAqi)").foregroundStyle(aqiColor(avgAqi))
-                            Text("·").foregroundStyle(.white.opacity(0.45))
-                            Text(aqiCategory(avgAqi)).foregroundStyle(aqiColor(avgAqi))
+                    VStack(spacing: 0) {
+                        CollapsibleSummary(isOpen: $aqiOpen) {
+                            HStack(spacing: 6) {
+                                Text("空气质量").foregroundStyle(.white)
+                                Text("·").foregroundStyle(.white.opacity(0.45))
+                                Text("AQI \(avgAqi)").foregroundStyle(aqiColor(avgAqi))
+                                Text("·").foregroundStyle(.white.opacity(0.45))
+                                Text(aqiCategory(avgAqi)).foregroundStyle(aqiColor(avgAqi))
+                            }
+                            .font(.system(size: 14, weight: .medium))
                         }
-                        .font(.system(size: 14, weight: .medium))
+                        if aqiOpen {
+                            AQISectionView(air: vm.air)
+                                .padding(.top, 10)
+                                .transition(.opacity.combined(with: .move(edge: .top)))
+                        }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 12)
+                    .padding(.bottom, 16)
                     .riseIn(0.20)
-
-                    if aqiOpen {
-                        AQISectionView(air: vm.air)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 10)
-                            .transition(.opacity.combined(with: .move(edge: .top)))
-                    }
                 }
 
                 Spacer(minLength: 48)
