@@ -99,7 +99,7 @@ function mapAreaData(d) {
   const mean = (key) => {
     const n = parseFloat(gdpy[key])
     if (isNaN(n) || n <= -999 * z) return undefined
-    return n / z / 10
+    return Math.round(n / z / 10)
   }
 
   const temp = mean('t')
@@ -119,7 +119,7 @@ function mapAreaData(d) {
   return {
     temp,
     humidity:  mean('rh'),
-    windSpeed: speedMs != null ? Math.round(speedMs * 3.6 * 10) / 10 : undefined,
+    windSpeed: speedMs != null ? Math.round(speedMs * 3.6) : undefined,
     windDir:   deg != null ? degToDir(deg) : undefined,
     pressure:  mean('p'),
     rain1h:    mean('hourrf'),

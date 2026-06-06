@@ -161,7 +161,7 @@ function mapAreaData(d: any): GzRealtime {
   const mean = (key: string): number | undefined => {
     const n = parseFloat(gdpy[key])
     if (isNaN(n) || n <= -999 * z) return undefined
-    return n / z / 10
+    return Math.round(n / z / 10)
   }
 
   const temp = mean('t')
@@ -183,7 +183,7 @@ function mapAreaData(d: any): GzRealtime {
   return {
     temp,
     humidity: mean('rh'),
-    windSpeed: speedMs != null ? Math.round(speedMs * 3.6 * 10) / 10 : undefined, // m/s -> km/h
+    windSpeed: speedMs != null ? Math.round(speedMs * 3.6) : undefined, // m/s -> km/h
     windDir: deg != null ? degToDir(deg) : undefined,
     pressure: mean('p'),
     rain1h: mean('hourrf'),
