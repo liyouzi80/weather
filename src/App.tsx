@@ -1212,10 +1212,15 @@ function parseForecast(raw: string) {
   }
   const weather = wxParts.join('，')
 
-  // 附加提示：含警示词或「局部XXX」的段落
+  // 附加提示：含警示词的段落。其中高危信息（局部暴雨/短时强降水/冰雹）即使
+  // 与主天气描述同段（如「有中雷雨局部暴雨」），也提取为提示——否则整段会被当作
+  // 普通天气归入 wxOrigSet，note 落空导致卡片被 `if (!note)` 整张隐藏。
   const noteRe = /注意|防范|防御|局部|短时强|冰雹|建议/
-  const noteParts = segs.filter(x => noteRe.test(x) && !wxOrigSet.has(x))
-  let note = noteParts.join('，')
+  const severeRe = /局部|短时强|冰雹/
+  const noteParts = segs
+    .filter(x => (noteRe.test(x) && !wxOrigSet.has(x)) || severeRe.test(x))
+    .map(x => x.replace(/^有\s*/, ''))
+  let note = [...new Set(noteParts)].join('，')
   if (note.length > 36) note = note.slice(0, 36).replace(/[，,\s]+$/, '') + '…'
 
   // 解析完全失败时兜底：截断原文展示
