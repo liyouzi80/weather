@@ -94,7 +94,7 @@ struct GZQXProvider: WeatherProvider {
     // MARK: - 网络抓取
 
     private func fetchObject(_ urlStr: String, varName: String) async throws -> [String: Any] {
-        guard let url = URL(string: "\(urlStr)?random=\(Double.random(in: 0..<1))") else { throw FetchError.invalidURL }
+        guard let url = URL(string: "\(urlStr)?t=\(Int(Date().timeIntervalSince1970) / 60)") else { throw FetchError.invalidURL }
         var req = URLRequest(url: url, timeoutInterval: 12)
         fetchHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
         let (data, resp) = try await URLSession.shared.data(for: req)
@@ -108,7 +108,7 @@ struct GZQXProvider: WeatherProvider {
     }
 
     private func fetchTextOptional(_ urlStr: String) async -> String? {
-        guard let url = URL(string: "\(urlStr)?t=\(Int(Date().timeIntervalSince1970 * 1000))") else { return nil }
+        guard let url = URL(string: "\(urlStr)?t=\(Int(Date().timeIntervalSince1970) / 60)") else { return nil }
         var req = URLRequest(url: url, timeoutInterval: 12)
         pageHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
         guard let (data, resp) = try? await URLSession.shared.data(for: req),

@@ -179,14 +179,14 @@ export function isForecastCurrent(content?: string, issued?: string): boolean {
 
 /** 抓取一个 `try{ var <name> = {...};}catch(e){}` 数据文件并解析成对象。 */
 async function fetchData(url: string, varName: string): Promise<any> {
-  const res = await fetch(`${url}?random=${Math.random()}`, { headers: FETCH_HEADERS })
+  const res = await fetch(`${url}?t=${Math.floor(Date.now() / 60_000)}`, { headers: FETCH_HEADERS })
   if (!res.ok) throw new Error(`数据接口请求失败 HTTP ${res.status}`)
   return extractObject(await res.text(), varName)
 }
 
 /** 抓取一个 HTML 页面文本（不带 XHR 标识，避免服务器返回非 HTML 内容）。 */
 async function fetchText(url: string): Promise<string> {
-  const res = await fetch(`${url}?t=${Date.now()}`, { headers: PAGE_HEADERS })
+  const res = await fetch(`${url}?t=${Math.floor(Date.now() / 60_000)}`, { headers: PAGE_HEADERS })
   if (!res.ok) throw new Error(`页面请求失败 HTTP ${res.status}`)
   return res.text()
 }
