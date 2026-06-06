@@ -22,26 +22,38 @@ const RESP_HEADERS = {
   'Access-Control-Allow-Origin': '*',
 }
 
-// 阿里云 FC 3.0 HTTP 函数入口：Web API 风格，return new Response(...)
-export const handler = async (request, _context) => {
-  // 鉴权
+// 阿里云 FC 3.0 事件函数 + HTTP 触发器入口。
+// event 为序列化的 HTTP 请求（Buffer 或对象），返回 {statusCode, headers, body}。
+export const handler = async (event, _context) => {
+  // 解析 event：可能是 Buffer、JSON 字符串或已解析的对象
+  let req = {}
+  try {
+    if (Buffer.isBuffer(event)) req = JSON.parse(event.toString('utf8'))
+    else if (typeof event === 'string') req = JSON.parse(event)
+    else if (event && typeof event === 'object') req = event
+  } catch (_e) {
+    req = {}
+  }
+
+  // 鉴权：headers 键名大小写不定，逐一兜底
   const expectedToken = process.env.AUTH_TOKEN
   if (expectedToken) {
-    const incoming = request.headers.get('x-auth-token') ?? ''
+    const h = req.headers || {}
+    const incoming = h['x-auth-token'] || h['X-Auth-Token'] || h['X-AUTH-TOKEN'] || ''
     if (incoming !== expectedToken) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401, headers: RESP_HEADERS,
-      })
+      return { statusCode: 401, headers: RESP_HEADERS, body: JSON.stringify({ error: 'Unauthorized' }) }
     }
   }
 
   try {
     const data = await scrapeGuangzhou()
-    return new Response(JSON.stringify(data), { status: 200, headers: RESP_HEADERS })
+    return { statusCode: 200, headers: RESP_HEADERS, body: JSON.stringify(data) }
   } catch (e) {
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
-      status: 502, headers: RESP_HEADERS,
-    })
+    return {
+      statusCode: 502,
+      headers: RESP_HEADERS,
+      body: JSON.stringify({ error: e instanceof Error ? e.message : String(e) }),
+    }
   }
 }
 
