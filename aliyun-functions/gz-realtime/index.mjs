@@ -1,10 +1,9 @@
-// 阿里云函数计算 FC：番禺气象台数据抓取（国内节点兜底）。
+// 阿里云函数计算 FC 3.0：番禺气象台数据抓取（国内节点兜底）。
 //
 // 部署要求：
 //   函数类型：HTTP 函数
 //   运行时：Node.js 18
 //   函数执行入口：index.handler
-//   触发器：HTTP 触发器（创建函数时自动生成）
 //   环境变量：AUTH_TOKEN — 自定义鉴权 token（Cloudflare 侧调用时在 X-Auth-Token 头携带）
 
 const ORIGIN = 'http://www.tqyb.com.cn'
@@ -18,29 +17,31 @@ const FETCH_HEADERS = {
   'X-Requested-With': 'XMLHttpRequest',
 }
 
-// 阿里云 FC HTTP 函数入口（ES 模块格式）
-export const handler = async (req, resp, _context) => {
-  resp.setHeader('Content-Type', 'application/json; charset=utf-8')
-  resp.setHeader('Access-Control-Allow-Origin', '*')
+const RESP_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Access-Control-Allow-Origin': '*',
+}
 
-  // 鉴权：AUTH_TOKEN 环境变量不为空时校验 X-Auth-Token 请求头
+// 阿里云 FC 3.0 HTTP 函数入口：Web API 风格，return new Response(...)
+export const handler = async (request, _context) => {
+  // 鉴权
   const expectedToken = process.env.AUTH_TOKEN
   if (expectedToken) {
-    const incoming = req.headers['x-auth-token'] || ''
+    const incoming = request.headers.get('x-auth-token') ?? ''
     if (incoming !== expectedToken) {
-      resp.setStatusCode(401)
-      resp.send(JSON.stringify({ error: 'Unauthorized' }))
-      return
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401, headers: RESP_HEADERS,
+      })
     }
   }
 
   try {
     const data = await scrapeGuangzhou()
-    resp.setStatusCode(200)
-    resp.send(JSON.stringify(data))
+    return new Response(JSON.stringify(data), { status: 200, headers: RESP_HEADERS })
   } catch (e) {
-    resp.setStatusCode(502)
-    resp.send(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }))
+    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : String(e) }), {
+      status: 502, headers: RESP_HEADERS,
+    })
   }
 }
 
