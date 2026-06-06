@@ -636,9 +636,9 @@ export default function App() {
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
-        {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
-
         {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
+
+        {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
 
         {showPullHint && !initialLoad && (
           <div className="pull-hint" aria-hidden="true">↓ 下拉更新</div>
