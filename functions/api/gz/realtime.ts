@@ -1,5 +1,5 @@
 // Cloudflare Pages Function：抓取广州市气象局·番禺页面，返回归一化实况 JSON。
-// 直连 tqyb.com.cn 被 503 时，自动降级到华为云 FunctionGraph 兜底。
+// 直连 tqyb.com.cn 被 503 时，自动降级到阿里云函数计算兜底。
 //
 // Pages 环境变量（Settings → Environment variables）：
 //   HW_GZ_URL   — 华为云函数 HTTP 触发器地址（必须配置才启用兜底）
