@@ -4,11 +4,13 @@ import Foundation
 //
 // 番禺页面由 require.js 驱动，实况/预报来自形如 `try{ var X = {...};}catch(e){}`
 // 的 JS 数据文件（UTF-8）：
-//  1) 实况数值：/data/latestWeather/gz_latestWeather.js
-//     gzObtInfo（番禺本地站）为主、baseObtInfo（广州基本站）备用；
-//     temp 温度℃ / rh 湿度% / wd2dd 风向(度) / wd2ds 风速(m/s)；-999.9 等为缺测。
+//  1) 实况（番禺区均值）：/data/obtAreaRep/gz_obtAreaRep.js
+//     GDPY 字段为番禺区所有气象站聚合统计；值 = 各站×10之和，z = 统计站数；
+//     均值公式：value / z / 10；字段：t 温度 / rh 湿度 / wdidd 风向(度) / wdidf 风速(m/s)
+//              hourrf 时雨量 / p 气压(hPa) / ddatetime 观测时间（北京时字符串）。
 //  2) 番禺短时预报文字：/data/shorttime/GDPY_shorttime.js（content 正文 / ddatetime 发布时间）
-//  3) 预警信号：渲染在番禺主页 #panyuAlarmList，需抓 HTML 解析。
+//  3) 预警信号（JSON）：/data/alarm/panyu/panyu_areaAlarm.js
+//     JSON 数组，每项含 serial 字段（如「暴雨黄色」），无需解析 HTML。
 //
 // 浏览器受 CORS 限制只能经服务端代抓；原生 URLSession 无此限制，直接抓取。
 struct GZQXProvider: WeatherProvider {
@@ -20,27 +22,24 @@ struct GZQXProvider: WeatherProvider {
     func appliesTo(_ loc: GeoLocation) -> Bool { loc.cityName == "番禺" }
 
     private static let origin = "http://www.tqyb.com.cn"
-    private var dataURL: String { "\(Self.origin)/data/latestWeather/gz_latestWeather.js" }
+    private var obtAreaRepURL: String { "\(Self.origin)/data/obtAreaRep/gz_obtAreaRep.js" }
     private var forecastURL: String { "\(Self.origin)/data/shorttime/GDPY_shorttime.js" }
-    private var homeURL: String { "\(Self.origin)/gzpanyu/" }
+    private var alarmURL: String { "\(Self.origin)/data/alarm/panyu/panyu_areaAlarm.js" }
 
     private let ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
     private var fetchHeaders: [String: String] {
         ["User-Agent": ua, "Referer": "\(Self.origin)/gzpanyu/", "X-Requested-With": "XMLHttpRequest"]
     }
-    private var pageHeaders: [String: String] {
-        ["User-Agent": ua, "Referer": "\(Self.origin)/gzpanyu/", "Cache-Control": "no-cache", "Pragma": "no-cache"]
-    }
 
     func fetchCurrent(_ loc: GeoLocation) async throws -> CurrentWeather {
         // 实况必需；短时预报 / 预警失败不影响实况返回。
-        async let rtTask = fetchObject(dataURL, varName: "gz_latestWeather")
+        async let rtTask = fetchObject(obtAreaRepURL, varName: "gz_obtAreaRep")
         async let fcTask = fetchObjectOptional(forecastURL, varName: "GDPY_shorttime")
-        async let homeTask = fetchTextOptional(homeURL)
+        async let alarmTask = fetchArrayOptional(alarmURL, varName: "panyu_areaAlarm")
 
-        let rt = try mapData(try await rtTask)
+        let rt = try mapAreaData(try await rtTask)
         let fc = await fcTask
-        let html = await homeTask
+        let alarmItems = await alarmTask
 
         var forecast: String?
         var forecastIssuedAt: String?
@@ -54,15 +53,11 @@ struct GZQXProvider: WeatherProvider {
         }
 
         var warnings: [WeatherWarning]?
-        if let html {
-            let w = parseWarnings(html)
+        if let items = alarmItems {
+            let w = parseAlarms(items)
             if !w.isEmpty { warnings = w }
         }
 
-        // 基本站实况没有天气现象描述（rt.text 恒为 nil）；若短时预报也不在时效内、
-        // 且无生效预警，这张信源卡无实质内容（仅温度/湿度/风），与 PWA 一致：静默隐藏。
-        // 注意：预报须包含「X时到Y时」时间窗口或注意事项关键词，
-        // 才能让 NoticeCardView 实际渲染，否则等同于无内容。
         let hasForecastContent: Bool
         if let fc = forecast {
             hasForecastContent = fc.range(of: "\\d{1,2}时到\\d{1,2}时", options: .regularExpression) != nil ||
@@ -107,13 +102,18 @@ struct GZQXProvider: WeatherProvider {
         try? await fetchObject(urlStr, varName: varName)
     }
 
-    private func fetchTextOptional(_ urlStr: String) async -> String? {
-        guard let url = URL(string: "\(urlStr)?t=\(Int(Date().timeIntervalSince1970) / 60)") else { return nil }
+    private func fetchArray(_ urlStr: String, varName: String) async throws -> [[String: Any]] {
+        guard let url = URL(string: "\(urlStr)?t=\(Int(Date().timeIntervalSince1970) / 60)") else { throw FetchError.invalidURL }
         var req = URLRequest(url: url, timeoutInterval: 12)
-        pageHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
-        guard let (data, resp) = try? await URLSession.shared.data(for: req),
-              let http = resp as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-        return String(data: data, encoding: .utf8)
+        fetchHeaders.forEach { req.setValue($1, forHTTPHeaderField: $0) }
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        guard let http = resp as? HTTPURLResponse, http.statusCode == 200 else { throw FetchError.noData }
+        let text = String(data: data, encoding: .utf8) ?? ""
+        return try extractArray(text, varName: varName)
+    }
+
+    private func fetchArrayOptional(_ urlStr: String, varName: String) async -> [[String: Any]]? {
+        try? await fetchArray(urlStr, varName: varName)
     }
 
     // MARK: - 解析
@@ -127,41 +127,71 @@ struct GZQXProvider: WeatherProvider {
         var observedAt: String?
     }
 
-    /// 映射成统一模型：取 gzObtInfo（番禺本地站），备用 baseObtInfo（广州基本站）。
-    private func mapData(_ d: [String: Any]) throws -> GzRT {
-        guard let obt = (d["gzObtInfo"] as? [String: Any]) ?? (d["baseObtInfo"] as? [String: Any]) else {
+    /// 映射成统一模型：从 gz_obtAreaRep GDPY 字段取番禺区均值（value / z / 10）。
+    private func mapAreaData(_ d: [String: Any]) throws -> GzRT {
+        guard let gdpy = d["GDPY"] as? [String: Any] else {
             throw FetchError.noData
         }
-        func clean(_ key: String) -> Double? {
-            let v = obt[key]
-            var n: Double?
-            if let num = v as? NSNumber { n = num.doubleValue }
-            else if let s = v as? String { n = Double(s) }
-            guard let nn = n, nn > -999 else { return nil }
-            return nn
-        }
-        guard let temp = clean("temp") else { throw FetchError.noData }
-        let speed = clean("wd2ds") // m/s
-        let deg = clean("wd2dd")   // 度
 
+        func numVal(_ obj: [String: Any], _ key: String) -> Double? {
+            let v = obj[key]
+            if let num = v as? NSNumber { return num.doubleValue }
+            if let s = v as? String { return Double(s) }
+            return nil
+        }
+
+        guard let z = numVal(gdpy, "z"), z > 0 else { throw FetchError.noData }
+
+        func mean(_ key: String) -> Double? {
+            guard let v = numVal(gdpy, key), v > -999 * z else { return nil }
+            return v / z / 10
+        }
+
+        guard let temp = mean("t") else { throw FetchError.noData }
+
+        let speedMs = mean("wdidf") // m/s
+        let deg = mean("wdidd")    // 度
+
+        // ddatetime 为北京时字符串（如「2026-06-05 15:00」）；
+        // 按惯例存为"北京时写入 UTC 字段"，前端渲染时直接显示即为正确的北京时间。
         var observedAt: String?
-        let tsAny = d["gzObtDate"] ?? d["baseObtDate"]
-        if let ts = (tsAny as? NSNumber)?.doubleValue ?? (tsAny as? String).flatMap({ Double($0) }) {
-            // ts 为毫秒 UTC 时间戳；+8h 转北京墙上时间后写入 UTC 字段，前端按 UTC 渲染即原样显示。
-            let beijing = Date(timeIntervalSince1970: ts / 1000 + 8 * 3600)
-            let fmt = ISO8601DateFormatter()
-            fmt.timeZone = TimeZone(identifier: "UTC")
-            observedAt = fmt.string(from: beijing)
+        if let ts = gdpy["ddatetime"] as? String {
+            let dtStr = ts.replacingOccurrences(of: " ", with: "T")
+            let withSec: String
+            if dtStr.range(of: "T\\d{2}:\\d{2}$", options: .regularExpression) != nil {
+                withSec = dtStr + ":00"
+            } else {
+                withSec = dtStr
+            }
+            observedAt = withSec + ".000Z"
         }
 
         return GzRT(
             temp: temp,
-            humidity: clean("rh"),
-            windSpeed: speed != nil ? (speed! * 3.6 * 10).rounded() / 10 : nil, // m/s -> km/h
+            humidity: mean("rh"),
+            windSpeed: speedMs != nil ? (speedMs! * 3.6 * 10).rounded() / 10 : nil, // m/s -> km/h
             windDir: deg != nil ? degToDir(deg!) : nil,
-            text: nil, // 基本站实况无天气现象描述
+            text: nil, // 区均值实况无天气现象描述
             observedAt: observedAt
         )
+    }
+
+    /// 从 panyu_areaAlarm JSON 数组解析生效预警信号。
+    /// serial 形如「暴雨黄色」，末2字为等级，其余为类型。
+    private func parseAlarms(_ items: [[String: Any]]) -> [WeatherWarning] {
+        var warnings: [WeatherWarning] = []
+        var seen = Set<String>()
+        for item in items {
+            guard let serial = item["serial"] as? String, serial.count >= 3 else { continue }
+            let level = String(serial.suffix(2))
+            let type = String(serial.dropLast(2))
+            guard !type.isEmpty else { continue }
+            let key = type + level
+            if seen.contains(key) { continue }
+            seen.insert(key)
+            warnings.append(WeatherWarning(title: "\(type)\(level)预警信号", type: type, level: level))
+        }
+        return warnings
     }
 
     /// 从 `var <varName> = {...};` 中用括号配对精确截取 JSON 对象（兼容外层 try/catch 与字符串内括号）。
@@ -208,62 +238,48 @@ struct GZQXProvider: WeatherProvider {
         throw FetchError.decodingError("括号不配对")
     }
 
-    /// 从番禺主页 HTML 解析生效预警信号。优先 #panyuAlarmList 区域，找不到则搜全页。
-    private func parseWarnings(_ html: String) -> [WeatherWarning] {
-        let clean = html
-            .replacingOccurrences(of: "<script[\\s\\S]*?</script>", with: " ", options: [.regularExpression, .caseInsensitive])
-            .replacingOccurrences(of: "<style[\\s\\S]*?</style>", with: " ", options: [.regularExpression, .caseInsensitive])
+    /// 从 `var <varName> = [...];` 中用括号配对精确截取 JSON 数组（兼容外层 try/catch）。
+    private func extractArray(_ text: String, varName: String) throws -> [[String: Any]] {
+        let ns = text as NSString
+        let anchor = ns.range(of: varName).location
+        let searchFrom = anchor == NSNotFound ? 0 : anchor
+        let bracketRange = ns.range(of: "[", options: [], range: NSRange(location: searchFrom, length: ns.length - searchFrom))
+        guard bracketRange.location != NSNotFound else { throw FetchError.decodingError("未找到数组起始 [") }
+        let from = bracketRange.location
 
-        let types = "台风|暴雨|暴雪|寒潮|大风|沙尘暴|高温|干旱|雷电|冰雹|霜冻|大雾|霾|道路结冰|雷雨大风|森林火险|灰霾|寒冷"
-        let levels = "蓝色|黄色|橙色|红色|白色"
+        let quote = ("\"" as NSString).character(at: 0)
+        let apos = ("'" as NSString).character(at: 0)
+        let open = ("[" as NSString).character(at: 0)
+        let close = ("]" as NSString).character(at: 0)
+        let backslash = ("\\" as NSString).character(at: 0)
 
-        let ns = clean as NSString
-        let ti = ns.range(of: "panyuAlarmList").location
-        var searchArea: String
-        if ti != NSNotFound {
-            var endIdx = -1
-            for c in ["</table>", "</div>", "</ul>", "</section>"] {
-                let r = ns.range(of: c, options: [], range: NSRange(location: ti, length: ns.length - ti))
-                if r.location != NSNotFound, r.location > ti, endIdx < 0 || Int(r.location) < endIdx {
-                    endIdx = r.location
+        var depth = 0
+        var inStr = false
+        var strCh: unichar = 0
+        var i = from
+        while i < ns.length {
+            let ch = ns.character(at: i)
+            if inStr {
+                if ch == strCh && (i == 0 || ns.character(at: i - 1) != backslash) { inStr = false }
+            } else if ch == quote || ch == apos {
+                inStr = true
+                strCh = ch
+            } else if ch == open {
+                depth += 1
+            } else if ch == close {
+                depth -= 1
+                if depth == 0 {
+                    let slice = ns.substring(with: NSRange(location: from, length: i - from + 1))
+                    guard let data = slice.data(using: .utf8),
+                          let arr = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else {
+                        throw FetchError.decodingError("数组解析失败")
+                    }
+                    return arr
                 }
             }
-            if endIdx > ti {
-                searchArea = ns.substring(with: NSRange(location: ti, length: min(endIdx + 20, ns.length) - ti))
-            } else {
-                searchArea = ns.substring(with: NSRange(location: ti, length: min(12000, ns.length - ti)))
-            }
-        } else {
-            let bs = ns.range(of: "<body").location
-            searchArea = bs != NSNotFound ? ns.substring(from: bs) : clean
+            i += 1
         }
-
-        let imgMeta = matches(in: searchArea, pattern: "(?:alt|title|src)=\"([^\"]+)\"", group: 1).joined(separator: " ")
-        let plainText = searchArea
-            .replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "&nbsp;", with: " ")
-            .replacingOccurrences(of: "&#\\d+;", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "&[a-z]+;", with: " ", options: .regularExpression)
-            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
-
-        if plainText.range(of: "无生效预警|暂无预警|无预警", options: .regularExpression) != nil { return [] }
-
-        let combined = "\(plainText) \(imgMeta)"
-        let cns = combined as NSString
-        var warnings: [WeatherWarning] = []
-        var seen = Set<String>()
-        if let re = try? NSRegularExpression(pattern: "(\(types))(\(levels))预警(?:信号)?") {
-            re.enumerateMatches(in: combined, range: NSRange(location: 0, length: cns.length)) { m, _, _ in
-                guard let m else { return }
-                let type = cns.substring(with: m.range(at: 1))
-                let level = cns.substring(with: m.range(at: 2))
-                let key = type + level
-                if seen.contains(key) { return }
-                seen.insert(key)
-                warnings.append(WeatherWarning(title: "\(type)\(level)预警信号", type: type, level: level))
-            }
-        }
-        return warnings
+        throw FetchError.decodingError("括号不配对")
     }
 
     /// 短时预报时效检测：按预报窗口结束时间（北京时）判断是否过期，过期返回 false。

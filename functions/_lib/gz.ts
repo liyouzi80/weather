@@ -3,37 +3,31 @@
 // 番禺页面 http://www.tqyb.com.cn/gzpanyu/ 由 require.js 驱动，实况/预报来自若干
 // 形如 `try{ var X = { ... };}catch(e){}` 的 JS 数据文件（均为 UTF-8 编码）：
 //
-//  1) 实况（数值）：/data/latestWeather/gz_latestWeather.js
-//        - baseObtInfo（广州国家基本站 59287）为主，gzObtInfo 为备用站；
-//        - 字段：temp 温度℃、rh 湿度%、wd2dd 风向(度)、wd2ds 风速(m/s)、hourrf 时雨量mm；
-//        - -999.9 等为缺测哨兵。
+//  1) 实况（番禺区925站均值）：/data/obtAreaRep/gz_obtAreaRep.js
+//        - GDPY 字段为番禺区所有气象站的聚合统计；
+//        - 字段值 = 各站累计和×10，z = 统计站点数；均值公式：value / z / 10；
+//        - 字段：t 温度℃×10z / rh 湿度%×10z / wdidd 风向(度)×10z / wdidf 风速(m/s)×10z
+//                hourrf 时雨量mm×10z / p 气压hPa×10z / ddatetime 观测时间。
 //  2) 番禺本地预报（文字）：/data/shorttime/GDPY_shorttime.js
-//        - 番禺区气象台发布的短时（未来数小时）预报文字，比基本站实况更贴合番禺本地；
+//        - 番禺区气象台发布的短时（未来数小时）预报文字；
 //        - 字段：content 预报正文、ddatetime 发布时间。
+//  3) 预警信号（JSON）：/data/alarm/panyu/panyu_areaAlarm.js
+//        - JSON 数组，每项含 serial 字段（如「暴雨黄色」），无需解析 HTML。
 //
 // 注意：
-//  - 文件外层有 try{...}catch 包裹，需用括号配对精确截取对象，不能简单取首尾大括号。
-//  - 基本站实况本身无天气现象描述，故以番禺区气象台短时预报作为文字补充。
+//  - 文件外层有 try{...}catch 包裹，需用括号配对精确截取对象/数组，不能简单取首尾括号。
+//  - tqyb.com.cn 封锁部分海外 IP（Cloudflare 节点可能被拒），故 PWA 侧三项均可能失败。
 
 const ORIGIN = 'http://www.tqyb.com.cn'
-const GZ_DATA_URL = `${ORIGIN}/data/latestWeather/gz_latestWeather.js`
+const OBT_AREA_REP_URL = `${ORIGIN}/data/obtAreaRep/gz_obtAreaRep.js`
 const PY_FORECAST_URL = `${ORIGIN}/data/shorttime/GDPY_shorttime.js`
-// 番禺预警信号：服务端直接渲染在番禺主页 #panyuAlarmList 表格中，无独立 JSON 接口
-const PY_HOME_URL = `${ORIGIN}/gzpanyu/`
+const ALARM_URL = `${ORIGIN}/data/alarm/panyu/panyu_areaAlarm.js`
 
 const FETCH_HEADERS = {
   'User-Agent':
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
   Referer: `${ORIGIN}/gzpanyu/`,
   'X-Requested-With': 'XMLHttpRequest',
-}
-
-// 抓取 HTML 主页时不发送 XHR 标识，否则部分服务器会返回 JSON 而非 HTML
-const PAGE_HEADERS = {
-  'User-Agent': FETCH_HEADERS['User-Agent'],
-  Referer: FETCH_HEADERS.Referer,
-  'Cache-Control': 'no-cache',
-  'Pragma': 'no-cache',
 }
 
 /** 气象台预警信号 */
@@ -65,83 +59,47 @@ export interface GzRealtime {
 }
 
 export async function scrapeGuangzhou(): Promise<GzRealtime> {
-  // 实况、短时预报、预警(主页 HTML)并行抓取；预报/预警失败不影响实况返回。
-  const [rtRes, fcRes, wnRes] = await Promise.allSettled([
-    fetchData(GZ_DATA_URL, 'gz_latestWeather'),
+  // 实况、短时预报、预警 JSON 并行抓取；预报/预警失败不影响实况返回。
+  const [rtRes, fcRes, alarmRes] = await Promise.allSettled([
+    fetchData(OBT_AREA_REP_URL, 'gz_obtAreaRep'),
     fetchData(PY_FORECAST_URL, 'GDPY_shorttime'),
-    fetchText(PY_HOME_URL),
+    fetchArray(ALARM_URL, 'panyu_areaAlarm'),
   ])
 
   if (rtRes.status === 'rejected') throw rtRes.reason
-  const out = mapData(rtRes.value)
+  const out = mapAreaData(rtRes.value)
 
   if (fcRes.status === 'fulfilled') {
     const fc = fcRes.value
     const content = typeof fc?.content === 'string' ? fc.content.trim() : undefined
     const issued = typeof fc?.ddatetime === 'string' ? fc.ddatetime : undefined
-    // 时效检测：仅当短时预报仍在有效窗口内才返回（过期不返回，任何消费方都拿不到）。
+    // 时效检测：仅当短时预报仍在有效窗口内才返回。
     if (content && isForecastCurrent(content, issued)) {
       out.forecast = content
       out.forecastIssuedAt = issued
     }
   }
 
-  if (wnRes.status === 'fulfilled') {
-    const warnings = parseWarnings(wnRes.value)
+  if (alarmRes.status === 'fulfilled') {
+    const warnings = parseAlarms(alarmRes.value)
     if (warnings.length) out.warnings = warnings
   }
 
   return out
 }
 
-/** 从番禺主页 HTML 解析生效预警信号。
- *  优先从 #panyuAlarmList 区域提取，找不到则搜索全页；同时从 img alt/src 中提取信号图标。 */
-export function parseWarnings(html: string): GzWarning[] {
-  // 去掉 script/style 块，避免误匹配 JS 代码里的字符串
-  const clean = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-
-  const TYPES = '台风|暴雨|暴雪|寒潮|大风|沙尘暴|高温|干旱|雷电|冰雹|霜冻|大雾|霾|道路结冰|雷雨大风|森林火险|灰霾|寒冷'
-  const LEVELS = '蓝色|黄色|橙色|红色|白色'
-
-  // 定位 panyuAlarmList 容器（table/div/ul 均兼容）
-  const ti = clean.indexOf('panyuAlarmList')
-  let searchArea: string
-  if (ti >= 0) {
-    // 找最近的闭合标签（多种容器类型）
-    const closers = ['</table>', '</div>', '</ul>', '</section>']
-    let endIdx = -1
-    for (const c of closers) {
-      const idx = clean.indexOf(c, ti)
-      if (idx > ti && (endIdx < 0 || idx < endIdx)) endIdx = idx
-    }
-    searchArea = endIdx > ti ? clean.slice(ti, endIdx + 20) : clean.slice(ti, ti + 12000)
-  } else {
-    // 找不到容器 ID，扩大到全页（去掉 head 节省匹配量）
-    const bodyStart = clean.indexOf('<body')
-    searchArea = bodyStart >= 0 ? clean.slice(bodyStart) : clean
-  }
-
-  // 提取纯文本 + img alt/title/src（预警图标文件名也携带类型信息）
-  const imgMeta = [...searchArea.matchAll(/(?:alt|title|src)="([^"]+)"/gi)].map((m) => m[1]).join(' ')
-  const plainText = searchArea
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&#\d+;/g, ' ')
-    .replace(/&[a-z]+;/g, ' ')
-    .replace(/\s+/g, ' ')
-  const combined = `${plainText} ${imgMeta}`
-
-  if (/无生效预警|暂无预警|无预警/.test(plainText)) return []
-
-  const re = new RegExp(`(${TYPES})(${LEVELS})预警(?:信号)?`, 'g')
+/** 从 panyu_areaAlarm JSON 数组解析生效预警信号。
+ *  每项 serial 字段形如「暴雨黄色」，末2字为等级，其余为类型。 */
+export function parseAlarms(items: any[]): GzWarning[] {
+  if (!Array.isArray(items)) return []
   const warnings: GzWarning[] = []
   const seen = new Set<string>()
-  let m: RegExpExecArray | null
-  while ((m = re.exec(combined)) !== null) {
-    const type = m[1]
-    const level = m[2]
+  for (const item of items) {
+    const serial = typeof item?.serial === 'string' ? item.serial.trim() : ''
+    if (serial.length < 3) continue
+    const level = serial.slice(-2)
+    const type = serial.slice(0, -2)
+    if (!type) continue
     const key = type + level
     if (seen.has(key)) continue
     seen.add(key)
@@ -184,41 +142,53 @@ async function fetchData(url: string, varName: string): Promise<any> {
   return extractObject(await res.text(), varName)
 }
 
-/** 抓取一个 HTML 页面文本（不带 XHR 标识，避免服务器返回非 HTML 内容）。 */
-async function fetchText(url: string): Promise<string> {
-  const res = await fetch(`${url}?t=${Math.floor(Date.now() / 60_000)}`, { headers: PAGE_HEADERS })
-  if (!res.ok) throw new Error(`页面请求失败 HTTP ${res.status}`)
-  return res.text()
+/** 抓取一个 `try{ var <name> = [...];}catch(e){}` 数据文件并解析成数组。 */
+async function fetchArray(url: string, varName: string): Promise<any[]> {
+  const res = await fetch(`${url}?t=${Math.floor(Date.now() / 60_000)}`, { headers: FETCH_HEADERS })
+  if (!res.ok) throw new Error(`数据接口请求失败 HTTP ${res.status}`)
+  return extractArray(await res.text(), varName)
 }
 
-/** 映射成统一模型：取 gzObtInfo（番禺本地站 G1099），备用 baseObtInfo（广州基本站）。 */
-function mapData(d: any): GzRealtime {
-  const obt = d?.gzObtInfo ?? d?.baseObtInfo
-  if (!obt) throw new Error(`数据缺少 gzObtInfo/baseObtInfo，顶层字段: [${d ? Object.keys(d).join(', ') : d}]`)
+/** 映射成统一模型：从 gz_obtAreaRep GDPY 字段取番禺区925站均值。
+ *  均值公式：value / z / 10（z = 统计站点数，值为各站×10之和）。 */
+function mapAreaData(d: any): GzRealtime {
+  const gdpy = d?.GDPY
+  if (!gdpy) throw new Error(`数据缺少 GDPY 字段，顶层字段: [${d ? Object.keys(d).join(', ') : d}]`)
 
-  // -999.9 等为缺测哨兵
-  const clean = (v: any) => {
-    const n = parseFloat(v)
-    return isNaN(n) || n <= -999 ? undefined : n
+  const z = parseFloat(gdpy.z)
+  if (isNaN(z) || z <= 0) throw new Error(`GDPY.z 无效: ${gdpy.z}`)
+
+  const mean = (key: string): number | undefined => {
+    const n = parseFloat(gdpy[key])
+    if (isNaN(n) || n <= -999 * z) return undefined
+    return n / z / 10
   }
 
-  const temp = clean(obt.temp)
-  if (temp == null) throw new Error(`未解析到温度，baseObtInfo 字段: [${Object.keys(obt).join(', ')}]`)
+  const temp = mean('t')
+  if (temp == null) throw new Error(`未解析到温度 GDPY.t`)
 
-  const speed = clean(obt.wd2ds) // m/s
-  const deg = clean(obt.wd2dd) // 度
-  const ts = d.gzObtDate ?? d.baseObtDate
+  const speedMs = mean('wdidf') // m/s
+  const deg = mean('wdidd')    // 度
+
+  // ddatetime 为北京时间字符串（如「2026-06-05 15:00」）；
+  // 按惯例存为"北京时写入 UTC 字段"，前端按 UTC 渲染即显示正确的北京时间。
+  let observedAt: string | undefined
+  const ts = typeof gdpy.ddatetime === 'string' ? gdpy.ddatetime : undefined
+  if (ts) {
+    const dtStr = ts.replace(' ', 'T')
+    const withSec = /T\d{2}:\d{2}$/.test(dtStr) ? dtStr + ':00' : dtStr
+    observedAt = withSec + '.000Z'
+  }
 
   return {
     temp,
-    humidity: clean(obt.rh),
-    windSpeed: speed != null ? Math.round(speed * 3.6 * 10) / 10 : undefined, // m/s -> km/h
+    humidity: mean('rh'),
+    windSpeed: speedMs != null ? Math.round(speedMs * 3.6 * 10) / 10 : undefined, // m/s -> km/h
     windDir: deg != null ? degToDir(deg) : undefined,
-    rain1h: clean(obt.hourrf),
-    text: undefined, // 基本站实况无天气现象描述
-    // ts 为毫秒时间戳（真 UTC）；+8h 转北京墙上时间后写入 UTC 字段，
-    // 前端按 UTC 渲染即原样显示，不随运行环境/设备时区偏移。
-    observedAt: ts != null ? new Date(Number(ts) + 8 * 3600 * 1000).toISOString() : undefined,
+    pressure: mean('p'),
+    rain1h: mean('hourrf'),
+    text: undefined, // 区均值实况无天气现象描述
+    observedAt,
   }
 }
 
@@ -255,6 +225,41 @@ function extractObject(text: string, varName: string): any {
     }
   }
   throw new Error('括号不配对，未能截取完整对象')
+}
+
+/** 从 `var <varName> = [ ... ];` 中用括号配对精确截取 JSON 数组（兼容外层 try/catch 包裹）。 */
+function extractArray(text: string, varName: string): any[] {
+  const anchor = text.indexOf(varName)
+  const from = text.indexOf('[', anchor >= 0 ? anchor : 0)
+  if (from === -1) throw new Error('未找到数据数组起始 [')
+
+  let depth = 0
+  let inStr = false
+  let strCh = ''
+  for (let i = from; i < text.length; i++) {
+    const ch = text[i]
+    if (inStr) {
+      if (ch === strCh && text[i - 1] !== '\\') inStr = false
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      inStr = true
+      strCh = ch
+    } else if (ch === '[') {
+      depth++
+    } else if (ch === ']') {
+      depth--
+      if (depth === 0) {
+        const slice = text.slice(from, i + 1)
+        try {
+          return JSON.parse(slice)
+        } catch (e) {
+          throw new Error(`数组解析失败：${e instanceof Error ? e.message : String(e)}`)
+        }
+      }
+    }
+  }
+  throw new Error('括号不配对，未能截取完整数组')
 }
 
 function degToDir(deg: number): string {
