@@ -1045,15 +1045,6 @@ const ProviderCard = memo(function ProviderCard({
   if (r.error || !r.current) return null   // 失败/无数据信源静默隐藏
 
   const c = r.current
-  // GZQX 从缓存恢复时，预报可能在两次刷新间隙过期：此时 text='—'、无预警，
-  // NoticeCard 不渲染任何内容，故同样静默隐藏本卡片。
-  if (r.providerId === 'gzqx' && c.text === '—' && !c.warnings?.length) {
-    const hasFc = !!c.forecast && (
-      /\d{1,2}时到\d{1,2}时/.test(c.forecast) ||
-      /注意|防范|防御|局部|短时强|冰雹|建议/.test(c.forecast)
-    )
-    if (!hasFc || !isForecastCurrent(c.forecast, c.forecastIssuedAt)) return null
-  }
   const muted = score === 0
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : '', muted ? 'score-muted' : ''].filter(Boolean).join(' ')
   return (
