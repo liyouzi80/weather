@@ -4,6 +4,13 @@ import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, MinutelyRain, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
+import { loadScores, saveScore, getScore, type Scores } from './credibility'
+
+// CSS Scroll-driven Animations (Chrome 115+, Firefox 110+, Safari 18+):
+// hero parallax / phase-1 fade / temp-fly / sticky-temp cross-fade are handled by CSS.
+// When supported, the JS scroll handler skips all inline-style visual updates.
+const CSS_SCROLL_DRIVEN =
+  typeof CSS !== 'undefined' && CSS.supports('animation-timeline: scroll()')
 
 const CITIES: GeoLocation[] = [
   {
@@ -45,32 +52,6 @@ function readCache(idx: number): { results: ProviderResult[]; air: AqiResult[]; 
   } catch { return null }
 }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
-
-// 按 providerId 合并 AQI：保留原顺序，每个源优先取「有数据」的版本（新>旧），用于后台补齐。
-function mergeAqi(prev: AqiResult[], next: AqiResult[]): AqiResult[] {
-  const ids = prev.map((s) => s.providerId)
-  for (const s of next) if (!ids.includes(s.providerId)) ids.push(s.providerId)
-  return ids.map((id) => {
-    const fresh = next.find((s) => s.providerId === id)
-    const old = prev.find((s) => s.providerId === id)
-    if (fresh?.air) return fresh
-    if (old?.air) return old
-    return fresh ?? old
-  }).filter((s): s is AqiResult => s != null)
-}
-const aqiHealthy = (air: AqiResult[]) => air.filter((s) => s.air).length
-
-// 按 providerId 合并天气结果：保留原顺序，每源只升级「有数据」（新>旧），不降级。
-function mergeResults(prev: ProviderResult[], next: ProviderResult[]): ProviderResult[] {
-  return prev.map((p) => {
-    if (p.current) return p
-    const fresh = next.find((n) => n.providerId === p.providerId)
-    return fresh?.current ? fresh : p
-  })
-}
-const weatherHealthy = (rs: ProviderResult[]) => rs.filter((r) => r.current).length
-
 export default function App() {
   const [cityIdx, setCityIdx] = useState(0)
   const [results, setResults] = useState<ProviderResult[]>([])
@@ -82,52 +63,9 @@ export default function App() {
   const [showPullHint, setShowPullHint] = useState(() => {
     try { return !localStorage.getItem('pwr_hint_seen') } catch { return true }
   })
-  const [cardsOpen, setCardsOpen] = useState(false)
-  const [aqiOpen, setAqiOpen] = useState(false)
+  const [scores, setScores] = useState<Scores>(() => loadScores())
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
-
-  // 后台补齐：刷新完成后若 AQI 仍缺失（服务端抓站点页偶发失败），静默重试合并，不打断 UI。
-  // 与 refreshIdRef 绑定——切城市或再次刷新会让进行中的补齐自动作废。
-  // AQI 后台补齐（服务端抓站点页偶发失败）
-  const backfill = useCallback(async (id: number, idx: number, loc: GeoLocation, air0: AqiResult[]) => {
-    let air = air0
-    const EXPECTED = 2 // 两源：在意空气 + IQAir
-    const delays = [2500, 5000, 9000, 15000]
-    for (const delay of delays) {
-      if (aqiHealthy(air) >= EXPECTED) return
-      await sleep(delay)
-      if (id !== refreshIdRef.current) return
-      const r = await fetchAllAqi(loc)
-      if (id !== refreshIdRef.current) return
-      const merged = mergeAqi(air, r.sources)
-      if (aqiHealthy(merged) > aqiHealthy(air)) {
-        air = merged
-        setAir(merged)
-        writeCache(idx, resultsRef.current, merged)
-      }
-    }
-  }, [])
-
-  // 天气信源后台补齐（个别源首次超时/失败时静默重试，合并补齐，不打断 UI）
-  const backfillWeather = useCallback(async (id: number, idx: number, loc: GeoLocation, init: ProviderResult[]) => {
-    let cur = init
-    const expected = init.length
-    const delays = [3000, 7000, 13000, 21000]
-    for (const delay of delays) {
-      if (weatherHealthy(cur) >= expected) return
-      await sleep(delay)
-      if (id !== refreshIdRef.current) return
-      const fresh = await fetchAll(loc)
-      if (id !== refreshIdRef.current) return
-      const merged = mergeResults(cur, fresh)
-      if (weatherHealthy(merged) > weatherHealthy(cur)) {
-        cur = merged
-        setResults(merged)
-        writeCache(idx, merged, airRef.current)
-      }
-    }
-  }, [])
 
   const refresh = useCallback(async () => {
     const id = ++refreshIdRef.current
@@ -140,15 +78,13 @@ export default function App() {
       setAir(aqi.sources)
       setUpdatedAt(new Date())
       writeCache(cityIdx, weather, aqi.sources)
-      if (aqiHealthy(aqi.sources) < 2) void backfill(id, cityIdx, loc, aqi.sources)
-      if (weatherHealthy(weather) < weather.length) void backfillWeather(id, cityIdx, loc, weather)
     } finally {
       if (id === refreshIdRef.current) {
         setLoading(false)
         setInitialLoad(false)
       }
     }
-  }, [cityIdx, backfill, backfillWeather])
+  }, [cityIdx])
 
   useEffect(() => {
     const cached = readCache(cityIdxRef.current)
@@ -163,32 +99,22 @@ export default function App() {
 
   const selectCity = useCallback((i: number) => {
     if (i === cityIdx) return
-    haptic(8)
-    cityIdxRef.current = i
-
-    const doSwitch = () => {
-      flushSync(() => {
-        setResults([])
-        setAir([])
-        setUpdatedAt(null)
-        setInitialLoad(true)
-        setCityIdx(i)
-        setScrolled(false)
-        setCardsOpen(false)
-        setAqiOpen(false)
-      })
-      window.scrollTo(0, 0)
-      if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
+    haptic(8) // 切城市轻触觉，与下拉刷新反馈保持一致
+    setResults([])
+    setAir([])
+    setUpdatedAt(null)
+    setInitialLoad(true)
+    setCityIdx(i)
+    // 切城市回到顶部，避免吸顶城市名残留（停在滚动态时切换会重复显示地名）
+    window.scrollTo(0, 0)
+    setScrolled(false)
+    // 重置 hero 视差 + 高度（切城市后重新量测）
+    if (heroRef.current) {
+      if (!CSS_SCROLL_DRIVEN) heroRef.current.style.opacity = '1'
+      if (!CSS_SCROLL_DRIVEN) heroRef.current.style.transform = ''
+      heroRef.current.style.minHeight = ''
     }
-
-    // View Transitions：根据城市索引方向设置滑动方向（forward/back），让转场带有方向感。
-    if (typeof document.startViewTransition === 'function') {
-      document.documentElement.dataset.vtDir = i > cityIdx ? 'forward' : 'back'
-      const vt = document.startViewTransition(doSwitch)
-      vt.finished.finally(() => { delete document.documentElement.dataset.vtDir })
-    } else {
-      doSwitch()
-    }
+    if (stickyTempRef.current && !CSS_SCROLL_DRIVEN) stickyTempRef.current.style.opacity = '0'
   }, [cityIdx])
 
   // 首次加载完成后显示下拉提示 4 秒，之后自动隐藏
@@ -226,8 +152,6 @@ export default function App() {
   const refreshRef = useRef(refresh)
   const selectCityRef = useRef(selectCity)
   const cityIdxRef = useRef(cityIdx)
-  const resultsRef = useRef(results)
-  const airRef = useRef(air)
   const PULL_MAX = 64
   const PULL_TRIGGER = 46
   const SWIPE_TRIGGER = 45
@@ -236,9 +160,7 @@ export default function App() {
     refreshRef.current = refresh
     selectCityRef.current = selectCity
     cityIdxRef.current = cityIdx
-    resultsRef.current = results
-    airRef.current = air
-  }, [loading, refresh, selectCity, cityIdx, results, air])
+  }, [loading, refresh, selectCity, cityIdx])
   useEffect(() => {
     const el = appRef.current
     if (!el) return
@@ -246,7 +168,9 @@ export default function App() {
       const t = e.touches[0]
       startX.current = t.clientX
       startY.current = t.clientY
-      gesture.current = null
+      // Touch started inside a provider card — let card handle it, never city-switch
+      const insideCard = !!(e.target as Element | null)?.closest('.card')
+      gesture.current = insideCard ? 'ignore' : null
       atTop.current = window.scrollY <= 0 && !loadingRef.current
     }
     const onMove = (e: TouchEvent) => {
@@ -433,20 +357,22 @@ export default function App() {
         const tempEl = hero.querySelector<HTMLElement>('.hero-temp')
         const condEl = hero.querySelector<HTMLElement>('.hero-cond')
         const hiloEl = hero.querySelector<HTMLElement>('.hero-hilo')
-        const comfortEl = hero.querySelector<HTMLElement>('.hero-comfort')
         const cityEl = hero.querySelector<HTMLElement>('.hero-city')
 
         // 吸顶 scrolled：显示阈值 80px，隐藏阈值 60px（滞后区间防止边界反复闪烁）
         const isScrolled = wasScrolled ? y > 60 : y > 80
         if (isScrolled !== wasScrolled) { wasScrolled = isScrolled; setScrolled(isScrolled) }
 
+        // CSS scroll-driven animations handle all visual effects — JS only tracks state
+        if (CSS_SCROLL_DRIVEN) return
+
         if (y <= 0) {
           const justArrived = !wasAtTop
           wasAtTop = true
+          hero.style.opacity = '1'; hero.style.transform = ''
           if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
           if (condEl) condEl.style.opacity = ''
           if (hiloEl) hiloEl.style.opacity = ''
-          if (comfortEl) comfortEl.style.opacity = ''
           if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
           if (cityEl) {
             // 从滚动态回到顶部时：平滑淡入城市名，避免硬跳
@@ -462,14 +388,14 @@ export default function App() {
         }
         wasAtTop = false
         // Phase 1 (0–80px): 城市名 + 天气状况 + 高低温淡出
-        // hero translateY + opacity 由 CSS scroll-driven 接管（@supports animation-timeline）
         const t1 = Math.min(y / 80, 1)
         // Phase 2 (80–180px): 温度数字缩小 + 向上飞出；吸顶温度交叉淡入
         const t2 = Math.max(0, Math.min((y - 80) / 100, 1))
+        hero.style.transform = `translateY(${(-y * 0.18).toFixed(1)}px)`
+        hero.style.opacity = `${Math.max(0, 1 - y / 200).toFixed(3)}`
         if (cityEl) cityEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
-        if (comfortEl) comfortEl.style.opacity = `${(1 - t1).toFixed(3)}`
         if (tempEl) {
           // transform-origin: 50% 20% 令缩放从顶部折叠，translateY 让数字向上飞向吸顶栏
           const scale = (1 - 0.28 * t2).toFixed(3)
@@ -499,14 +425,38 @@ export default function App() {
     return () => clearInterval(t)
   }, [updatedAt])
 
-  const { annotated, stats } = useMemo(() => analyze(results), [results])
-  const sourceSummary = useMemo(() => {
-    const temps = results.filter(r => !r.error && r.current != null).map(r => r.current!.temp)
-    if (temps.length < 2) return null
-    const avg = temps.reduce((a, b) => a + b, 0) / temps.length
-    const sd = Math.sqrt(temps.reduce((a, b) => a + (b - avg) ** 2, 0) / temps.length)
-    return { count: temps.length, sd: sd.toFixed(1) }
-  }, [results])
+  const city = CITIES[cityIdx]
+  const cityKey = city.cityName ?? city.name
+
+  const weightMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of PROVIDERS) map.set(p.id, getScore(scores, cityKey, p.id))
+    return map
+  }, [scores, cityKey])
+
+  const { annotated, stats } = useMemo(() => analyze(results, weightMap), [results, weightMap])
+
+  const sortedAnnotated = useMemo(() =>
+    [...annotated].sort((a, b) =>
+      getScore(scores, cityKey, b.providerId) - getScore(scores, cityKey, a.providerId)
+    ),
+  [annotated, scores, cityKey])
+
+  const updateScore = useCallback((providerId: string, delta: number) => {
+    const current = getScore(scores, cityKey, providerId)
+    const next = Math.max(0, Math.min(5, current + delta))
+    if (next === current) return
+    haptic([8, 30, 8])
+    const doUpdate = () => {
+      flushSync(() => setScores(prev => saveScore(prev, cityKey, providerId, next)))
+    }
+    if (typeof document.startViewTransition === 'function') {
+      document.startViewTransition(doUpdate)
+    } else {
+      doUpdate()
+    }
+  }, [scores, cityKey])
+
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
     return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
@@ -527,7 +477,6 @@ export default function App() {
     () => results.find((r) => r.current?.minutelyRain)?.current?.minutelyRain ?? null,
     [results],
   )
-  const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
   const activeCount = useMemo(
     () => PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(city) ?? true)).length,
@@ -543,6 +492,21 @@ export default function App() {
     document.documentElement.dataset.sky = sky
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', SKY_THEME[sky] ?? '#0b1426')
   }, [stats, night])
+  // Hero 高度自适应：量测第4个排行行的实际底部位置，压缩 hero 让它刚好落在视口底部。
+  // CSS calc() 仅适配「无公告卡」场景；JS 量测处理公告卡、预警等可变内容。
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => {
+      const hero = heroRef.current
+      const rows = document.querySelectorAll<HTMLElement>('.rank-row')
+      if (!hero || rows.length < 4) return
+      const row4Bottom = rows[3].getBoundingClientRect().bottom
+      const target = window.innerHeight - 24  // 第4行距底部留 24px，5th row 微露
+      if (row4Bottom <= target) return        // 已在视口内，CSS calc 已够用
+      const overflow = row4Bottom - target
+      hero.style.minHeight = `${Math.max(160, hero.getBoundingClientRect().height - overflow)}px`
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [results])
 
   // 实时天气动效类型（全屏背景层）
   const fx: FxKind = useMemo(() => fxKind(stats?.text, night), [stats, night])
@@ -594,6 +558,10 @@ export default function App() {
       <div className="app-content" key={cityIdx}>
         <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <h1 className="hero-city">{city.name}</h1>
+          {loading && results.length > 0
+            ? <span className="hero-updated refreshing">数据更新中…</span>
+            : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
+          }
           {stats ? (
             <>
               <div
@@ -603,25 +571,10 @@ export default function App() {
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
-              {(stats.feelsLike != null || stats.humidity != null) && (
-                <div className="hero-comfort" aria-hidden="true">
-                  {stats.feelsLike != null && (
-                    <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
-                  )}
-                  {stats.feelsLike != null && stats.humidity != null && <span className="hero-comfort-sep">·</span>}
-                  {stats.humidity != null && (
-                    <span style={{ color: humidLevel(stats.humidity).color }}>湿度 {stats.humidity}%</span>
-                  )}
-                </div>
-              )}
               <div className="hero-hilo" aria-hidden="true">
                 <span>↑ {Math.round(stats.max)}°</span>
                 <span>↓ {Math.round(stats.min)}°</span>
               </div>
-              {loading && results.length > 0
-                ? <span className="hero-updated refreshing">数据更新中…</span>
-                : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
-              }
             </>
           ) : (
             <>
@@ -632,18 +585,23 @@ export default function App() {
           )}
         </div>
 
-        {warnings.length > 0 && <WarningInline warnings={warnings} />}
+        {/* 气象预警 + 分钟级降水：统一放在 hero 下方，视觉上构成「风险提示」区块 */}
+        {(warnings.length > 0 || minutelyRain) && (
+          <div className="hazard-block">
+            {warnings.length > 0 && <WarningInline warnings={warnings} />}
+            {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
+          </div>
+        )}
 
         {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
-
-        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
-
-        {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
 
         {showPullHint && !initialLoad && (
           <div className="pull-hint" aria-hidden="true">↓ 下拉更新</div>
         )}
 
+        {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
+
+        {stats && stats.count >= 2 && <TempRanking results={annotated} />}
       </div>
 
       <div className="app-content" key={`cards-${cityIdx}`}>
@@ -655,67 +613,23 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* 信源摘要：默认收起，点击展开全部信源卡 */}
-            {sourceSummary && (
-              <button
-                type="button"
-                className={'cards-summary' + (cardsOpen ? ' open' : '')}
-                onClick={() => setCardsOpen(o => !o)}
-                aria-expanded={cardsOpen}
-              >
-                <span className="cards-summary-label">
-                  <span className="cards-summary-count">{sourceSummary.count} 个信源</span>
-                  <span className="cards-summary-sep">·</span>
-                  <span>偏差 ±{sourceSummary.sd}°</span>
-                </span>
-                <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="2.2"
-                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-            )}
-            {/* 展开区域：grid-template-rows 0fr→1fr 平滑撑开 */}
-            <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
-              <div className="cards-expand-inner">
-                <div className="cards">
-                  {annotated.map((r) => (
-                    <ProviderCard key={r.providerId} r={r} />
-                  ))}
-                </div>
-              </div>
+            <div className="cards">
+              {sortedAnnotated.map((r) => (
+                <ProviderCard
+                  key={r.providerId}
+                  r={r}
+                  score={getScore(scores, cityKey, r.providerId)}
+                  onScoreChange={(delta) => updateScore(r.providerId, delta)}
+                />
+              ))}
             </div>
+            {sortedAnnotated.some(r => r.current) && (
+              <div className="score-hint">← 左滑降分　右滑升分 →</div>
+            )}
           </>
         )}
 
-        {air.length > 0 && avgAqi != null && (
-          <>
-            <button
-              type="button"
-              className={'cards-summary' + (aqiOpen ? ' open' : '')}
-              onClick={() => setAqiOpen(o => !o)}
-              aria-expanded={aqiOpen}
-            >
-              <span className="cards-summary-label">
-                <span className="cards-summary-count">空气质量</span>
-                <span className="cards-summary-sep">·</span>
-                <span style={{ color: aqiColor(avgAqi) }}>AQI {avgAqi}</span>
-                <span className="cards-summary-sep">·</span>
-                <span style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
-              </span>
-              <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2.2"
-                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-            <div className={'cards-expand' + (aqiOpen ? ' open' : '')}>
-              <div className="cards-expand-inner">
-                <AqiSection air={air} />
-              </div>
-            </div>
-          </>
-        )}
+        {air.length > 0 && <AqiSection air={air} />}
 
         {isEmpty && (
           <div className="hint">
@@ -775,7 +689,7 @@ function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
       {sorted.map((w) => (
         <span
           key={w.type + w.level}
-          className={'warn-chip' + (/橙|红/.test(w.level) ? ' warn-chip-severe' : '')}
+          className="warn-chip"
           style={{
             background: warnColorRgba(w.level, 0.15),
             borderColor: warnColorRgba(w.level, 0.45),
@@ -790,50 +704,53 @@ function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
 }
 
 // 分钟级降水卡（和风天气 minutely/5m）
+const RAIN_SVG = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="8" y1="19" x2="8" y2="21" /><line x1="8" y1="13" x2="8" y2="15" />
+    <line x1="16" y1="19" x2="16" y2="21" /><line x1="16" y1="13" x2="16" y2="15" />
+    <line x1="12" y1="21" x2="12" y2="23" /><line x1="12" y1="15" x2="12" y2="17" />
+    <path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" />
+  </svg>
+)
+const SNOW_SVG = (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <path d="m17 7-5-5-5 5" /><path d="m7 17 5 5 5-5" />
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <path d="m7 7-5 5 5 5" /><path d="m17 7 5 5-5 5" />
+  </svg>
+)
 function MinutelyRainCard({ data }: { data: MinutelyRain }) {
-  const pts = data.minutely.slice(0, 12)
-  const maxPrecip = Math.max(...pts.map(b => b.precip), 0.1)
-
-  // SVG geometry — viewBox 300×56; floor at 88% for zero-rain baseline
-  const W = 300, H = 56
-  const floor = H * 0.88
-  const ys = pts.map(b =>
-    b.precip > 0
-      ? Math.max(H * 0.04, floor - (b.precip / maxPrecip) * (floor - H * 0.04))
-      : floor
-  )
-  const xs = pts.map((_, i) => (i / (pts.length - 1)) * W)
-
-  let linePath = `M ${xs[0]} ${ys[0]}`
-  for (let i = 1; i < xs.length; i++) {
-    const dx = (xs[i] - xs[i - 1]) * 0.4
-    linePath += ` C ${xs[i - 1] + dx} ${ys[i - 1]}, ${xs[i] - dx} ${ys[i]}, ${xs[i]} ${ys[i]}`
-  }
-  const areaPath = `${linePath} L ${W} ${H} L 0 ${H} Z`
-
+  const bars = data.minutely.slice(0, 12)
+  const maxPrecip = Math.max(...bars.map(b => b.precip), 0.5)
+  const isSnow = bars.some(b => b.type === 'snow' && b.precip > 0)
   return (
     <div className="minutely-card">
-      {data.summary && <p className="minutely-title">{data.summary}</p>}
-      <svg viewBox={`0 0 ${W} ${H}`} className="minutely-svg"
-           preserveAspectRatio="none" aria-hidden="true">
-        <defs>
-          <linearGradient id="mly-fill" x1="0" y1="0" x2="0" y2={H}
-                          gradientUnits="userSpaceOnUse">
-            <stop offset="0%" stopColor="#5ac8fa" stopOpacity="0.70" />
-            <stop offset="100%" stopColor="#0a84ff" stopOpacity="0.08" />
-          </linearGradient>
-        </defs>
-        {[0.25, 0.50, 0.75].map((frac, i) => (
-          <line key={i} x1="0" y1={frac * H} x2={W} y2={frac * H}
-                stroke="rgba(255,255,255,0.10)" strokeWidth="0.8" strokeDasharray="3 3" />
-        ))}
-        <path d={areaPath} fill="url(#mly-fill)" />
-        <path d={linePath} fill="none" stroke="rgba(90,200,250,0.85)"
-              strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <div className="minutely-time-row" aria-hidden="true">
-        <span>现在</span><span>15分钟</span><span>30分钟</span><span>45分钟</span><span>1小时</span>
+      <div className="minutely-head">
+        {isSnow ? SNOW_SVG : RAIN_SVG}
+        <span className="minutely-label">未来一小时</span>
       </div>
+      <div className="minutely-chart" aria-hidden="true">
+        {bars.map((b, i) => {
+          const h = b.precip > 0 ? Math.max(8, (b.precip / maxPrecip) * 100) : 4
+          const opacity = b.precip > 0 ? 0.55 + (b.precip / maxPrecip) * 0.4 : 0.18
+          return (
+            <div
+              key={i}
+              className="minutely-bar"
+              style={{ height: `${h}%`, opacity }}
+            />
+          )
+        })}
+      </div>
+      <div className="minutely-time-row" aria-hidden="true">
+        <span>现在</span>
+        <span>30分钟</span>
+        <span>1小时</span>
+      </div>
+      {data.summary && <p className="minutely-summary">{data.summary}</p>}
     </div>
   )
 }
@@ -859,79 +776,169 @@ function aqiCategory(aqi: number): string {
 // memo：拖动/下拉手势会每帧更新 App 状态，记忆化避免数据未变时整列重渲染
 const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
   return (
-    <div className="cards">
-      {air.map((r) => {
-        if (r.error || !r.air) return null
-        const a = r.air
-        const col = aqiColor(a.aqi)
-        const Tag = r.url ? 'a' : 'div'
-        return (
-          <Tag
-            className={'card aqi-card' + (r.url ? ' card-link' : '')}
-            key={r.providerId}
-            {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-          >
-            <div className="head">
-              <span className="dot" style={{ background: r.color }} />
-              <span className="name">{r.providerName}</span>
-              {r.url && (
-                <svg className="card-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              )}
-              <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
-              <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
-            </div>
-            {(a.dominant || a.pm25 != null) && (
-              <div className="row">
-                {a.dominant === 'PM2.5' && a.pm25 != null ? (
-                  <span>主要污染物 <b>PM2.5</b> · {a.pm25} μg/m³</span>
-                ) : (
-                  <>
-                    {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
-                    {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
-                  </>
+    <div className="aqi-section">
+      <div className="ranking-title">空气质量 · 美国 AQI</div>
+      <div className="cards">
+        {air.map((r) => {
+          if (r.error || !r.air) {
+            return null   // AQI 源失败时静默跳过
+          }
+          const a = r.air
+          const col = aqiColor(a.aqi)
+          const Tag = r.url ? 'a' : 'div'
+          return (
+            <Tag
+              className={'card' + (r.url ? ' card-link' : '')}
+              key={r.providerId}
+              {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
+            >
+              <div className="head">
+                <span className="dot" style={{ background: r.color }} />
+                <span className="name">{r.providerName}</span>
+                {r.url && (
+                  <svg className="card-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
                 )}
+                <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
+                <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
               </div>
-            )}
-            {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
-          </Tag>
-        )
-      })}
+              {(a.dominant || a.pm25 != null) && (
+                <div className="row">
+                  {a.dominant === 'PM2.5' && a.pm25 != null ? (
+                    // 主要污染物就是 PM2.5 时合并成一条，避免「主要污染物 PM2.5」与「PM2.5 9」重复
+                    <span>主要污染物 <b>PM2.5</b> · {a.pm25} μg/m³</span>
+                  ) : (
+                    <>
+                      {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
+                      {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
+                    </>
+                  )}
+                </div>
+              )}
+              {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
+            </Tag>
+          )
+        })}
+      </div>
     </div>
   )
 })
 
-const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
+function ScoreDots({ score }: { score: number }) {
+  return (
+    <span className="score-dots" aria-label={`可信度 ${score}/5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={'score-dot' + (i < score ? ' on' : '')} />
+      ))}
+    </span>
+  )
+}
+
+const ProviderCard = memo(function ProviderCard({
+  r, score, onScoreChange,
+}: {
+  r: Annotated
+  score: number
+  onScoreChange: (delta: number) => void
+}) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef<number | null>(null)
+  const swipeStartY = useRef<number | null>(null)
+  const swipeGesture = useRef<'swipe' | 'scroll' | null>(null)
+  const swipeRaw = useRef(0)
+  const onScoreChangeRef = useRef(onScoreChange)
+  useEffect(() => { onScoreChangeRef.current = onScoreChange }, [onScoreChange])
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const THRESHOLD = 55
+
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      swipeStartX.current = t.clientX
+      swipeStartY.current = t.clientY
+      swipeGesture.current = null
+      swipeRaw.current = 0
+    }
+    const onMove = (e: TouchEvent) => {
+      if (swipeStartX.current == null || swipeStartY.current == null) return
+      const t = e.touches[0]
+      const dx = t.clientX - swipeStartX.current
+      const dy = t.clientY - swipeStartY.current
+      if (swipeGesture.current == null) {
+        if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return
+        swipeGesture.current = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll'
+      }
+      if (swipeGesture.current === 'swipe') {
+        e.preventDefault()
+        e.stopPropagation()
+        swipeRaw.current = dx
+        const clamped = Math.max(-72, Math.min(72, dx * 0.65))
+        el.style.transition = 'none'
+        el.style.transform = `translateX(${clamped}px)`
+        const pct = Math.min(Math.abs(dx) / THRESHOLD, 1)
+        el.style.setProperty('--swipe-hint', pct.toFixed(2))
+        el.classList.toggle('swipe-up', dx > 8)
+        el.classList.toggle('swipe-down', dx < -8)
+      }
+    }
+    const onEnd = () => {
+      if (swipeGesture.current === 'swipe') {
+        const raw = swipeRaw.current
+        el.style.transition = 'transform 0.35s var(--spring), box-shadow 0.2s ease, opacity 0.3s ease'
+        el.style.transform = ''
+        el.style.removeProperty('--swipe-hint')
+        el.classList.remove('swipe-up', 'swipe-down')
+        setTimeout(() => { if (el) el.style.transition = '' }, 360)
+        if (raw >= THRESHOLD) onScoreChangeRef.current(1)
+        else if (raw <= -THRESHOLD) onScoreChangeRef.current(-1)
+      }
+      swipeStartX.current = null
+      swipeStartY.current = null
+      swipeGesture.current = null
+      swipeRaw.current = 0
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('touchcancel', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+  }, [])
+
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
-  if (r.error || !r.current) return null   // 失败/无数据信源静默隐藏
+  if (r.error || !r.current) return null
 
   const c = r.current
-  // GZQX 从缓存恢复时，预报可能在两次刷新间隙过期：此时 text='—'、无预警，
-  // NoticeCard 不渲染任何内容，故同样静默隐藏本卡片。
-  if (r.providerId === 'gzqx' && c.text === '—' && !c.warnings?.length) {
-    const hasFc = !!c.forecast && (
-      /\d{1,2}时到\d{1,2}时/.test(c.forecast) ||
-      /注意|防范|防御|局部|短时强|冰雹|建议/.test(c.forecast)
-    )
-    if (!hasFc || !isForecastCurrent(c.forecast, c.forecastIssuedAt)) return null
-  }
-  const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
+  const muted = score === 0
+  const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : '', muted ? 'score-muted' : ''].filter(Boolean).join(' ')
   return (
-    <div className={cls}>
+    <div
+      ref={cardRef}
+      className={cls}
+      style={{ viewTransitionName: `provider-card-${r.providerId}` } as React.CSSProperties}
+    >
       <div className="head">
         <span className="dot" style={{ background: color }} />
         <span className="name">{r.providerName}</span>
         {r.isMax && <span className="tag tag-hot">最高</span>}
         {r.isMin && <span className="tag tag-cold">最低</span>}
+        <ScoreDots score={score} />
         <span className="temp">{Math.round(c.temp)}°</span>
       </div>
       <div className="row">
-        {c.text !== '—' && (
+        {c.text && c.text !== '—' && (
           <span className="wx">
             <WeatherIcon text={c.text} size={17} className="wx-icon" />
             <b>{c.text}</b>
@@ -951,37 +958,86 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
   )
 })
 
+const TempRanking = memo(function TempRanking({ results }: { results: Annotated[] }) {
+  const ranked = results
+    .filter((r) => r.current)
+    .sort((a, b) => b.current!.temp - a.current!.temp)
+  if (ranked.length < 2) return null
+  const hi = ranked[0].current!.temp
+  const lo = ranked[ranked.length - 1].current!.temp
+  const span = hi - lo || 1
+  return (
+    <div className="ranking">
+      <div className="ranking-title">温度排行</div>
+      {ranked.map((r, i) => {
+        const c = r.current!
+        const color = PROVIDERS.find((p) => p.id === r.providerId)?.color ?? '#0a84ff'
+        const pct = 14 + ((c.temp - lo) / span) * 86
+        return (
+          <div className="rank-row" key={r.providerId}>
+            <span className="rank-no">{i + 1}</span>
+            <span className="dot" style={{ background: color }} />
+            <span className="rank-name">{r.providerName}</span>
+            <span className="rank-bar">
+              <span className="rank-bar-fill" style={{ width: `${pct}%`, background: color }} />
+            </span>
+            <span className="rank-temp">{c.temp.toFixed(1)}°</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+})
+
 interface Stats {
   avg: number; min: number; max: number; count: number; text: string
-  feelsLike?: number; humidity?: number; pop?: number; uvIndex?: number; windSpeed?: number
+  feelsLike?: number; humidity?: number; uvIndex?: number
 }
 
-function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
+function analyze(
+  results: ProviderResult[],
+  weights?: Map<string, number>,
+): { annotated: Annotated[]; stats: null | Stats } {
+  const getW = (r: ProviderResult) => weights?.get(r.providerId) ?? 3
+
   const ok = results.filter((r) => r.current)
-  // round to 1 decimal to avoid float comparison issues
-  const temps = ok.map((r) => Math.round(r.current!.temp * 10) / 10)
-  if (temps.length === 0) {
-    return { annotated: results, stats: null }
-  }
+  // Sources with weight=0 are excluded; fall back to all if every source is excluded
+  const active = ok.filter((r) => getW(r) > 0)
+  const pool = active.length > 0 ? active : ok
+
+  const temps = pool.map((r) => Math.round(r.current!.temp * 10) / 10)
+  if (temps.length === 0) return { annotated: results, stats: null }
 
   const min = Math.min(...temps)
   const max = Math.max(...temps)
-  const avg = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10
 
-  // 取多数天气现象用于概览图标
+  // Weighted temperature average
+  const totalW = pool.reduce((s, r) => s + getW(r), 0)
+  const avg = totalW > 0
+    ? Math.round(pool.reduce((s, r) => s + r.current!.temp * getW(r), 0) / totalW * 10) / 10
+    : Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10
+
+  // Weighted text majority vote (exclude placeholder "—")
   const textCounts = new Map<string, number>()
-  for (const r of ok) textCounts.set(r.current!.text, (textCounts.get(r.current!.text) ?? 0) + 1)
-  const majorityText = [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  for (const r of pool) {
+    const t = r.current!.text
+    if (t && t !== '—') textCounts.set(t, (textCounts.get(t) ?? 0) + getW(r))
+  }
+  const majorityText = textCounts.size > 0
+    ? [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    : (ok[0]?.current?.text ?? '—')
 
-  // 多源聚合的体感/湿度/风（仅取提供该字段的源求平均）
-  const avgOf = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : undefined)
+  // Weighted average of optional fields
+  const wavg = (vals: { v: number; w: number }[]) => {
+    if (vals.length === 0) return undefined
+    const tw = vals.reduce((s, x) => s + x.w, 0)
+    return tw > 0 ? vals.reduce((s, x) => s + x.v * x.w, 0) / tw : undefined
+  }
   const r1 = (x?: number) => (x == null ? undefined : Math.round(x * 10) / 10)
-  const feels = ok.map((r) => r.current!.feelsLike).filter((n): n is number => n != null)
-  const hums = ok.map((r) => r.current!.humidity).filter((n): n is number => n != null)
-  const humAvg = avgOf(hums)
-  const pops = ok.map((r) => r.current!.pop).filter((n): n is number => n != null)
-  const uvs = ok.map((r) => r.current!.uvIndex).filter((n): n is number => n != null)
-  const winds = ok.map((r) => r.current!.windSpeed).filter((n): n is number => n != null)
+  const feels = pool.flatMap((r) => r.current!.feelsLike != null ? [{ v: r.current!.feelsLike, w: getW(r) }] : [])
+  const hums  = pool.flatMap((r) => r.current!.humidity  != null ? [{ v: r.current!.humidity,  w: getW(r) }] : [])
+  const uvs   = pool.flatMap((r) => r.current!.uvIndex   != null ? [{ v: r.current!.uvIndex,   w: getW(r) }] : [])
+  const humAvg = wavg(hums)
 
   const annotated: Annotated[] = results.map((r) => {
     if (!r.current) return r
@@ -997,11 +1053,9 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
     annotated,
     stats: {
       avg, min, max, count: temps.length, text: majorityText,
-      feelsLike: r1(avgOf(feels)),
+      feelsLike: r1(wavg(feels)),
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
-      pop: pops.length > 0 ? Math.round(Math.max(...pops)) : undefined,
-      uvIndex: r1(avgOf(uvs)),
-      windSpeed: r1(avgOf(winds)),
+      uvIndex: r1(wavg(uvs)),
     },
   }
 }
@@ -1015,7 +1069,6 @@ const SKY_THEME: Record<string, string> = {
   rain: '#172a3e',
   snow: '#293751',
   fog: '#2b2e36',
-  haze: '#34302a',
 }
 
 // 太阳时相：按北京时（番禺/安福均在 UTC+8）算昼夜 + 日出/日落暖色染色。
@@ -1040,91 +1093,72 @@ function skyKey(text: string | undefined, night: boolean): string {
   if (text) {
     if (/雷|雨/.test(text)) return 'rain'
     if (/雪/.test(text)) return 'snow'
-    if (/霾|沙|尘/.test(text)) return 'haze'
-    if (/雾/.test(text)) return 'fog'
+    if (/雾|霾|沙|尘/.test(text)) return 'fog'
     if (/阴/.test(text)) return 'overcast'
     if (/多云|间/.test(text)) return 'cloudy'
   }
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 指标条等级：每项恒返回 颜色 + 等级文字（常驻显示，信息密度优先）。
-// 正常/舒适区间用中性白（不着色），仅偏离正常时逐级升到黄/橙/红/紫等警示色。
-type Level = { color: string; level: string }
-const NORMAL = '#f5f5f7' // 中性白：正常区间不加颜色
-function feelsLevel(t: number): Level {
+type Alert = { color: string; level: string } | undefined
+// 体感始终着色：冷蓝→绿→黄→橙→红
+function feelsAlert(t: number): { color: string; level: string } {
   if (t <= 10) return { color: '#64d2ff', level: '偏冷' }
-  if (t <= 26) return { color: NORMAL, level: '舒适' }
-  if (t < 32)  return { color: '#ffd60a', level: '偏热' }
-  if (t < 38)  return { color: '#ff9f0a', level: '较热' }
+  if (t <= 18) return { color: '#34c759', level: '凉爽' }
+  if (t <= 26) return { color: '#34c759', level: '舒适' }
+  if (t <= 32) return { color: '#ffd60a', level: '偏热' }
+  if (t <= 38) return { color: '#ff9f0a', level: '较热' }
   return { color: '#ff453a', level: '酷热' }
 }
-// 湿度舒适度：30–70% 中性，过干偏黄、过湿逐级橙/红（南方梅雨/回南天常态高湿）
-function humidLevel(h: number): Level {
-  if (h < 30)  return { color: '#ffd60a', level: '偏干' }
-  if (h <= 70) return { color: NORMAL, level: '舒适' }
-  if (h <= 85) return { color: '#ffd60a', level: '偏湿' }
-  if (h <= 92) return { color: '#ff9f0a', level: '潮湿' }
-  return { color: '#ff453a', level: '闷湿' }
+// 湿度始终着色：绿区 30–60%，两侧渐差
+function humidAlert(h: number): { color: string; level: string } {
+  if (h < 30) return { color: '#ffd60a', level: '偏干' }
+  if (h <= 60) return { color: '#34c759', level: '适宜' }
+  if (h <= 80) return { color: '#ffd60a', level: '偏湿' }
+  if (h <= 90) return { color: '#ff9f0a', level: '闷湿' }
+  return { color: '#ff453a', level: '潮湿' }
 }
-function aqiLevel(aqi: number): Level {
-  if (aqi <= 50)  return { color: NORMAL, level: '优' }
-  if (aqi <= 100) return { color: '#ffd60a', level: '良' }
+function aqiAlert(aqi: number): Alert {
+  if (aqi <= 100) return undefined
   if (aqi <= 150) return { color: '#ff9f0a', level: '轻度污染' }
   if (aqi <= 200) return { color: '#ff453a', level: '中度污染' }
   if (aqi <= 300) return { color: '#af52de', level: '重度污染' }
   return { color: '#a1304e', level: '严重污染' }
 }
-function uvLevel(uv: number): Level {
-  if (uv <= 2) return { color: NORMAL, level: '弱' }
-  if (uv <= 4) return { color: '#ffd60a', level: '中等' }
+function uvAlert(uv: number): Alert {
+  if (uv <= 4) return undefined
   if (uv <= 6) return { color: '#ff9f0a', level: '较强' }
   if (uv <= 9) return { color: '#ff453a', level: '强' }
   return { color: '#bf5af2', level: '极强' }
 }
-function popLevel(p: number): Level {
-  if (p <= 20) return { color: NORMAL, level: '晴好' }
-  if (p <= 40) return { color: '#ffd60a', level: '小概率' }
-  if (p <= 70) return { color: '#ff9f0a', level: '中等' }
-  return { color: '#ff453a', level: '较大' }
-}
-function windLevel(v: number): Level {
-  if (v < 20) return { color: NORMAL,     level: '微风' }
-  if (v < 40) return { color: '#ffd60a',  level: '中风' }
-  if (v < 60) return { color: '#ff9f0a',  level: '强风' }
-  return       { color: '#ff453a',  level: '大风' }
-}
 
-// 关键指标条：降水概率 / 空气质量 / 紫外线 / 风速
-// 体感 + 湿度已在各信源卡内展示，此处聚焦「天气决策信息」（是否带伞/外出/防晒）
+// 概览次要指标小卡：体感/湿度/AQI/紫外线，≤3 个时单行，4 个时 2×2
+// 关键指标：hero 下方一排「图标 + 数值 + 标签」，去卡片框，直接浮于天气动效之上
 const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const cols: { key: string; value: string; dim: string; level: string; color: string }[] = []
-  if (stats.pop != null) {
-    const a = popLevel(stats.pop)
-    cols.push({ key: 'pop', value: `${stats.pop}%`, dim: '降水', level: a.level, color: a.color })
+  const cols: { key: string; value: string; label: string; color?: string }[] = []
+  if (stats.feelsLike != null) {
+    const a = feelsAlert(stats.feelsLike)
+    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, label: `体感 · ${a.level}`, color: a.color })
+  }
+  if (stats.humidity != null) {
+    const a = humidAlert(stats.humidity)
+    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: `湿度 · ${a.level}`, color: a.color })
   }
   if (avgAqi != null) {
-    const a = aqiLevel(avgAqi)
-    cols.push({ key: 'aqi', value: `${avgAqi}`, dim: '空气', level: a.level, color: a.color })
+    const a = aqiAlert(avgAqi)
+    cols.push({ key: 'aqi', value: `${avgAqi}`, label: a ? `空气 · ${a.level}` : '空气', color: a?.color })
   }
   if (stats.uvIndex != null) {
-    const a = uvLevel(stats.uvIndex)
-    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, dim: '紫外线', level: a.level, color: a.color })
-  }
-  if (stats.windSpeed != null) {
-    const a = windLevel(stats.windSpeed)
-    cols.push({ key: 'wind', value: `${Math.round(stats.windSpeed)}`, dim: 'km/h', level: a.level, color: a.color })
+    const a = uvAlert(stats.uvIndex)
+    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, label: a ? `紫外线 · ${a.level}` : '紫外线', color: a?.color })
   }
   if (cols.length === 0) return null
   return (
     <div className="metric-strip">
       {cols.map((c, i) => (
         <div className="metric-col" key={c.key} style={{ animationDelay: `${i * 0.06}s` }}>
-          <span className="mc-value" style={{ color: c.color }}>{c.value}</span>
-          <div className="mc-label">
-            <span className="mc-dim">{c.dim}</span>
-            <span className="mc-level">{c.level}</span>
-          </div>
+          <span className="mc-value" style={c.color ? { color: c.color } : undefined}>{c.value}</span>
+          <span className="mc-label">{c.label}</span>
         </div>
       ))}
     </div>
@@ -1135,8 +1169,8 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
 function NoticeCard({ text, issuedAt }: { text: string; issuedAt?: string }) {
   const { timeLabel, note } = parseForecast(text)
   const issued = fmtIssuedAt(issuedAt)
-  // 卡片价值在于「注意/防范」提示；只有时间窗口、无实质内容时不渲染（避免空卡片）
-  if (!note) return null
+  // 时间窗口和注意事项都没有时不渲染
+  if (!timeLabel && !note) return null
   return (
     <div className="notice-card">
       <div className="notice-head">
@@ -1212,15 +1246,10 @@ function parseForecast(raw: string) {
   }
   const weather = wxParts.join('，')
 
-  // 附加提示：含警示词的段落。其中高危信息（局部暴雨/短时强降水/冰雹）即使
-  // 与主天气描述同段（如「有中雷雨局部暴雨」），也提取为提示——否则整段会被当作
-  // 普通天气归入 wxOrigSet，note 落空导致卡片被 `if (!note)` 整张隐藏。
+  // 附加提示：含警示词或「局部XXX」的段落
   const noteRe = /注意|防范|防御|局部|短时强|冰雹|建议/
-  const severeRe = /局部|短时强|冰雹/
-  const noteParts = segs
-    .filter(x => (noteRe.test(x) && !wxOrigSet.has(x)) || severeRe.test(x))
-    .map(x => x.replace(/^有\s*/, ''))
-  let note = [...new Set(noteParts)].join('，')
+  const noteParts = segs.filter(x => noteRe.test(x) && !wxOrigSet.has(x))
+  let note = noteParts.join('，')
   if (note.length > 36) note = note.slice(0, 36).replace(/[，,\s]+$/, '') + '…'
 
   // 解析完全失败时兜底：截断原文展示
