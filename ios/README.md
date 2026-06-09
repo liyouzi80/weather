@@ -105,6 +105,16 @@ Sources/
 > `xcodegen generate` 会自动把 Widget 作为 extension 嵌入主 App。在 Xcode 里为
 > **两个 target** 都配好同一 Team 的签名即可。添加方式：长按桌面 → 加小组件 → 搜「天气」。
 
+## 待完成（PWA 已有，iOS 尚未移植）
+
+- [ ] **信源可信度评分**：左右滑动卡片打分 0–5，加权影响聚合温度与天气文字，卡片按评分自动排序，评分为 0 的信源排除出聚合。PWA 用 `localStorage` 持久化，iOS 对应用 `UserDefaults`。参考 `src/credibility.ts` 和 `src/App.tsx` 中 `ProviderCard` 的滑动手势实现。
+- [ ] **指标条始终着色**：体感与湿度始终显示颜色 + 等级文字（凉爽绿 / 偏热黄 / 较热橙 / 酷热红；适宜绿 / 偏湿黄 / 闷湿橙 / 潮湿红），不再仅在异常时才着色。参考 PWA `feelsAlert()` / `humidAlert()` 的颜色区间。
+
+## 待完成（iOS 平台新特性）
+
+- [ ] **iOS 26 / SwiftUI 新 API**：`swipeActions` 替代当前自定义横滑手势打分；`toolbarMinimizeBehavior` 配合顶栏收起；Liquid Glass 2 材质（`.glassEffect()`）替换现有毛玻璃卡片背景。
+- [ ] **`@starting-style` 卡片进场动效**：iOS / Safari 17.4+ 原生支持，可给信源卡首次出现加 opacity 0→1 的无 JS 进场过渡。
+
 ## 可选优化
 
 - [ ] 天气动效改用 `.sks` 粒子文件：当前为纯代码生成粒子（`WeatherScene.swift`），
