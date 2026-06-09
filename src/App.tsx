@@ -6,6 +6,12 @@ import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
 import { loadScores, saveScore, getScore, type Scores } from './credibility'
 
+// CSS Scroll-driven Animations (Chrome 115+, Firefox 110+, Safari 18+):
+// hero parallax / phase-1 fade / temp-fly / sticky-temp cross-fade are handled by CSS.
+// When supported, the JS scroll handler skips all inline-style visual updates.
+const CSS_SCROLL_DRIVEN =
+  typeof CSS !== 'undefined' && CSS.supports('animation-timeline: scroll()')
+
 const CITIES: GeoLocation[] = [
   {
     name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622,
@@ -104,11 +110,11 @@ export default function App() {
     setScrolled(false)
     // 重置 hero 视差 + 高度（切城市后重新量测）
     if (heroRef.current) {
-      heroRef.current.style.opacity = '1'
-      heroRef.current.style.transform = ''
+      if (!CSS_SCROLL_DRIVEN) heroRef.current.style.opacity = '1'
+      if (!CSS_SCROLL_DRIVEN) heroRef.current.style.transform = ''
       heroRef.current.style.minHeight = ''
     }
-    if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
+    if (stickyTempRef.current && !CSS_SCROLL_DRIVEN) stickyTempRef.current.style.opacity = '0'
   }, [cityIdx])
 
   // 首次加载完成后显示下拉提示 4 秒，之后自动隐藏
@@ -354,6 +360,9 @@ export default function App() {
         // 吸顶 scrolled：显示阈值 80px，隐藏阈值 60px（滞后区间防止边界反复闪烁）
         const isScrolled = wasScrolled ? y > 60 : y > 80
         if (isScrolled !== wasScrolled) { wasScrolled = isScrolled; setScrolled(isScrolled) }
+
+        // CSS scroll-driven animations handle all visual effects — JS only tracks state
+        if (CSS_SCROLL_DRIVEN) return
 
         if (y <= 0) {
           const justArrived = !wasAtTop
