@@ -168,7 +168,9 @@ export default function App() {
       const t = e.touches[0]
       startX.current = t.clientX
       startY.current = t.clientY
-      gesture.current = null
+      // Touch started inside a provider card — let card handle it, never city-switch
+      const insideCard = !!(e.target as Element | null)?.closest('.card')
+      gesture.current = insideCard ? 'ignore' : null
       atTop.current = window.scrollY <= 0 && !loadingRef.current
     }
     const onMove = (e: TouchEvent) => {
@@ -1098,19 +1100,23 @@ function skyKey(text: string | undefined, night: boolean): string {
   return night ? 'clear-night' : 'clear-day'
 }
 
-// 指标条「警示色」：正常范围返回 undefined（不着色），仅异常/极端时返回颜色 + 等级文字
 type Alert = { color: string; level: string } | undefined
-function feelsAlert(t: number): Alert {
+// 体感始终着色：冷蓝→绿→黄→橙→红
+function feelsAlert(t: number): { color: string; level: string } {
   if (t <= 10) return { color: '#64d2ff', level: '偏冷' }
-  if (t >= 38) return { color: '#ff453a', level: '酷热' }
-  if (t >= 32) return { color: '#ff9f0a', level: '较热' }
-  return undefined
+  if (t <= 18) return { color: '#34c759', level: '凉爽' }
+  if (t <= 26) return { color: '#34c759', level: '舒适' }
+  if (t <= 32) return { color: '#ffd60a', level: '偏热' }
+  if (t <= 38) return { color: '#ff9f0a', level: '较热' }
+  return { color: '#ff453a', level: '酷热' }
 }
-function humidAlert(h: number): Alert {
+// 湿度始终着色：绿区 30–60%，两侧渐差
+function humidAlert(h: number): { color: string; level: string } {
   if (h < 30) return { color: '#ffd60a', level: '偏干' }
-  if (h > 90) return { color: '#ff453a', level: '潮湿' }
-  if (h > 85) return { color: '#ff9f0a', level: '闷湿' }
-  return undefined
+  if (h <= 60) return { color: '#34c759', level: '适宜' }
+  if (h <= 80) return { color: '#ffd60a', level: '偏湿' }
+  if (h <= 90) return { color: '#ff9f0a', level: '闷湿' }
+  return { color: '#ff453a', level: '潮湿' }
 }
 function aqiAlert(aqi: number): Alert {
   if (aqi <= 100) return undefined
@@ -1132,11 +1138,11 @@ const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats;
   const cols: { key: string; value: string; label: string; color?: string }[] = []
   if (stats.feelsLike != null) {
     const a = feelsAlert(stats.feelsLike)
-    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, label: a ? `体感 · ${a.level}` : '体感', color: a?.color })
+    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, label: `体感 · ${a.level}`, color: a.color })
   }
   if (stats.humidity != null) {
     const a = humidAlert(stats.humidity)
-    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: a ? `湿度 · ${a.level}` : '湿度', color: a?.color })
+    cols.push({ key: 'humid', value: `${stats.humidity}%`, label: `湿度 · ${a.level}`, color: a.color })
   }
   if (avgAqi != null) {
     const a = aqiAlert(avgAqi)
