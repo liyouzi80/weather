@@ -4,6 +4,13 @@ import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, MinutelyRain, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
+import { loadScores, saveScore, getScore, type Scores } from './credibility'
+
+// CSS Scroll-driven Animations (Chrome 115+, Firefox 110+, Safari 18+):
+// hero parallax / phase-1 fade / temp-fly / sticky-temp cross-fade are handled by CSS.
+// When supported, the JS scroll handler skips all inline-style visual updates.
+const CSS_SCROLL_DRIVEN =
+  typeof CSS !== 'undefined' && CSS.supports('animation-timeline: scroll()')
 
 const CITIES: GeoLocation[] = [
   {
@@ -84,6 +91,7 @@ export default function App() {
   })
   const [cardsOpen, setCardsOpen] = useState(false)
   const [aqiOpen, setAqiOpen] = useState(false)
+  const [scores, setScores] = useState<Scores>(() => loadScores())
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
 
@@ -178,7 +186,7 @@ export default function App() {
         setAqiOpen(false)
       })
       window.scrollTo(0, 0)
-      if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
+      if (stickyTempRef.current && !CSS_SCROLL_DRIVEN) stickyTempRef.current.style.opacity = '0'
     }
 
     // View Transitions：根据城市索引方向设置滑动方向（forward/back），让转场带有方向感。
@@ -246,7 +254,9 @@ export default function App() {
       const t = e.touches[0]
       startX.current = t.clientX
       startY.current = t.clientY
-      gesture.current = null
+      // Touch started inside a provider card — let card handle it, never city-switch
+      const insideCard = !!(e.target as Element | null)?.closest('.card')
+      gesture.current = insideCard ? 'ignore' : null
       atTop.current = window.scrollY <= 0 && !loadingRef.current
     }
     const onMove = (e: TouchEvent) => {
@@ -440,6 +450,9 @@ export default function App() {
         const isScrolled = wasScrolled ? y > 60 : y > 80
         if (isScrolled !== wasScrolled) { wasScrolled = isScrolled; setScrolled(isScrolled) }
 
+        // CSS scroll-driven animations handle all visual effects — JS only tracks state
+        if (CSS_SCROLL_DRIVEN) return
+
         if (y <= 0) {
           const justArrived = !wasAtTop
           wasAtTop = true
@@ -499,7 +512,37 @@ export default function App() {
     return () => clearInterval(t)
   }, [updatedAt])
 
-  const { annotated, stats } = useMemo(() => analyze(results), [results])
+  const city = CITIES[cityIdx]
+  const cityKey = city.cityName ?? city.name
+
+  const weightMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const p of PROVIDERS) map.set(p.id, getScore(scores, cityKey, p.id))
+    return map
+  }, [scores, cityKey])
+
+  const { annotated, stats } = useMemo(() => analyze(results, weightMap), [results, weightMap])
+
+  const sortedAnnotated = useMemo(() =>
+    [...annotated].sort((a, b) =>
+      getScore(scores, cityKey, b.providerId) - getScore(scores, cityKey, a.providerId)
+    ),
+  [annotated, scores, cityKey])
+
+  const updateScore = useCallback((providerId: string, delta: number) => {
+    const current = getScore(scores, cityKey, providerId)
+    const next = Math.max(0, Math.min(5, current + delta))
+    if (next === current) return
+    haptic([8, 30, 8])
+    const doUpdate = () => {
+      flushSync(() => setScores(prev => saveScore(prev, cityKey, providerId, next)))
+    }
+    if (typeof document.startViewTransition === 'function') {
+      document.startViewTransition(doUpdate)
+    } else {
+      doUpdate()
+    }
+  }, [scores, cityKey])
   const sourceSummary = useMemo(() => {
     const temps = results.filter(r => !r.error && r.current != null).map(r => r.current!.temp)
     if (temps.length < 2) return null
@@ -527,7 +570,6 @@ export default function App() {
     () => results.find((r) => r.current?.minutelyRain)?.current?.minutelyRain ?? null,
     [results],
   )
-  const city = CITIES[cityIdx]
   const isEmpty = !loading && results.length === 0 && !initialLoad
   const activeCount = useMemo(
     () => PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(city) ?? true)).length,
@@ -679,8 +721,13 @@ export default function App() {
             <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
               <div className="cards-expand-inner">
                 <div className="cards">
-                  {annotated.map((r) => (
-                    <ProviderCard key={r.providerId} r={r} />
+                  {sortedAnnotated.map((r) => (
+                    <ProviderCard
+                      key={r.providerId}
+                      r={r}
+                      score={getScore(scores, cityKey, r.providerId)}
+                      onScoreChange={(delta) => updateScore(r.providerId, delta)}
+                    />
                   ))}
                 </div>
               </div>
@@ -904,7 +951,94 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
   )
 })
 
-const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
+function ScoreDots({ score }: { score: number }) {
+  return (
+    <span className="score-dots" aria-label={`可信度 ${score}/5`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <span key={i} className={'score-dot' + (i < score ? ' on' : '')} />
+      ))}
+    </span>
+  )
+}
+
+const ProviderCard = memo(function ProviderCard({
+  r, score, onScoreChange,
+}: {
+  r: Annotated
+  score: number
+  onScoreChange: (delta: number) => void
+}) {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const swipeStartX = useRef<number | null>(null)
+  const swipeStartY = useRef<number | null>(null)
+  const swipeGesture = useRef<'swipe' | 'scroll' | null>(null)
+  const swipeRaw = useRef(0)
+  const onScoreChangeRef = useRef(onScoreChange)
+  useEffect(() => { onScoreChangeRef.current = onScoreChange }, [onScoreChange])
+
+  useEffect(() => {
+    const el = cardRef.current
+    if (!el) return
+    const THRESHOLD = 55
+
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0]
+      swipeStartX.current = t.clientX
+      swipeStartY.current = t.clientY
+      swipeGesture.current = null
+      swipeRaw.current = 0
+    }
+    const onMove = (e: TouchEvent) => {
+      if (swipeStartX.current == null || swipeStartY.current == null) return
+      const t = e.touches[0]
+      const dx = t.clientX - swipeStartX.current
+      const dy = t.clientY - swipeStartY.current
+      if (swipeGesture.current == null) {
+        if (Math.abs(dx) < 7 && Math.abs(dy) < 7) return
+        swipeGesture.current = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'scroll'
+      }
+      if (swipeGesture.current === 'swipe') {
+        e.preventDefault()
+        e.stopPropagation()
+        swipeRaw.current = dx
+        const clamped = Math.max(-72, Math.min(72, dx * 0.65))
+        el.style.transition = 'none'
+        el.style.transform = `translateX(${clamped}px)`
+        const pct = Math.min(Math.abs(dx) / THRESHOLD, 1)
+        el.style.setProperty('--swipe-hint', pct.toFixed(2))
+        el.classList.toggle('swipe-up', dx > 8)
+        el.classList.toggle('swipe-down', dx < -8)
+      }
+    }
+    const onEnd = () => {
+      if (swipeGesture.current === 'swipe') {
+        const raw = swipeRaw.current
+        el.style.transition = 'transform 0.35s var(--spring), box-shadow 0.2s ease, opacity 0.3s ease'
+        el.style.transform = ''
+        el.style.removeProperty('--swipe-hint')
+        el.classList.remove('swipe-up', 'swipe-down')
+        setTimeout(() => { if (el) el.style.transition = '' }, 360)
+        if (raw >= THRESHOLD) onScoreChangeRef.current(1)
+        else if (raw <= -THRESHOLD) onScoreChangeRef.current(-1)
+      }
+      swipeStartX.current = null
+      swipeStartY.current = null
+      swipeGesture.current = null
+      swipeRaw.current = 0
+    }
+
+    el.addEventListener('touchstart', onStart, { passive: true })
+    el.addEventListener('touchmove', onMove, { passive: false })
+    el.addEventListener('touchend', onEnd, { passive: true })
+    el.addEventListener('touchcancel', onEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onStart)
+      el.removeEventListener('touchmove', onMove)
+      el.removeEventListener('touchend', onEnd)
+      el.removeEventListener('touchcancel', onEnd)
+    }
+  }, [])
+
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
 
@@ -920,14 +1054,20 @@ const ProviderCard = memo(function ProviderCard({ r }: { r: Annotated }) {
     )
     if (!hasFc || !isForecastCurrent(c.forecast, c.forecastIssuedAt)) return null
   }
-  const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : ''].filter(Boolean).join(' ')
+  const muted = score === 0
+  const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : '', muted ? 'score-muted' : ''].filter(Boolean).join(' ')
   return (
-    <div className={cls}>
+    <div
+      ref={cardRef}
+      className={cls}
+      style={{ viewTransitionName: `provider-card-${r.providerId}` } as React.CSSProperties}
+    >
       <div className="head">
         <span className="dot" style={{ background: color }} />
         <span className="name">{r.providerName}</span>
         {r.isMax && <span className="tag tag-hot">最高</span>}
         {r.isMin && <span className="tag tag-cold">最低</span>}
+        <ScoreDots score={score} />
         <span className="temp">{Math.round(c.temp)}°</span>
       </div>
       <div className="row">
@@ -956,31 +1096,52 @@ interface Stats {
   feelsLike?: number; humidity?: number; pop?: number; uvIndex?: number; windSpeed?: number
 }
 
-function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: null | Stats } {
+function analyze(
+  results: ProviderResult[],
+  weights?: Map<string, number>,
+): { annotated: Annotated[]; stats: null | Stats } {
+  const getW = (r: ProviderResult) => weights?.get(r.providerId) ?? 3
+
   const ok = results.filter((r) => r.current)
-  // round to 1 decimal to avoid float comparison issues
-  const temps = ok.map((r) => Math.round(r.current!.temp * 10) / 10)
-  if (temps.length === 0) {
-    return { annotated: results, stats: null }
-  }
+  // Sources with weight=0 are excluded; fall back to all if every source is excluded
+  const active = ok.filter((r) => getW(r) > 0)
+  const pool = active.length > 0 ? active : ok
+
+  const temps = pool.map((r) => Math.round(r.current!.temp * 10) / 10)
+  if (temps.length === 0) return { annotated: results, stats: null }
 
   const min = Math.min(...temps)
   const max = Math.max(...temps)
-  const avg = Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10
 
-  // 取多数天气现象用于概览图标
+  // Weighted temperature average
+  const totalW = pool.reduce((s, r) => s + getW(r), 0)
+  const avg = totalW > 0
+    ? Math.round(pool.reduce((s, r) => s + r.current!.temp * getW(r), 0) / totalW * 10) / 10
+    : Math.round(temps.reduce((a, b) => a + b, 0) / temps.length * 10) / 10
+
+  // Weighted text majority vote (exclude placeholder "—")
   const textCounts = new Map<string, number>()
-  for (const r of ok) textCounts.set(r.current!.text, (textCounts.get(r.current!.text) ?? 0) + 1)
-  const majorityText = [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+  for (const r of pool) {
+    const t = r.current!.text
+    if (t && t !== '—') textCounts.set(t, (textCounts.get(t) ?? 0) + getW(r))
+  }
+  const majorityText = textCounts.size > 0
+    ? [...textCounts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    : (ok[0]?.current?.text ?? '—')
 
-  // 多源聚合的体感/湿度/风（仅取提供该字段的源求平均）
+  // Weighted average of optional fields
+  const wavg = (vals: { v: number; w: number }[]) => {
+    if (vals.length === 0) return undefined
+    const tw = vals.reduce((s, x) => s + x.w, 0)
+    return tw > 0 ? vals.reduce((s, x) => s + x.v * x.w, 0) / tw : undefined
+  }
   const avgOf = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : undefined)
   const r1 = (x?: number) => (x == null ? undefined : Math.round(x * 10) / 10)
-  const feels = ok.map((r) => r.current!.feelsLike).filter((n): n is number => n != null)
-  const hums = ok.map((r) => r.current!.humidity).filter((n): n is number => n != null)
-  const humAvg = avgOf(hums)
+  const feels = pool.flatMap((r) => r.current!.feelsLike != null ? [{ v: r.current!.feelsLike, w: getW(r) }] : [])
+  const hums  = pool.flatMap((r) => r.current!.humidity  != null ? [{ v: r.current!.humidity,  w: getW(r) }] : [])
+  const humAvg = wavg(hums)
   const pops = ok.map((r) => r.current!.pop).filter((n): n is number => n != null)
-  const uvs = ok.map((r) => r.current!.uvIndex).filter((n): n is number => n != null)
+  const uvs   = pool.flatMap((r) => r.current!.uvIndex   != null ? [{ v: r.current!.uvIndex,   w: getW(r) }] : [])
   const winds = ok.map((r) => r.current!.windSpeed).filter((n): n is number => n != null)
 
   const annotated: Annotated[] = results.map((r) => {
@@ -997,10 +1158,10 @@ function analyze(results: ProviderResult[]): { annotated: Annotated[]; stats: nu
     annotated,
     stats: {
       avg, min, max, count: temps.length, text: majorityText,
-      feelsLike: r1(avgOf(feels)),
+      feelsLike: r1(wavg(feels)),
       humidity: humAvg != null ? Math.round(humAvg) : undefined,
       pop: pops.length > 0 ? Math.round(Math.max(...pops)) : undefined,
-      uvIndex: r1(avgOf(uvs)),
+      uvIndex: r1(wavg(uvs)),
       windSpeed: r1(avgOf(winds)),
     },
   }
