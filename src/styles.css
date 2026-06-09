@@ -658,69 +658,6 @@ html[data-sky='haze'] body::before {
   filter: drop-shadow(0 1px 10px rgba(0, 0, 0, 0.28));
 }
 
-/* ── CSS Scroll-driven Animations ─────────────────────────────────────────
-   Replaces the JS rAF scroll handler for all hero visual effects.
-   Requires animation-timeline: scroll() (Chrome 115+, Firefox 110+, Safari 18+).
-   Gracefully falls back to the JS handler in older browsers.
-   Disabled when user prefers reduced motion.
-   ──────────────────────────────────────────────────────────────────────── */
-@supports (animation-timeline: scroll()) {
-  @media not (prefers-reduced-motion: reduce) {
-
-    /* Hero container: parallax translateY, additive over entrance riseIn.
-       animation-composition: add → scroll offset stacks on top of riseIn's transform
-       so the entrance slide-up still plays while scroll-driven parallax runs.      */
-    .hero {
-      animation-name: riseIn, hero-scroll-parallax;
-      animation-duration: 0.55s, auto;
-      animation-timing-function: var(--spring), linear;
-      animation-fill-mode: both, both;
-      animation-timeline: auto, scroll(root);
-      animation-range: normal, 0px 200px;
-      animation-composition: replace, add;
-    }
-    @keyframes hero-scroll-parallax {
-      from { transform: translateY(0);    opacity: 1; }
-      to   { transform: translateY(-36px); opacity: 0; }
-    }
-
-    /* Phase 1 (0–80px): city name, weather condition, hi/lo fade out */
-    .hero-city,
-    .hero-cond,
-    .hero-hilo {
-      animation: hero-p1-out linear both;
-      animation-timeline: scroll(root);
-      animation-range: 0px 80px;
-    }
-    @keyframes hero-p1-out {
-      from { opacity: 1; }
-      to   { opacity: 0; }
-    }
-
-    /* Phase 2 (80–180px): temperature number shrinks and flies toward sticky bar */
-    .hero-temp {
-      animation: hero-temp-fly linear both;
-      animation-timeline: scroll(root);
-      animation-range: 80px 180px;
-    }
-    @keyframes hero-temp-fly {
-      from { transform: scale(1)    translateY(0);    opacity: 1; }
-      to   { transform: scale(0.72) translateY(-88px); opacity: 0; }
-    }
-
-    /* Phase 2 (80–180px): sticky bar temperature cross-fades in */
-    .loc-sticky-temp {
-      animation: sticky-temp-in linear both;
-      animation-timeline: scroll(root);
-      animation-range: 80px 180px;
-    }
-    @keyframes sticky-temp-in {
-      from { opacity: 0; }
-      to   { opacity: 1; }
-    }
-  }
-}
-
 /* Hero 骨架屏（加载中占位，结构与真实 hero 对齐） */
 .hero-skeleton { pointer-events: none; }
 .hskel {
@@ -829,62 +766,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 .card.err { opacity: 0.7; }
 .card .err-msg { color: #ff6961; font-size: 13px; font-weight: 500; }
-
-/* 可信度评分：5 个小圆点 */
-.score-dots {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-  margin-left: auto;
-  margin-right: 2px;
-  flex: none;
-}
-.score-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  transition: background 0.25s ease;
-}
-.score-dot.on {
-  background: rgba(255, 255, 255, 0.72);
-}
-
-/* 评分为 0 的信源：降低透明度 + 饱和度，明确表示已排除 */
-.card.score-muted {
-  opacity: 0.38;
-  filter: saturate(0.4);
-}
-
-/* 滑动打分视觉反馈：右滑→绿边，左滑→红边（强度跟随滑动进度） */
-.card.swipe-up {
-  border-color: rgba(52, 199, 89, calc(var(--swipe-hint, 0) * 0.7));
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.25),
-    inset 0 0 0 1px rgba(52, 199, 89, calc(var(--swipe-hint, 0) * 0.5));
-}
-.card.swipe-down {
-  border-color: rgba(255, 69, 58, calc(var(--swipe-hint, 0) * 0.7));
-  box-shadow:
-    0 4px 20px rgba(0, 0, 0, 0.25),
-    inset 0 0 0 1px rgba(255, 69, 58, calc(var(--swipe-hint, 0) * 0.5));
-}
-
-/* 滑动提示文字 */
-.score-hint {
-  text-align: center;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.3);
-  padding: 4px 0 2px;
-  letter-spacing: 0.02em;
-}
-
-/* View Transitions：卡片重排时位移动画（::view-transition-group 自动处理） */
-@supports (view-transition-name: none) {
-  .cards .card {
-    contain: layout;
-  }
-}
 
 /* 最高/最低温:用一抹暖/冷向的背景渐变标识(不再用彩色左边框) */
 .card.is-max {
