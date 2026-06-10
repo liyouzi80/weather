@@ -112,6 +112,8 @@ struct CityPageView: View {
                 }
 
                 // 信源：默认折叠成摘要行（N 个信源 · 偏差 ±X°），点击展开全部信源卡
+                // iOS 27 GlassEffectContainer：相邻信源卡的 Liquid Glass 自动混合渲染，
+                // 展开/折叠时卡片间边缘平滑衔接，与 PWA 折叠动效对齐。
                 if let summary = vm.sourceSummary {
                     VStack(spacing: 0) {
                         CollapsibleSummary(isOpen: $cardsOpen) {
@@ -123,13 +125,15 @@ struct CityPageView: View {
                             .font(.system(size: 14, weight: .medium))
                         }
                         if cardsOpen {
-                            LazyVGrid(columns: providerColumns, spacing: 10) {
-                                ForEach(vm.sortedAnnotated) { item in
-                                    ProviderCardView(
-                                        result: item,
-                                        score: vm.scoreFor(item.base.providerId),
-                                        onScoreChange: { delta in vm.updateScore(item.base.providerId, delta: delta) }
-                                    )
+                            GlassEffectContainer {
+                                LazyVGrid(columns: providerColumns, spacing: 10) {
+                                    ForEach(vm.sortedAnnotated) { item in
+                                        ProviderCardView(
+                                            result: item,
+                                            score: vm.scoreFor(item.base.providerId),
+                                            onScoreChange: { delta in vm.updateScore(item.base.providerId, delta: delta) }
+                                        )
+                                    }
                                 }
                             }
                             .padding(.top, 10)
@@ -141,14 +145,16 @@ struct CityPageView: View {
                     .riseIn(0.16)
                 } else {
                     // 不足 2 源：无可折叠摘要，直接平铺
-                    LazyVGrid(columns: providerColumns, spacing: 10) {
-                        ForEach(Array(vm.sortedAnnotated.enumerated()), id: \.element.id) { idx, item in
-                            ProviderCardView(
-                                result: item,
-                                score: vm.scoreFor(item.base.providerId),
-                                onScoreChange: { delta in vm.updateScore(item.base.providerId, delta: delta) }
-                            )
-                            .riseIn(0.16 + Double(idx) * 0.05)
+                    GlassEffectContainer {
+                        LazyVGrid(columns: providerColumns, spacing: 10) {
+                            ForEach(Array(vm.sortedAnnotated.enumerated()), id: \.element.id) { idx, item in
+                                ProviderCardView(
+                                    result: item,
+                                    score: vm.scoreFor(item.base.providerId),
+                                    onScoreChange: { delta in vm.updateScore(item.base.providerId, delta: delta) }
+                                )
+                                .riseIn(0.16 + Double(idx) * 0.05)
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -169,9 +175,11 @@ struct CityPageView: View {
                             .font(.system(size: 14, weight: .medium))
                         }
                         if aqiOpen {
-                            AQISectionView(air: vm.air)
-                                .padding(.top, 10)
-                                .transition(.opacity.combined(with: .move(edge: .top)))
+                            GlassEffectContainer {
+                                AQISectionView(air: vm.air)
+                            }
+                            .padding(.top, 10)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
                         }
                     }
                     .padding(.horizontal, 16)

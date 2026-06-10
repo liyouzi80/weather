@@ -1,6 +1,7 @@
 # 天气 · iOS
 
 番禺/安福天气的原生 iOS 版本，SwiftUI + SpriteKit，支持 iPhone 15 Pro/17 Pro 和 iPad Pro。
+部署目标 iOS 26+，使用 Liquid Glass（`.glassEffect()`）和 iOS 27 `swipeActions` / `GlassEffectContainer`。
 
 ## 首次运行
 
@@ -92,6 +93,9 @@ Sources/
 - [x] 上滑吸顶动效（Hero 视差淡出 + 顶部吸顶条）
 - [x] WidgetKit 桌面小组件（小 + 中尺寸，长按可切番禺 / 安福）
 - [x] 信源可信度评分（左右滑动卡片 0–5 分，加权聚合 + 自动排序 + 评分为 0 时排除出聚合，`UserDefaults` 持久化）
+- [x] **iOS 26 Liquid Glass**：`.glassEffect()` 替换手写毛玻璃卡片，自动适配天气动效背景
+- [x] **iOS 27 swipeActions**：系统原生横滑打分手势（右滑升分 / 左滑降分），替代自定义 `DragGesture`
+- [x] **iOS 27 GlassEffectContainer**：信源卡 + AQI 卡列表包裹在容器内，相邻 Glass 形状自动混合渲染
 
 ## 桌面小组件（WidgetKit）
 
@@ -106,9 +110,10 @@ Sources/
 > `xcodegen generate` 会自动把 Widget 作为 extension 嵌入主 App。在 Xcode 里为
 > **两个 target** 都配好同一 Team 的签名即可。添加方式：长按桌面 → 加小组件 → 搜「天气」。
 
-## 待完成（iOS 平台新特性）
+## 可选优化（iOS 平台）
 
-- [ ] **iOS 26 / SwiftUI 新 API**：`swipeActions` 替代当前自定义横滑手势打分；`toolbarMinimizeBehavior` 配合顶栏收起；Liquid Glass 2 材质（`.glassEffect()`）替换现有毛玻璃卡片背景（需 iOS 26 deployment target）。
+- [ ] **AsyncImage 缓存**：iOS 26+ `AsyncImage` 默认遵守 HTTP Cache-Control，天气图标 / 网络图片可直接受益（当前已是原生 URLSession，无需代码改动，升级部署目标后自动生效）。
+- [ ] **`toolbarMinimizeBehavior`**：顶栏收起行为精细控制（需引入 `NavigationStack`）。
 
 ## 可选优化
 

@@ -15,17 +15,13 @@ struct ScoreDotsView: View {
     }
 }
 
-// 信源卡片：标题行（圆点+名称+标签+评分圆点+温度），下方平铺天气/体感/湿度/风，底部观测时间。
-// 左右滑动：右滑升分，左滑降分；滑动距离 ≥55pt 触发，边框渐变提示方向。
+// 信源卡片：iOS 27 swipeActions 替代自定义 DragGesture 实现打分。
+// 右滑（leading）= 升分，左滑（trailing）= 降分；触觉反馈保留。
+// iOS 27 起 swipeActions 不再局限于 List 容器，可直接附加到任意视图。
 struct ProviderCardView: View {
     let result: AnnotatedResult
     let score: Int
     let onScoreChange: (Int) -> Void
-
-    @State private var dragOffset: CGFloat = 0
-    @State private var isDragging = false
-
-    private let threshold: CGFloat = 55
 
     var body: some View {
         if result.base.hasData, let w = result.base.current {
@@ -98,40 +94,32 @@ struct ProviderCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(score == 0 ? 0.38 : 1)
             .saturation(score == 0 ? 0.4 : 1)
-            .offset(x: dragOffset * 0.65)
-            .background {
+            // 最高/最低温渐变叠加（低透明度，不遮文字）
+            .overlay {
                 RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
-                    .fill(Color.cardFill)
-                    .overlay {
-                        RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
-                            .fill(tintGradient)
-                    }
-                    .overlay {
-                        // 滑动方向边框：右滑绿，左滑红
-                        RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
-                            .strokeBorder(swipeBorderGradient, lineWidth: 1)
-                    }
-                    .shadow(color: .black.opacity(0.25), radius: 20, y: 4)
+                    .fill(tintGradient)
+                    .allowsHitTesting(false)
             }
-            .animation(isDragging ? nil : .spring(response: 0.35, dampingFraction: 0.75), value: dragOffset)
-            .gesture(
-                DragGesture(minimumDistance: 8)
-                    .onChanged { v in
-                        let dx = v.translation.width
-                        let dy = v.translation.height
-                        // 横向主轴才响应（斜向滑动不触发）
-                        guard abs(dx) > abs(dy) else { return }
-                        isDragging = true
-                        dragOffset = max(-threshold * 1.3, min(threshold * 1.3, dx))
-                    }
-                    .onEnded { v in
-                        let dx = v.translation.width
-                        isDragging = false
-                        dragOffset = 0
-                        if dx >= threshold { onScoreChange(1) }
-                        else if dx <= -threshold { onScoreChange(-1) }
-                    }
-            )
+            // iOS 26+ Liquid Glass 卡片材质
+            .glassEffect(in: RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous))
+            // iOS 27：swipeActions 扩展至 List 以外的任意容器
+            // 右滑（leading）= 升分，左滑（trailing）= 降分
+            .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                Button {
+                    onScoreChange(1)
+                } label: {
+                    Label("升分", systemImage: "plus")
+                }
+                .tint(Color(red: 52/255, green: 199/255, blue: 89/255))
+            }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button {
+                    onScoreChange(-1)
+                } label: {
+                    Label("降分", systemImage: "minus")
+                }
+                .tint(Color(red: 255/255, green: 69/255, blue: 58/255))
+            }
         }
     }
 
@@ -146,24 +134,6 @@ struct ProviderCardView: View {
                                   startPoint: .topLeading, endPoint: UnitPoint(x: 0.62, y: 0.62))
         }
         return LinearGradient(colors: [.clear, .clear], startPoint: .top, endPoint: .bottom)
-    }
-
-    private var swipeBorderGradient: LinearGradient {
-        let pct = min(abs(dragOffset) / threshold, 1.0)
-        if dragOffset > 8 {
-            return LinearGradient(
-                colors: [Color(red: 52/255, green: 199/255, blue: 89/255).opacity(pct * 0.7),
-                         Color.white.opacity(0.04)],
-                startPoint: .top, endPoint: .bottom)
-        } else if dragOffset < -8 {
-            return LinearGradient(
-                colors: [Color(red: 255/255, green: 69/255, blue: 58/255).opacity(pct * 0.7),
-                         Color.white.opacity(0.04)],
-                startPoint: .top, endPoint: .bottom)
-        }
-        return LinearGradient(
-            colors: [Color.white.opacity(0.10), Color.white.opacity(0.04)],
-            startPoint: .top, endPoint: .bottom)
     }
 
     private func metric(_ label: String, _ value: String) -> some View {

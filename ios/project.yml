@@ -17,8 +17,8 @@ schemes:
 options:
   bundleIdPrefix: com.personal
   deploymentTarget:
-    iOS: "17.0"
-  xcodeVersion: "16"
+    iOS: "26.0"
+  xcodeVersion: "27"
   createIntermediateGroups: true
 
 settings:
@@ -30,7 +30,7 @@ targets:
   TianQi:
     type: application
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     sources:
       - Sources
     dependencies:
@@ -74,7 +74,7 @@ targets:
   TianQiWidget:
     type: app-extension
     platform: iOS
-    deploymentTarget: "17.0"
+    deploymentTarget: "26.0"
     # 复用主 App 的数据层（纯 Foundation + 直抓信源，无后端），仅 Views/ViewModels/Effects 不参与
     sources:
       - Widget
