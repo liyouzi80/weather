@@ -12,6 +12,7 @@ class CityViewModel {
 
     let loc: GeoLocation
     private let agg = ProviderAggregator.shared
+    private let cred = CredibilityStore.shared
     // 每次刷新自增；后台补齐任务据此判断是否已被新刷新取代
     private var refreshToken = 0
 
@@ -19,8 +20,25 @@ class CityViewModel {
         self.loc = loc
     }
 
-    var stats: WeatherStats? { agg.analyze(results) }
-    var annotated: [AnnotatedResult] { agg.annotate(results) }
+    private var cityKey: String { loc.cityName ?? loc.name }
+    func scoreFor(_ providerId: String) -> Int { cred.score(city: cityKey, provider: providerId) }
+
+    func updateScore(_ providerId: String, delta: Int) {
+        let cur = cred.score(city: cityKey, provider: providerId)
+        let next = max(0, min(5, cur + delta))
+        guard next != cur else { return }
+        Haptics.impact()
+        cred.setScore(city: cityKey, provider: providerId, value: next)
+    }
+
+    var stats: WeatherStats? {
+        agg.analyze(results, weights: { [weak self] id in self?.scoreFor(id) ?? 3 })
+    }
+
+    // 卡片按评分降序排列（评分相同保持原信源顺序）
+    var sortedAnnotated: [AnnotatedResult] {
+        agg.annotate(results).sorted { scoreFor($0.base.providerId) > scoreFor($1.base.providerId) }
+    }
 
     var avgAqi: Int? {
         let vals = air.compactMap { $0.air?.aqi }

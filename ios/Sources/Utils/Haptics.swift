@@ -13,4 +13,17 @@ enum Haptics {
         g.prepare()
         g.impactOccurred()
     }
+
+    // 三连短振：用于评分升/降（对齐 PWA haptic([8,30,8])）
+    static func impact() {
+        let g = UIImpactFeedbackGenerator(style: .rigid)
+        g.prepare()
+        g.impactOccurred()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.03) {
+            g.impactOccurred(intensity: 0.6)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+            g.impactOccurred()
+        }
+    }
 }

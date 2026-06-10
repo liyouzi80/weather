@@ -124,8 +124,12 @@ struct CityPageView: View {
                         }
                         if cardsOpen {
                             LazyVGrid(columns: providerColumns, spacing: 10) {
-                                ForEach(vm.annotated) { item in
-                                    ProviderCardView(result: item)
+                                ForEach(vm.sortedAnnotated) { item in
+                                    ProviderCardView(
+                                        result: item,
+                                        score: vm.scoreFor(item.base.providerId),
+                                        onScoreChange: { delta in vm.updateScore(item.base.providerId, delta: delta) }
+                                    )
                                 }
                             }
                             .padding(.top, 10)
@@ -138,9 +142,13 @@ struct CityPageView: View {
                 } else {
                     // 不足 2 源：无可折叠摘要，直接平铺
                     LazyVGrid(columns: providerColumns, spacing: 10) {
-                        ForEach(Array(vm.annotated.enumerated()), id: \.element.id) { idx, item in
-                            ProviderCardView(result: item)
-                                .riseIn(0.16 + Double(idx) * 0.05)
+                        ForEach(Array(vm.sortedAnnotated.enumerated()), id: \.element.id) { idx, item in
+                            ProviderCardView(
+                                result: item,
+                                score: vm.scoreFor(item.base.providerId),
+                                onScoreChange: { delta in vm.updateScore(item.base.providerId, delta: delta) }
+                            )
+                            .riseIn(0.16 + Double(idx) * 0.05)
                         }
                     }
                     .padding(.horizontal, 16)

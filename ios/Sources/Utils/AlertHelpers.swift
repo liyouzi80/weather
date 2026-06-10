@@ -1,29 +1,28 @@
 import SwiftUI
 
 // MARK: - 指标条等级：每项恒返回 颜色 + 等级文字（常驻显示，信息密度优先）
-// 正常/舒适区间用中性白（不着色），仅偏离正常时逐级升到黄/橙/红/紫等警示色。与 PWA src/App.tsx 逐项对齐。
+// 体感/湿度始终着色（与 PWA feelsAlert/humidAlert 对齐）；其余仅偏离正常区间才着色。
 
 struct AlertStyle {
     let color: Color
     let level: String
 }
 
-private let metricNormal = Color(hex: "#f5f5f7") // 中性白：正常区间不加颜色
-
 func feelsLevel(_ t: Double) -> AlertStyle {
     if t <= 10 { return AlertStyle(color: Color(hex: "#64d2ff"), level: "偏冷") }
-    if t <= 26 { return AlertStyle(color: metricNormal, level: "舒适") }
-    if t < 32  { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏热") }
-    if t < 38  { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "较热") }
+    if t <= 18 { return AlertStyle(color: Color(hex: "#34c759"), level: "凉爽") }
+    if t <= 26 { return AlertStyle(color: Color(hex: "#34c759"), level: "舒适") }
+    if t <= 32 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏热") }
+    if t <= 38 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "较热") }
     return AlertStyle(color: Color(hex: "#ff453a"), level: "酷热")
 }
 
 func humidLevel(_ h: Double) -> AlertStyle {
     if h < 30  { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏干") }
-    if h <= 70 { return AlertStyle(color: metricNormal, level: "舒适") }
-    if h <= 85 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏湿") }
-    if h <= 92 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "潮湿") }
-    return AlertStyle(color: Color(hex: "#ff453a"), level: "闷湿")
+    if h <= 60 { return AlertStyle(color: Color(hex: "#34c759"), level: "适宜") }
+    if h <= 80 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "偏湿") }
+    if h <= 90 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "闷湿") }
+    return AlertStyle(color: Color(hex: "#ff453a"), level: "潮湿")
 }
 
 func windLevel(_ v: Double) -> AlertStyle {

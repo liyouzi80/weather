@@ -1,9 +1,31 @@
 import SwiftUI
 
-// 信源卡片：对齐 PWA 紧凑布局——标题行（圆点+名称+标签+温度），
-// 下方平铺天气/体感/湿度/风，底部观测时间。最高/最低用背景斜渐变标识（非徽章）。
+// MARK: - 5 个可信度圆点（对齐 PWA ScoreDots）
+struct ScoreDotsView: View {
+    let score: Int
+    var body: some View {
+        HStack(spacing: 3) {
+            ForEach(0..<5, id: \.self) { i in
+                Circle()
+                    .fill(i < score ? Color.white.opacity(0.72) : Color.white.opacity(0.18))
+                    .frame(width: 5, height: 5)
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: score)
+    }
+}
+
+// 信源卡片：标题行（圆点+名称+标签+评分圆点+温度），下方平铺天气/体感/湿度/风，底部观测时间。
+// 左右滑动：右滑升分，左滑降分；滑动距离 ≥55pt 触发，边框渐变提示方向。
 struct ProviderCardView: View {
     let result: AnnotatedResult
+    let score: Int
+    let onScoreChange: (Int) -> Void
+
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
+
+    private let threshold: CGFloat = 55
 
     var body: some View {
         if result.base.hasData, let w = result.base.current {
@@ -27,6 +49,7 @@ struct ProviderCardView: View {
                             .foregroundStyle(Color(hex: "#40c8e0"))
                     }
                     Spacer()
+                    ScoreDotsView(score: score)
                     Text("\(Int(w.temp.rounded()))°")
                         .font(.system(size: 26, weight: .bold).monospacedDigit())
                         .foregroundStyle(.white)
@@ -56,7 +79,7 @@ struct ProviderCardView: View {
                                 .font(.system(size: 10))
                                 .rotationEffect(windAngle(wd))
                                 .foregroundStyle(.white.opacity(0.55))
-                            Text(wd + (w.windSpeed != nil ? " \(String(format: "%.1f", w.windSpeed!))km/h" : ""))
+                            Text(wd + (w.windSpeed != nil ? " \(Int(w.windSpeed!.rounded()))km/h" : ""))
                                 .font(.system(size: 13, weight: .medium))
                                 .foregroundStyle(.white.opacity(0.78))
                         }
@@ -73,6 +96,9 @@ struct ProviderCardView: View {
             .padding(.vertical, 16)
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(score == 0 ? 0.38 : 1)
+            .saturation(score == 0 ? 0.4 : 1)
+            .offset(x: dragOffset * 0.65)
             .background {
                 RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
                     .fill(Color.cardFill)
@@ -81,18 +107,36 @@ struct ProviderCardView: View {
                             .fill(tintGradient)
                     }
                     .overlay {
+                        // 滑动方向边框：右滑绿，左滑红
                         RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
-                            .strokeBorder(
-                                LinearGradient(colors: [Color.white.opacity(0.10), Color.white.opacity(0.04)],
-                                               startPoint: .top, endPoint: .bottom),
-                                lineWidth: 0.5)
+                            .strokeBorder(swipeBorderGradient, lineWidth: 1)
                     }
                     .shadow(color: .black.opacity(0.25), radius: 20, y: 4)
             }
+            .animation(isDragging ? nil : .spring(response: 0.35, dampingFraction: 0.75), value: dragOffset)
+            .gesture(
+                DragGesture(minimumDistance: 8)
+                    .onChanged { v in
+                        let dx = v.translation.width
+                        let dy = v.translation.height
+                        // 横向主轴才响应（斜向滑动不触发）
+                        guard abs(dx) > abs(dy) else { return }
+                        isDragging = true
+                        dragOffset = max(-threshold * 1.3, min(threshold * 1.3, dx))
+                    }
+                    .onEnded { v in
+                        let dx = v.translation.width
+                        isDragging = false
+                        dragOffset = 0
+                        if dx >= threshold { onScoreChange(1) }
+                        else if dx <= -threshold { onScoreChange(-1) }
+                    }
+            )
         }
     }
 
-    // 最高/最低温：一抹暖/冷斜向渐变（不再用徽章高亮）
+    // MARK: - Helpers
+
     private var tintGradient: LinearGradient {
         if result.isMax {
             return LinearGradient(colors: [Color(hex: "#ff453a").opacity(0.13), .clear],
@@ -101,9 +145,25 @@ struct ProviderCardView: View {
             return LinearGradient(colors: [Color(hex: "#40c8e0").opacity(0.13), .clear],
                                   startPoint: .topLeading, endPoint: UnitPoint(x: 0.62, y: 0.62))
         }
-        // 普通卡片不叠任何色，保持与 AQI / 温度排行（纯 GlassCard）相同的透明度
-        return LinearGradient(colors: [.clear, .clear],
-                              startPoint: .top, endPoint: .bottom)
+        return LinearGradient(colors: [.clear, .clear], startPoint: .top, endPoint: .bottom)
+    }
+
+    private var swipeBorderGradient: LinearGradient {
+        let pct = min(abs(dragOffset) / threshold, 1.0)
+        if dragOffset > 8 {
+            return LinearGradient(
+                colors: [Color(red: 52/255, green: 199/255, blue: 89/255).opacity(pct * 0.7),
+                         Color.white.opacity(0.04)],
+                startPoint: .top, endPoint: .bottom)
+        } else if dragOffset < -8 {
+            return LinearGradient(
+                colors: [Color(red: 255/255, green: 69/255, blue: 58/255).opacity(pct * 0.7),
+                         Color.white.opacity(0.04)],
+                startPoint: .top, endPoint: .bottom)
+        }
+        return LinearGradient(
+            colors: [Color.white.opacity(0.10), Color.white.opacity(0.04)],
+            startPoint: .top, endPoint: .bottom)
     }
 
     private func metric(_ label: String, _ value: String) -> some View {
@@ -124,7 +184,6 @@ struct ProviderCardView: View {
     }
 
     private func windAngle(_ dir: String) -> Angle {
-        // 风向文字 → 箭头旋转（指向风去的方向）
         let map: [(String, Double)] = [
             ("东北", 225), ("东南", 315), ("西北", 135), ("西南", 45),
             ("北", 180), ("南", 0), ("东", 270), ("西", 90),

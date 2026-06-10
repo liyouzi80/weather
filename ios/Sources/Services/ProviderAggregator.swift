@@ -45,31 +45,57 @@ class ProviderAggregator {
 
     // MARK: Stats
 
-    func analyze(_ results: [ProviderResult]) -> WeatherStats? {
+    /// weights: providerId → score (0–5, default 3). Score 0 = excluded from aggregation.
+    func analyze(_ results: [ProviderResult], weights: (String) -> Int = { _ in 3 }) -> WeatherStats? {
+        let w = { (r: ProviderResult) -> Double in Double(weights(r.providerId)) }
         let ok = results.filter { $0.hasData }
         guard !ok.isEmpty else { return nil }
-        let temps = ok.compactMap { $0.current?.temp }
-        let feels = ok.compactMap { $0.current?.feelsLike }
-        let hums  = ok.compactMap { $0.current?.humidity }
-        let pops  = ok.compactMap { $0.current?.pop }
-        let uvs   = ok.compactMap { $0.current?.uvIndex }
-        let winds = ok.compactMap { $0.current?.windSpeed }
 
-        let avg = temps.reduce(0, +) / Double(temps.count)
-        // 排除「未知」（番禺基本站无天气现象描述），避免盖过其他源的真实天气
-        let text = mostCommonWeather(ok.compactMap { $0.current?.text }.filter { $0 != "未知" })
+        // 评分=0 的信源排除出聚合；若全部为 0 则退回全部
+        let active = ok.filter { weights($0.providerId) > 0 }
+        let pool = active.isEmpty ? ok : active
+
+        let temps = pool.compactMap { $0.current?.temp }
+        guard !temps.isEmpty else { return nil }
+
+        // 加权平均温度
+        let totalW = pool.reduce(0.0) { $0 + w($1) }
+        let avg = totalW > 0
+            ? pool.compactMap { r in r.current.map { ($0.temp, w(r)) } }
+                  .reduce(0.0) { $0 + $1.0 * $1.1 } / totalW
+            : temps.reduce(0, +) / Double(temps.count)
+
+        // 加权多数投票天气文字（排除「未知」）
+        var textW: [String: Double] = [:]
+        for r in pool {
+            if let t = r.current?.text, t != "未知" { textW[t, default: 0] += w(r) }
+        }
+        let text = textW.max { $0.value < $1.value }?.key
+            ?? ok.first?.current?.text ?? "未知"
+
+        // 加权平均可选字段
+        func wavg(_ pairs: [(Double, Double)]) -> Double? {
+            guard !pairs.isEmpty else { return nil }
+            let tw = pairs.reduce(0.0) { $0 + $1.1 }
+            return tw > 0 ? pairs.reduce(0.0) { $0 + $1.0 * $1.1 } / tw : nil
+        }
+        let feels = pool.compactMap { r in r.current?.feelsLike.map { ($0, w(r)) } }
+        let hums  = pool.compactMap { r in r.current?.humidity.map  { ($0, w(r)) } }
+        let uvs   = pool.compactMap { r in r.current?.uvIndex.map   { ($0, w(r)) } }
+        let winds = pool.compactMap { r in r.current?.windSpeed.map  { ($0, w(r)) } }
+        let pops  = pool.compactMap { $0.current?.pop }
 
         return WeatherStats(
             avg: avg,
             min: temps.min() ?? avg,
             max: temps.max() ?? avg,
-            count: ok.count,
+            count: pool.count,
             text: text,
-            feelsLike: feels.isEmpty ? nil : (feels.reduce(0, +) / Double(feels.count)).rounded(),
-            humidity: hums.isEmpty ? nil : (hums.reduce(0, +) / Double(hums.count)).rounded(),
+            feelsLike: wavg(feels).map { $0.rounded() },
+            humidity: wavg(hums).map { $0.rounded() },
             pop: pops.isEmpty ? nil : pops.max()!.rounded(),
-            uvIndex: uvs.isEmpty ? nil : uvs.reduce(0, +) / Double(uvs.count),
-            windSpeed: winds.isEmpty ? nil : winds.reduce(0, +) / Double(winds.count)
+            uvIndex: wavg(uvs),
+            windSpeed: wavg(winds)
         )
     }
 
@@ -83,12 +109,6 @@ class ProviderAggregator {
                 isMin: r.current.map { $0.temp == minT } ?? false
             )
         }
-    }
-
-    private func mostCommonWeather(_ texts: [String]) -> String {
-        guard !texts.isEmpty else { return "未知" }
-        let counts = texts.reduce(into: [String: Int]()) { $0[$1, default: 0] += 1 }
-        return counts.max { $0.value < $1.value }?.key ?? texts[0]
     }
 }
 
