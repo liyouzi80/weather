@@ -76,7 +76,7 @@ Sources/
 
 - [x] 多信源天气并排（中央气象台 / 番禺气象台 / 和风 / 彩云 / OWM）
 - [x] Hero 大温度 + 多数天气状况
-- [x] 关键指标条（体感 / 湿度 / AQI / 紫外线；正常区间中性白不着色，仅异常时升警示色）
+- [x] 关键指标条（体感 / 湿度 / AQI / 紫外线；始终着色 + 等级文字，舒适区间为绿色）
 - [x] 温度排行
 - [x] 美国 AQI 对比
 - [x] 番禺气象台短时预报卡
@@ -91,6 +91,7 @@ Sources/
 - [x] iPad 横屏双栏布局（信源卡两列 + 内容限宽居中）
 - [x] 上滑吸顶动效（Hero 视差淡出 + 顶部吸顶条）
 - [x] WidgetKit 桌面小组件（小 + 中尺寸，长按可切番禺 / 安福）
+- [x] 信源可信度评分（左右滑动卡片 0–5 分，加权聚合 + 自动排序 + 评分为 0 时排除出聚合，`UserDefaults` 持久化）
 
 ## 桌面小组件（WidgetKit）
 
@@ -98,22 +99,16 @@ Sources/
 同样在设备上直接抓取信源、无需后端：
 
 - **小尺寸**：城市名 + 天气图标 + 平均气温 + 高低温 + AQI 评级胶囊
-- **中尺寸**：左侧同小尺寸大温度，右侧关键指标（体感 / 湿度 / 空气 / 紫外线，正常区间中性白、异常才着色）
+- **中尺寸**：左侧同小尺寸大温度，右侧关键指标（体感 / 湿度 / 空气 / 紫外线）
 - 长按小组件「编辑」可在**番禺区 / 安福县**间切换（AppIntents 配置）
 - 每 30 分钟刷新一次（系统按预算适当延后）
 
 > `xcodegen generate` 会自动把 Widget 作为 extension 嵌入主 App。在 Xcode 里为
 > **两个 target** 都配好同一 Team 的签名即可。添加方式：长按桌面 → 加小组件 → 搜「天气」。
 
-## 待完成（PWA 已有，iOS 尚未移植）
-
-- [ ] **信源可信度评分**：左右滑动卡片打分 0–5，加权影响聚合温度与天气文字，卡片按评分自动排序，评分为 0 的信源排除出聚合。PWA 用 `localStorage` 持久化，iOS 对应用 `UserDefaults`。参考 `src/credibility.ts` 和 `src/App.tsx` 中 `ProviderCard` 的滑动手势实现。
-- [ ] **指标条始终着色**：体感与湿度始终显示颜色 + 等级文字（凉爽绿 / 偏热黄 / 较热橙 / 酷热红；适宜绿 / 偏湿黄 / 闷湿橙 / 潮湿红），不再仅在异常时才着色。参考 PWA `feelsAlert()` / `humidAlert()` 的颜色区间。
-
 ## 待完成（iOS 平台新特性）
 
-- [ ] **iOS 26 / SwiftUI 新 API**：`swipeActions` 替代当前自定义横滑手势打分；`toolbarMinimizeBehavior` 配合顶栏收起；Liquid Glass 2 材质（`.glassEffect()`）替换现有毛玻璃卡片背景。
-- [ ] **`@starting-style` 卡片进场动效**：iOS / Safari 17.4+ 原生支持，可给信源卡首次出现加 opacity 0→1 的无 JS 进场过渡。
+- [ ] **iOS 26 / SwiftUI 新 API**：`swipeActions` 替代当前自定义横滑手势打分；`toolbarMinimizeBehavior` 配合顶栏收起；Liquid Glass 2 材质（`.glassEffect()`）替换现有毛玻璃卡片背景（需 iOS 26 deployment target）。
 
 ## 可选优化
 
