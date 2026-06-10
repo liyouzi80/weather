@@ -110,13 +110,7 @@ Sources/
 > `xcodegen generate` 会自动把 Widget 作为 extension 嵌入主 App。在 Xcode 里为
 > **两个 target** 都配好同一 Team 的签名即可。添加方式：长按桌面 → 加小组件 → 搜「天气」。
 
-## 可选优化（iOS 平台）
-
-- [ ] **AsyncImage 缓存**：iOS 26+ `AsyncImage` 默认遵守 HTTP Cache-Control，天气图标 / 网络图片可直接受益（当前已是原生 URLSession，无需代码改动，升级部署目标后自动生效）。
-- [ ] **`toolbarMinimizeBehavior`**：顶栏收起行为精细控制（需引入 `NavigationStack`）。
-
 ## 可选优化
 
-- [ ] 天气动效改用 `.sks` 粒子文件：当前为纯代码生成粒子（`WeatherScene.swift`），
-      已完整可用；如需在 Xcode 粒子编辑器里可视化微调，可创建 `Rain.sks` 等文件，
-      代码会自动优先加载（`SKEmitterNode(fileNamed:)`），缺失时回落到代码粒子。
+- [ ] **天气动效改用 `.sks` 粒子文件**：当前为纯代码生成粒子（`WeatherScene.swift`），已完整可用；如需在 Xcode 粒子编辑器里可视化微调，可创建 `Rain.sks` 等文件，代码会自动优先加载（`SKEmitterNode(fileNamed:)`），缺失时回落到代码粒子。
+- [ ] **Siri 查天气**（App Intents）：复用 Widget 数据层，加一个「查番禺天气」Siri 指令，说一句话报均温和预警状态。SiriKit 在 iOS 27 已正式废弃，迁移窗口就是现在。
