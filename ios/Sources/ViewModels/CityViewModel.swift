@@ -6,7 +6,6 @@ import Observation
 class CityViewModel {
     var results: [ProviderResult] = []
     var air: [AqiResult] = []
-    var loading = false
     var initialLoad = true
     var updatedAt = Date()
 
@@ -72,14 +71,12 @@ class CityViewModel {
 
     @MainActor
     func refresh() async {
-        loading = true
         refreshToken += 1
         let token = refreshToken
         async let weather = agg.fetchAll(loc: loc)
         async let aqiData = agg.fetchAqi(loc: loc)
         results = await weather
         air = await aqiData
-        loading = false
         initialLoad = false
         updatedAt = Date()
         // 刷新完成后，AQI 不全则后台静默补齐（服务站点页偶发抓取失败）
@@ -90,7 +87,7 @@ class CityViewModel {
 
     private func healthyAqiCount(_ a: [AqiResult]) -> Int { a.filter { $0.air != nil }.count }
 
-    // 后台补齐 AQI：退避重试，仅在仍属当前刷新时合并，不打断 UI（不动 loading）。
+    // 后台补齐 AQI：退避重试，仅在仍属当前刷新时合并，不打断 UI。
     private func backfillAqi(token: Int) {
         Task { [weak self] in
             guard let self else { return }

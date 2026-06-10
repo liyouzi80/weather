@@ -130,7 +130,7 @@ struct MediumWidgetView: View {
                     .padding(.top, 2)
             }
 
-            // 右：关键指标（正常区间中性白，异常才着色）
+            // 右：关键指标（体感/湿度始终着色；空气/紫外线正常区间中性白）
             VStack(alignment: .leading, spacing: 9) {
                 if let f = entry.feels {
                     MetricRow(label: "体感", value: "\(f)°",

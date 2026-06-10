@@ -94,11 +94,10 @@ struct ProviderCardView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .opacity(score == 0 ? 0.38 : 1)
             .saturation(score == 0 ? 0.4 : 1)
-            // 最高/最低温渐变叠加（低透明度，不遮文字）
-            .overlay {
+            // 最高/最低温渐变（背景层，置于文字之下、玻璃之上）
+            .background {
                 RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous)
                     .fill(tintGradient)
-                    .allowsHitTesting(false)
             }
             // iOS 26+ Liquid Glass 卡片材质
             .glassEffect(in: RoundedRectangle(cornerRadius: CardRadius.regular, style: .continuous))

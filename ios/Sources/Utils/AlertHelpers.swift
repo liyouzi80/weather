@@ -8,6 +8,9 @@ struct AlertStyle {
     let level: String
 }
 
+// 风/空气/降水/紫外线的正常区间：中性白（对齐 PWA NORMAL '#f5f5f7'）
+let metricNormal = Color(hex: "#f5f5f7")
+
 func feelsLevel(_ t: Double) -> AlertStyle {
     if t <= 10 { return AlertStyle(color: Color(hex: "#64d2ff"), level: "偏冷") }
     if t <= 18 { return AlertStyle(color: Color(hex: "#34c759"), level: "凉爽") }
