@@ -2,7 +2,6 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, MinutelyRain, ProviderResult, WeatherWarning } from './providers/types'
-import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
 import { loadScores, saveScore, getScore, type Scores } from './credibility'
 
@@ -90,7 +89,6 @@ export default function App() {
     try { return !localStorage.getItem('pwr_hint_seen') } catch { return true }
   })
   const [cardsOpen, setCardsOpen] = useState(false)
-  const [aqiOpen, setAqiOpen] = useState(false)
   const [scores, setScores] = useState<Scores>(() => loadScores())
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
@@ -183,7 +181,6 @@ export default function App() {
         setCityIdx(i)
         setScrolled(false)
         setCardsOpen(false)
-        setAqiOpen(false)
       })
       window.scrollTo(0, 0)
       if (stickyTempRef.current && !CSS_SCROLL_DRIVEN) stickyTempRef.current.style.opacity = '0'
@@ -543,14 +540,7 @@ export default function App() {
       doUpdate()
     }
   }, [scores, cityKey])
-  const sourceSummary = useMemo(() => {
-    const temps = results.filter(r => !r.error && r.current != null).map(r => r.current!.temp)
-    if (temps.length < 2) return null
-    const avg = temps.reduce((a, b) => a + b, 0) / temps.length
-    const sd = Math.sqrt(temps.reduce((a, b) => a + (b - avg) ** 2, 0) / temps.length)
-    return { count: temps.length, sd: sd.toFixed(1) }
-  }, [results])
-  const avgAqi = useMemo(() => {
+const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
     return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
   }, [air])
@@ -698,68 +688,50 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* 信源摘要：默认收起，点击展开全部信源卡 */}
-            {sourceSummary && (
-              <button
-                type="button"
-                className={'cards-summary' + (cardsOpen ? ' open' : '')}
-                onClick={() => setCardsOpen(o => !o)}
-                aria-expanded={cardsOpen}
-              >
-                <span className="cards-summary-label">
-                  <span className="cards-summary-count">{sourceSummary.count} 个信源</span>
-                  <span className="cards-summary-sep">·</span>
-                  <span>偏差 ±{sourceSummary.sd}°</span>
-                </span>
-                <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="2.2"
-                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
-            )}
-            {/* 展开区域：grid-template-rows 0fr→1fr 平滑撑开 */}
-            <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
-              <div className="cards-expand-inner">
-                <div className="cards">
-                  {sortedAnnotated.map((r) => (
-                    <ProviderCard
-                      key={r.providerId}
-                      r={r}
-                      score={getScore(scores, cityKey, r.providerId)}
-                      onScoreChange={(delta) => updateScore(r.providerId, delta)}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {air.length > 0 && avgAqi != null && (
-          <>
+            {/* 数据源摘要：极简文字展开按钮 */}
             <button
               type="button"
-              className={'cards-summary' + (aqiOpen ? ' open' : '')}
-              onClick={() => setAqiOpen(o => !o)}
-              aria-expanded={aqiOpen}
+              className={'cards-summary' + (cardsOpen ? ' open' : '')}
+              onClick={() => setCardsOpen(o => !o)}
+              aria-expanded={cardsOpen}
             >
-              <span className="cards-summary-label">
-                <span className="cards-summary-count">空气质量</span>
-                <span className="cards-summary-sep">·</span>
-                <span style={{ color: aqiColor(avgAqi) }}>AQI {avgAqi}</span>
-                <span className="cards-summary-sep">·</span>
-                <span style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
-              </span>
-              <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2.2"
+              <span className="cards-summary-label">数 据 源</span>
+              <svg className="cards-chevron" width="14" height="14" viewBox="0 0 24 24"
+                fill="none" stroke="currentColor" strokeWidth="2"
                 strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
-            <div className={'cards-expand' + (aqiOpen ? ' open' : '')}>
+            {/* 展开区域：信源行 + 空气质量行（合并） */}
+            <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
               <div className="cards-expand-inner">
-                <AqiSection air={air} />
+                <div className="cards">
+                  {sortedAnnotated.map((r) => {
+                    const dev = stats && r.current
+                      ? Math.round((r.current.temp - stats.avg) * 10) / 10
+                      : undefined
+                    return (
+                      <ProviderCard
+                        key={r.providerId}
+                        r={r}
+                        score={getScore(scores, cityKey, r.providerId)}
+                        onScoreChange={(delta) => updateScore(r.providerId, delta)}
+                        devFromAvg={dev}
+                      />
+                    )
+                  })}
+                  {air.filter((r) => !r.error && r.air).length > 0 && (
+                    <div className="src-divider">
+                      <span>空 气 质 量</span>
+                      {avgAqi != null && (
+                        <span style={{ color: aqiColor(avgAqi) }}>
+                          {aqiCategory(avgAqi)} · {avgAqi}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {air.map((r) => <AqiRow key={r.providerId} r={r} />)}
+                </div>
               </div>
             </div>
           </>
@@ -799,13 +771,6 @@ function warnColor(level: string): string {
   if (level.includes('蓝')) return '#0a84ff'
   return '#ff9f0a'
 }
-function warnColorRgba(level: string, alpha: number): string {
-  if (level.includes('红')) return `rgba(255, 69, 58, ${alpha})`
-  if (level.includes('橙')) return `rgba(255, 159, 10, ${alpha})`
-  if (level.includes('黄')) return `rgba(255, 214, 10, ${alpha})`
-  if (level.includes('蓝')) return `rgba(10, 132, 255, ${alpha})`
-  return `rgba(255, 159, 10, ${alpha})`
-}
 
 // 预警严重程度（红4>橙3>黄2>蓝1）
 function severityOf(w: WeatherWarning) {
@@ -824,13 +789,9 @@ function WarningInline({ warnings }: { warnings: WeatherWarning[] }) {
         <span
           key={w.type + w.level}
           className={'warn-chip' + (/橙|红/.test(w.level) ? ' warn-chip-severe' : '')}
-          style={{
-            background: warnColorRgba(w.level, 0.15),
-            borderColor: warnColorRgba(w.level, 0.45),
-            color: warnColor(w.level),
-          }}
+          style={{ color: warnColor(w.level) }}
         >
-          {w.type}预警
+          ⚠ {w.type}预警
         </span>
       ))}
     </div>
@@ -904,70 +865,41 @@ function aqiCategory(aqi: number): string {
   if (aqi <= 300) return '重度污染'
   return '严重污染'
 }
-// memo：拖动/下拉手势会每帧更新 App 状态，记忆化避免数据未变时整列重渲染
-const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
-  return (
-    <div className="cards">
-      {air.map((r) => {
-        if (r.error || !r.air) return null
-        const a = r.air
-        const col = aqiColor(a.aqi)
-        const Tag = r.url ? 'a' : 'div'
-        return (
-          <Tag
-            className={'card aqi-card' + (r.url ? ' card-link' : '')}
-            key={r.providerId}
-            {...(r.url ? { href: r.url, target: '_blank', rel: 'noopener noreferrer' } : {})}
-          >
-            <div className="head">
-              <span className="dot" style={{ background: r.color }} />
-              <span className="name">{r.providerName}</span>
-              {r.url && (
-                <svg className="card-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-              )}
-              <span className="aqi-cat" style={{ color: col }}>{aqiCategory(a.aqi)}</span>
-              <span className="temp" style={{ color: col }}>{a.aqi}<span className="aqi-unit">AQI</span></span>
-            </div>
-            {(a.dominant || a.pm25 != null) && (
-              <div className="row">
-                {a.dominant === 'PM2.5' && a.pm25 != null ? (
-                  <span>主要污染物 <b>PM2.5</b> · {a.pm25} μg/m³</span>
-                ) : (
-                  <>
-                    {a.dominant && <span>主要污染物 <b>{a.dominant}</b></span>}
-                    {a.pm25 != null && <span>PM2.5 <b>{a.pm25}</b> μg/m³</span>}
-                  </>
-                )}
-              </div>
-            )}
-            {a.observedAt && <div className="obs">观测 {formatTime(a.observedAt)}</div>}
-          </Tag>
-        )
-      })}
+// AQI 信源：文字行（点 + 名称 + AQI 数值 + 等级 + PM2.5）
+function AqiRow({ r }: { r: AqiResult }) {
+  if (r.error || !r.air) return null
+  const a = r.air
+  const col = aqiColor(a.aqi)
+  const inner = (
+    <div className="src-row">
+      <span className="src-dot" style={{ background: r.color }} />
+      <span className="src-name">{r.providerName}</span>
+      <span className="src-bar" aria-hidden="true" />
+      <span className="src-temp" style={{ color: col }}>
+        {a.aqi}
+        <span style={{ fontSize: '10px', opacity: 0.65, marginLeft: '2px' }}>AQI</span>
+      </span>
+      <span className="src-aqi-cat" style={{ color: col }}>
+        {aqiCategory(a.aqi)}{a.pm25 != null ? ` · ${a.pm25}μg` : ''}
+      </span>
     </div>
   )
-})
-
-function ScoreDots({ score }: { score: number }) {
-  return (
-    <span className="score-dots" aria-label={`可信度 ${score}/5`}>
-      {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={'score-dot' + (i < score ? ' on' : '')} />
-      ))}
-    </span>
+  return r.url ? (
+    <a className="card src-row-link" href={r.url} target="_blank" rel="noopener noreferrer">
+      {inner}
+    </a>
+  ) : (
+    <div className="card">{inner}</div>
   )
 }
 
 const ProviderCard = memo(function ProviderCard({
-  r, score, onScoreChange,
+  r, score, onScoreChange, devFromAvg,
 }: {
   r: Annotated
   score: number
   onScoreChange: (delta: number) => void
+  devFromAvg?: number
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const swipeStartX = useRef<number | null>(null)
@@ -1047,38 +979,25 @@ const ProviderCard = memo(function ProviderCard({
 
   const c = r.current
   const muted = score === 0
-  const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : '', muted ? 'score-muted' : ''].filter(Boolean).join(' ')
+  const cls = ['card', muted ? 'score-muted' : ''].filter(Boolean).join(' ')
+  const devStr = devFromAvg != null && Math.abs(devFromAvg) >= 0.1
+    ? (devFromAvg > 0 ? `+${devFromAvg.toFixed(1)}` : devFromAvg.toFixed(1))
+    : ''
   return (
     <div
       ref={cardRef}
       className={cls}
       style={{ viewTransitionName: `provider-card-${r.providerId}` } as React.CSSProperties}
     >
-      <div className="head">
-        <span className="dot" style={{ background: color }} />
-        <span className="name">{r.providerName}</span>
-        {r.isMax && <span className="tag tag-hot">最高</span>}
-        {r.isMin && <span className="tag tag-cold">最低</span>}
-        <ScoreDots score={score} />
-        <span className="temp">{Math.round(c.temp)}°</span>
+      <div className="src-row">
+        <span className="src-dot" style={{ background: color }} />
+        <span className="src-name">{r.providerName}</span>
+        <span className="src-bar" aria-hidden="true">
+          <span className="src-bar-fill" style={{ width: `${(score / 5) * 100}%` }} />
+        </span>
+        <span className="src-temp">{Math.round(c.temp)}°</span>
+        <span className="src-dev">{devStr}</span>
       </div>
-      <div className="row">
-        {c.text !== '—' && (
-          <span className="wx">
-            <WeatherIcon text={c.text} size={17} className="wx-icon" />
-            <b>{c.text}</b>
-          </span>
-        )}
-        {c.feelsLike != null && <span>体感 <b>{Math.round(c.feelsLike)}°</b></span>}
-        {c.humidity != null && <span>湿度 <b>{Math.round(c.humidity)}%</b></span>}
-        {c.windDir && (
-          <span className="wx-wind">
-            <WindArrow dir={c.windDir} />
-            {c.windDir}{c.windSpeed != null ? ` ${c.windSpeed.toFixed(1)} km/h` : ''}
-          </span>
-        )}
-      </div>
-      {c.observedAt && <div className="obs">观测 {formatTime(c.observedAt)}</div>}
     </div>
   )
 })
@@ -1409,35 +1328,3 @@ function isForecastCurrent(content?: string, issued?: string): boolean {
   return now <= limitUTC + 30 * 60_000 // 给 30 分钟宽限
 }
 
-// 风向文字 → 来向角度（0=北，顺时针）；箭头指向来风方向（气象惯例）
-const WIND_DIR_DEG: Record<string, number> = {
-  北: 0, 东北: 45, 东: 90, 东南: 135, 南: 180, 西南: 225, 西: 270, 西北: 315,
-}
-function WindArrow({ dir }: { dir: string }) {
-  const deg = WIND_DIR_DEG[dir.replace('风', '')]
-  if (deg == null) return null
-  return (
-    <svg
-      width="11" height="11" viewBox="0 0 12 12" aria-hidden="true"
-      style={{ transform: `rotate(${deg}deg)`, flex: 'none', opacity: 0.7 }}
-    >
-      {/* 上指箭头：顶点 + 两侧翼尖，指向来风方向 */}
-      <path d="M6 1 L9.5 10.5 L6 8 L2.5 10.5 Z" fill="currentColor" />
-    </svg>
-  )
-}
-
-function formatTime(iso: string): string {
-  const d = new Date(iso)
-  if (isNaN(d.getTime())) return iso
-  // observedAt 存储的是「北京墙上时间」写入 UTC 字段，计算差值时需与同一表示对齐：
-  // Date.now() + 8h = 当前北京时（用 UTC 毫秒表达），与 d.getTime() 在同一坐标系下相减
-  const diffMin = Math.round((Date.now() + 8 * 3600_000 - d.getTime()) / 60_000)
-  if (diffMin < 2) return '刚刚'
-  if (diffMin < 60) return `${diffMin} 分钟前`
-  if (diffMin < 120) return `${Math.floor(diffMin / 60)} 小时前`
-  return d.toLocaleString('zh-CN', {
-    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-    timeZone: 'UTC',
-  })
-}
