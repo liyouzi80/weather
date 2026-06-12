@@ -571,10 +571,11 @@ html[data-sky='haze'] body::before {
 }
 /* 城市名：hero 顶部居中；轻字重让大温度数字成为视觉主角 */
 .hero-city {
-  font-size: 28px;
-  font-weight: 300;
-  letter-spacing: -0.03em;
-  background: linear-gradient(180deg, #ffffff 0%, #d1d1d6 100%);
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 0.55em;
+  text-indent: 0.55em;
+  background: linear-gradient(180deg, #ffffff 0%, #c8c8cc 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -596,13 +597,12 @@ html[data-sky='haze'] body::before {
 }
 .hero-temp {
   position: relative;
-  font-size: clamp(88px, 27vw, 124px);
-  font-weight: 200;
-  line-height: 0.86;
-  letter-spacing: -0.04em;
+  font-size: clamp(100px, 30vw, 148px);
+  font-weight: 100;
+  line-height: 0.88;
+  letter-spacing: -0.05em;
   color: #ffffff;
   font-variant-numeric: tabular-nums;
-  /* 缩放时向上折叠，视觉上「飞向」吸顶栏 */
   transform-origin: 50% 20%;
 }
 /* 度数符号绝对悬挂在数字右侧：不计入宽度，让数字本身保持光学居中（同苹果天气） */
@@ -612,45 +612,97 @@ html[data-sky='haze'] body::before {
   top: 0;
   font-weight: 200;
 }
-/* 非 iOS/macOS Safari 的系统字体多无 200 字重，回退会突变粗：用 300 兜底 */
+/* 非 iOS/macOS Safari 的系统字体多无 100 字重，回退到 200 */
 @supports not (-webkit-touch-callout: none) {
-  .hero-temp, .hero-deg { font-weight: 300; }
+  .hero-temp, .hero-deg { font-weight: 200; }
 }
-/* 天气状况 + 体感/湿度：同一视觉层级（统一字号/字重/颜色），紧贴排列在温度下方 */
+/* 天气状况 */
 .hero-cond {
-  font-size: 17px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.90);
-  margin-top: 12px;
+  font-size: 15px;
+  font-weight: 300;
+  letter-spacing: 0.55em;
+  text-indent: 0.55em;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 14px;
 }
+/* 体感·湿度·降水·UV 合一行 */
 .hero-comfort {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 7px;
-  font-size: 17px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.90);
-  margin-top: 4px;
-}
-.hero-comfort-sep { opacity: 0.4; font-weight: 400; }
-.hero-hilo {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.58);
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: 12.5px;
+  font-weight: 300;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.82);
   margin-top: 10px;
-  letter-spacing: 0.01em;
+}
+.hero-comfort-sep {
+  opacity: 0.28;
+  font-weight: 300;
+  margin: 0 8px;
+}
+/* 地平线刻度尺 */
+.hero-horizon {
+  width: calc(100% - 48px);
+  margin-top: 28px;
+}
+.hero-hz-track {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.38) 10%,
+    rgba(255, 255, 255, 0.38) 90%,
+    transparent
+  );
+}
+.hero-hz-tick {
+  position: absolute;
+  top: -3px;
+  width: 1px;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.55);
+  transform: translateX(-50%);
+}
+.hero-hz-mark {
+  position: absolute;
+  top: -4.5px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 12px 3px rgba(255, 255, 255, 0.75);
+  transform: translateX(-50%);
+}
+.hero-hz-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 11px;
+  font-size: 10px;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.52);
+}
+.hero-hz-meta {
+  margin-top: 22px;
+  text-align: center;
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 0.28em;
+  text-indent: 0.28em;
+  color: rgba(255, 255, 255, 0.34);
 }
 /* Hero 文字浮于动态天气背景之上，加一层极淡暗影托底，
    保证在浅色天空主题（晴天/雪）+ 飘动粒子下仍清晰可读（对齐苹果天气）。 */
 .hero-temp,
 .hero-cond,
-.hero-hilo,
 .hero-comfort,
-.hero-updated {
+.hero-updated,
+.hero-hz-labels,
+.hero-hz-meta {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
 }
 /* 城市名用 background-clip:text，text-shadow 无效，改用 drop-shadow 滤镜 */

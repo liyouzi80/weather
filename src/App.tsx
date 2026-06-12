@@ -645,21 +645,24 @@ export default function App() {
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
-              {(stats.feelsLike != null || stats.humidity != null) && (
-                <div className="hero-comfort" aria-hidden="true">
-                  {stats.feelsLike != null && (
-                    <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
-                  )}
-                  {stats.feelsLike != null && stats.humidity != null && <span className="hero-comfort-sep">·</span>}
-                  {stats.humidity != null && (
-                    <span style={{ color: humidLevel(stats.humidity).color }}>湿度 {stats.humidity}%</span>
-                  )}
-                </div>
-              )}
-              <div className="hero-hilo" aria-hidden="true">
-                <span>↑ {Math.round(stats.max)}°</span>
-                <span>↓ {Math.round(stats.min)}°</span>
+              <div className="hero-comfort" aria-hidden="true">
+                {stats.feelsLike != null && (
+                  <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
+                )}
+                {stats.humidity != null && (
+                  <><span className="hero-comfort-sep">·</span>
+                  <span style={{ color: humidLevel(stats.humidity).color }}>湿度 {stats.humidity}%</span></>
+                )}
+                {stats.pop != null && (
+                  <><span className="hero-comfort-sep">·</span>
+                  <span style={{ color: popLevel(stats.pop).color }}>降水 {stats.pop}%</span></>
+                )}
+                {stats.uvIndex != null && (
+                  <><span className="hero-comfort-sep">·</span>
+                  <span style={{ color: uvLevel(stats.uvIndex).color }}>UV {Math.round(stats.uvIndex)}</span></>
+                )}
               </div>
+              <HorizonBar stats={stats} results={results} />
               {loading && results.length > 0
                 ? <span className="hero-updated refreshing">数据更新中…</span>
                 : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
@@ -675,8 +678,6 @@ export default function App() {
         </div>
 
         {warnings.length > 0 && <WarningInline warnings={warnings} />}
-
-        {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
 
         {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
@@ -1219,14 +1220,6 @@ function humidLevel(h: number): Level {
   if (h <= 92) return { color: '#ff9f0a', level: '潮湿' }
   return { color: '#ff453a', level: '闷湿' }
 }
-function aqiLevel(aqi: number): Level {
-  if (aqi <= 50)  return { color: NORMAL, level: '优' }
-  if (aqi <= 100) return { color: '#ffd60a', level: '良' }
-  if (aqi <= 150) return { color: '#ff9f0a', level: '轻度污染' }
-  if (aqi <= 200) return { color: '#ff453a', level: '中度污染' }
-  if (aqi <= 300) return { color: '#af52de', level: '重度污染' }
-  return { color: '#a1304e', level: '严重污染' }
-}
 function uvLevel(uv: number): Level {
   if (uv <= 2) return { color: NORMAL, level: '弱' }
   if (uv <= 4) return { color: '#ffd60a', level: '中等' }
@@ -1240,45 +1233,43 @@ function popLevel(p: number): Level {
   if (p <= 70) return { color: '#ff9f0a', level: '中等' }
   return { color: '#ff453a', level: '较大' }
 }
-function windLevel(v: number): Level {
-  if (v < 20) return { color: NORMAL,     level: '微风' }
-  if (v < 40) return { color: '#ffd60a',  level: '中风' }
-  if (v < 60) return { color: '#ff9f0a',  level: '强风' }
-  return       { color: '#ff453a',  level: '大风' }
-}
+// 地平线刻度尺：温度区间 + 各信源刻度 + 聚合光点
+const HorizonBar = memo(function HorizonBar({
+  stats, results,
+}: { stats: Stats; results: ProviderResult[] }) {
+  const { min, max, avg } = stats
+  const range = max - min
+  const pct = (v: number) =>
+    range > 0.05 ? Math.max(2, Math.min(98, ((v - min) / range) * 100)) : 50
 
-// 关键指标条：降水概率 / 空气质量 / 紫外线 / 风速
-// 体感 + 湿度已在各信源卡内展示，此处聚焦「天气决策信息」（是否带伞/外出/防晒）
-const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
-  const cols: { key: string; value: string; dim: string; level: string; color: string }[] = []
-  if (stats.pop != null) {
-    const a = popLevel(stats.pop)
-    cols.push({ key: 'pop', value: `${stats.pop}%`, dim: '降水', level: a.level, color: a.color })
-  }
-  if (avgAqi != null) {
-    const a = aqiLevel(avgAqi)
-    cols.push({ key: 'aqi', value: `${avgAqi}`, dim: '空气', level: a.level, color: a.color })
-  }
-  if (stats.uvIndex != null) {
-    const a = uvLevel(stats.uvIndex)
-    cols.push({ key: 'uv', value: `${Math.round(stats.uvIndex)}`, dim: '紫外线', level: a.level, color: a.color })
-  }
-  if (stats.windSpeed != null) {
-    const a = windLevel(stats.windSpeed)
-    cols.push({ key: 'wind', value: `${Math.round(stats.windSpeed)}`, dim: 'km/h', level: a.level, color: a.color })
-  }
-  if (cols.length === 0) return null
+  const ticks = results
+    .filter((r) => r.current != null)
+    .map((r) => pct(r.current!.temp))
+
+  const sd = results.filter((r) => r.current).length > 1
+    ? Math.sqrt(
+        results
+          .filter((r) => r.current)
+          .reduce((s, r) => s + (r.current!.temp - avg) ** 2, 0) /
+          results.filter((r) => r.current).length,
+      )
+    : 0
+
   return (
-    <div className="metric-strip">
-      {cols.map((c, i) => (
-        <div className="metric-col" key={c.key} style={{ animationDelay: `${i * 0.06}s` }}>
-          <span className="mc-value" style={{ color: c.color }}>{c.value}</span>
-          <div className="mc-label">
-            <span className="mc-dim">{c.dim}</span>
-            <span className="mc-level">{c.level}</span>
-          </div>
-        </div>
-      ))}
+    <div className="hero-horizon" aria-hidden="true">
+      <div className="hero-hz-track">
+        {ticks.map((p, i) => (
+          <span key={i} className="hero-hz-tick" style={{ left: `${p}%` }} />
+        ))}
+        <span className="hero-hz-mark" style={{ left: `${pct(avg)}%` }} />
+      </div>
+      <div className="hero-hz-labels">
+        <span>{Math.round(min)}°</span>
+        <span>{Math.round(max)}°</span>
+      </div>
+      <div className="hero-hz-meta">
+        {stats.count} 信源聚合{sd > 0.05 ? ` · 偏差 ±${sd.toFixed(1)}°` : ''}
+      </div>
     </div>
   )
 })
