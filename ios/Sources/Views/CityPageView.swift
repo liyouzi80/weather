@@ -89,7 +89,7 @@ struct CityPageView: View {
 
                 // 关键指标条
                 if let stats = vm.stats {
-                    MetricStripView(stats: stats, avgAqi: vm.avgAqi)
+                    MetricStripView(stats: stats)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 16)
                         .riseIn(0.06)

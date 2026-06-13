@@ -2,7 +2,6 @@ import SwiftUI
 
 struct MetricStripView: View {
     let stats: WeatherStats
-    let avgAqi: Int?
 
     private struct MetricCol: Identifiable {
         let id: String
@@ -12,18 +11,18 @@ struct MetricStripView: View {
         let alertColor: Color?
     }
 
-    // 体感/湿度已上移至 Hero 区，指标条聚焦「出行决策」：降水 / 空气 / 紫外线 / 风速
+    // 指标条：体感 / 湿度 / 紫外线 / 风速（对齐 PWA 指标条列顺序）
     private var cols: [MetricCol] {
         var result: [MetricCol] = []
-        if let p = stats.pop {
-            let a = popLevel(p)
-            result.append(MetricCol(id: "pop", value: "\(Int(p.rounded()))%",
-                                    dim: "降水", level: a.level, alertColor: a.color))
+        if let f = stats.feelsLike {
+            let a = feelsLevel(f)
+            result.append(MetricCol(id: "feels", value: "\(Int(f.rounded()))°",
+                                    dim: "体感", level: a.level, alertColor: a.color))
         }
-        if let aqi = avgAqi {
-            let a = aqiLevel(aqi)
-            result.append(MetricCol(id: "aqi", value: "\(aqi)",
-                                    dim: "空气", level: a.level, alertColor: a.color))
+        if let h = stats.humidity {
+            let a = humidLevel(h)
+            result.append(MetricCol(id: "humidity", value: "\(Int(h.rounded()))%",
+                                    dim: "湿度", level: a.level, alertColor: a.color))
         }
         if let uv = stats.uvIndex {
             let a = uvLevel(uv)

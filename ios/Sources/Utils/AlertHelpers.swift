@@ -8,7 +8,7 @@ struct AlertStyle {
     let level: String
 }
 
-// 风/空气/降水/紫外线的正常区间：中性白（对齐 PWA NORMAL '#f5f5f7'）
+// 风/紫外线的正常区间：中性白（对齐 PWA NORMAL '#f5f5f7'）
 let metricNormal = Color(hex: "#f5f5f7")
 
 func feelsLevel(_ t: Double) -> AlertStyle {
@@ -42,13 +42,6 @@ func aqiLevel(_ aqi: Int) -> AlertStyle {
     if aqi <= 200 { return AlertStyle(color: Color(hex: "#ff453a"), level: "中度污染") }
     if aqi <= 300 { return AlertStyle(color: Color(hex: "#af52de"), level: "重度污染") }
     return AlertStyle(color: Color(hex: "#a1304e"), level: "严重污染")
-}
-
-func popLevel(_ p: Double) -> AlertStyle {
-    if p <= 20 { return AlertStyle(color: metricNormal, level: "晴好") }
-    if p <= 40 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "小概率") }
-    if p <= 70 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "中等") }
-    return AlertStyle(color: Color(hex: "#ff453a"), level: "较大")
 }
 
 func uvLevel(_ uv: Double) -> AlertStyle {
