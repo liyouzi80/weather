@@ -81,8 +81,7 @@ struct GZQXProvider: WeatherProvider {
             forecastIssuedAt: forecastIssuedAt,
             uvIndex: nil,
             warnings: warnings,
-            minutelyRain: nil,
-            pop: nil
+            minutelyRain: nil
         )
     }
 

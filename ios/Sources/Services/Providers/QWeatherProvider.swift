@@ -16,7 +16,6 @@ struct QWeatherProvider: WeatherProvider {
         async let uvResp: QUVResp?       = try? fetchJSON(qurl("\(base)/indices/1d?type=5", loc: locStr, key: key))
         async let warnResp: QWarnResp?   = try? fetchJSON(qurl("\(base)/warning/now", loc: locStr, key: key))
         async let rainResp: QRainResp?   = try? fetchJSON(qurl("\(base)/minutely/5m", loc: locStr, key: key))
-        async let hourlyResp: QHourlyResp? = try? fetchJSON(qurl("\(base)/weather/24h", loc: locStr, key: key))
 
         let now = try await nowResp
         guard let n = now.now else { throw FetchError.noData }
@@ -24,7 +23,6 @@ struct QWeatherProvider: WeatherProvider {
         let uv    = try? await uvResp
         let warn  = try? await warnResp
         let rain  = try? await rainResp
-        let hourly = try? await hourlyResp
 
         let warnings: [WeatherWarning]? = warn?.warning?.compactMap {
             // typeName 部分类型（如「其他预警」）自带「预警」后缀；统一去掉，由展示层补回。
@@ -43,11 +41,6 @@ struct QWeatherProvider: WeatherProvider {
             return MinutelyRain(summary: r.summary ?? "", minutely: items)
         }
 
-        let pop: Double? = hourly?.hourly.flatMap { hours -> Double? in
-            let vals = hours.prefix(12).compactMap { Double($0.pop ?? "") }.filter { $0 >= 0 }
-            return vals.isEmpty ? nil : vals.max()
-        }
-
         return CurrentWeather(
             temp: Double(n.temp ?? "0") ?? 0,
             feelsLike: Double(n.feelsLike ?? ""),
@@ -59,8 +52,7 @@ struct QWeatherProvider: WeatherProvider {
             forecast: nil, forecastIssuedAt: nil,
             uvIndex: Double(uv?.daily?.first?.value ?? ""),
             warnings: warnings,
-            minutelyRain: minutelyRain,
-            pop: pop
+            minutelyRain: minutelyRain
         )
     }
 
@@ -91,9 +83,5 @@ struct QWeatherProvider: WeatherProvider {
         let summary: String?
         let minutely: [QMinutely]?
         struct QMinutely: Decodable { let fxTime: String; let precip: String; let type: String }
-    }
-    private struct QHourlyResp: Decodable {
-        let hourly: [QHourly]?
-        struct QHourly: Decodable { let pop: String? }
     }
 }

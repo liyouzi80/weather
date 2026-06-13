@@ -19,20 +19,13 @@ struct CaiyunProvider: WeatherProvider {
 
     func fetchCurrent(_ loc: GeoLocation) async throws -> CurrentWeather {
         let base = "https://api.caiyunapp.com/v2.6/\(Keys.caiyun)/\(loc.lon),\(loc.lat)"
-        guard let realtimeURL = URL(string: "\(base)/realtime"),
-              let dailyURL    = URL(string: "\(base)/daily?dailysteps=1") else {
+        guard let realtimeURL = URL(string: "\(base)/realtime") else {
             throw FetchError.invalidURL
         }
-        async let realtimeResp: CYResp      = fetchJSON(realtimeURL)
-        async let dailyResp:    CYDailyResp? = try? fetchJSON(dailyURL)
-
-        let resp  = try await realtimeResp
-        let daily = try? await dailyResp
+        let resp: CYResp = try await fetchJSON(realtimeURL)
         guard let r = resp.result?.realtime else { throw FetchError.noData }
 
         let text = textMap[r.skycon ?? ""] ?? r.skycon ?? "未知"
-        // 今日降水概率：daily.precipitation[0].probability（0–1），转百分比
-        let pop: Double? = daily?.result?.daily?.precipitation?.first?.probability.map { ($0 * 100).rounded() }
 
         return CurrentWeather(
             temp: r.temperature ?? 0,
@@ -44,7 +37,7 @@ struct CaiyunProvider: WeatherProvider {
             observedAt: nil,
             forecast: nil, forecastIssuedAt: nil,
             uvIndex: r.life_index?.ultraviolet?.index,
-            warnings: nil, minutelyRain: nil, pop: pop
+            warnings: nil, minutelyRain: nil
         )
     }
 
@@ -60,16 +53,6 @@ struct CaiyunProvider: WeatherProvider {
                 struct CYWind: Decodable { let speed: Double? }
                 struct CYLife: Decodable { let ultraviolet: CYUV? }
                 struct CYUV: Decodable { let index: Double? }
-            }
-        }
-    }
-    private struct CYDailyResp: Decodable {
-        let result: CYDResult?
-        struct CYDResult: Decodable {
-            let daily: CYDaily?
-            struct CYDaily: Decodable {
-                let precipitation: [CYPrecip]?
-                struct CYPrecip: Decodable { let probability: Double? }
             }
         }
     }

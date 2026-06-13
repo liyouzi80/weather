@@ -83,7 +83,6 @@ class ProviderAggregator {
         let hums  = pool.compactMap { r in r.current?.humidity.map  { ($0, w(r)) } }
         let uvs   = pool.compactMap { r in r.current?.uvIndex.map   { ($0, w(r)) } }
         let winds = pool.compactMap { r in r.current?.windSpeed.map  { ($0, w(r)) } }
-        let pops  = pool.compactMap { $0.current?.pop }
 
         return WeatherStats(
             avg: avg,
@@ -93,7 +92,6 @@ class ProviderAggregator {
             text: text,
             feelsLike: wavg(feels).map { $0.rounded() },
             humidity: wavg(hums).map { $0.rounded() },
-            pop: pops.isEmpty ? nil : pops.max()!.rounded(),
             uvIndex: wavg(uvs),
             windSpeed: wavg(winds)
         )

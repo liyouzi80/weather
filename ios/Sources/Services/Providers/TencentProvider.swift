@@ -69,8 +69,7 @@ struct TencentProvider: WeatherProvider {
             forecastIssuedAt: nil,
             uvIndex: nil,
             warnings: nil,
-            minutelyRain: nil,
-            pop: nil
+            minutelyRain: nil
         )
     }
 }
