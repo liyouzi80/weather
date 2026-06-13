@@ -638,21 +638,11 @@ export default function App() {
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
-              {(stats.feelsLike != null || stats.humidity != null) && (
+              {stats.feelsLike != null && (
                 <div className="hero-comfort" aria-hidden="true">
-                  {stats.feelsLike != null && (
-                    <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
-                  )}
-                  {stats.feelsLike != null && stats.humidity != null && <span className="hero-comfort-sep">·</span>}
-                  {stats.humidity != null && (
-                    <span style={{ color: humidLevel(stats.humidity).color }}>湿度 {stats.humidity}%</span>
-                  )}
+                  <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
                 </div>
               )}
-              <div className="hero-hilo" aria-hidden="true">
-                <span>↑ {Math.round(stats.max)}°</span>
-                <span>↓ {Math.round(stats.min)}°</span>
-              </div>
               {loading && results.length > 0
                 ? <span className="hero-updated refreshing">数据更新中…</span>
                 : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
@@ -662,14 +652,13 @@ export default function App() {
             <>
               <div className="hskel hskel-temp" />
               <div className="hskel hskel-cond" />
-              <div className="hskel hskel-hilo" />
             </>
           )}
         </div>
 
         {warnings.length > 0 && <WarningInline warnings={warnings} />}
 
-        {stats && <MetricTiles stats={stats} avgAqi={avgAqi} />}
+        {stats && <MetricTiles stats={stats} />}
 
         {panyuForecast && <NoticeCard text={panyuForecast.text} issuedAt={panyuForecast.issuedAt} />}
 
@@ -1264,14 +1253,6 @@ function humidLevel(h: number): Level {
   if (h <= 92) return { color: '#ff9f0a', level: '潮湿' }
   return { color: '#ff453a', level: '闷湿' }
 }
-function aqiLevel(aqi: number): Level {
-  if (aqi <= 50)  return { color: NORMAL, level: '优' }
-  if (aqi <= 100) return { color: '#ffd60a', level: '良' }
-  if (aqi <= 150) return { color: '#ff9f0a', level: '轻度污染' }
-  if (aqi <= 200) return { color: '#ff453a', level: '中度污染' }
-  if (aqi <= 300) return { color: '#af52de', level: '重度污染' }
-  return { color: '#a1304e', level: '严重污染' }
-}
 function uvLevel(uv: number): Level {
   if (uv <= 2) return { color: NORMAL, level: '弱' }
   if (uv <= 4) return { color: '#ffd60a', level: '中等' }
@@ -1292,17 +1273,16 @@ function windLevel(v: number): Level {
   return       { color: '#ff453a',  level: '大风' }
 }
 
-// 关键指标条：降水概率 / 空气质量 / 紫外线 / 风速
-// 体感 + 湿度已在各信源卡内展示，此处聚焦「天气决策信息」（是否带伞/外出/防晒）
-const MetricTiles = memo(function MetricTiles({ stats, avgAqi }: { stats: Stats; avgAqi: number | null }) {
+// 关键指标条：降水概率 / 湿度 / 紫外线 / 风速
+const MetricTiles = memo(function MetricTiles({ stats }: { stats: Stats }) {
   const cols: { key: string; value: string; dim: string; level: string; color: string }[] = []
   if (stats.pop != null) {
     const a = popLevel(stats.pop)
     cols.push({ key: 'pop', value: `${stats.pop}%`, dim: '降水', level: a.level, color: a.color })
   }
-  if (avgAqi != null) {
-    const a = aqiLevel(avgAqi)
-    cols.push({ key: 'aqi', value: `${avgAqi}`, dim: '空气', level: a.level, color: a.color })
+  if (stats.humidity != null) {
+    const a = humidLevel(stats.humidity)
+    cols.push({ key: 'humid', value: `${Math.round(stats.humidity)}%`, dim: '湿度', level: a.level, color: a.color })
   }
   if (stats.uvIndex != null) {
     const a = uvLevel(stats.uvIndex)
