@@ -638,11 +638,6 @@ export default function App() {
                 {Math.round(stats.avg)}<span className="hero-deg" aria-hidden="true">°</span>
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
-              {stats.feelsLike != null && (
-                <div className="hero-comfort" aria-hidden="true">
-                  <span style={{ color: feelsLevel(stats.feelsLike).color }}>体感 {Math.round(stats.feelsLike)}°</span>
-                </div>
-              )}
               {loading && results.length > 0
                 ? <span className="hero-updated refreshing">数据更新中…</span>
                 : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
@@ -1260,12 +1255,6 @@ function uvLevel(uv: number): Level {
   if (uv <= 9) return { color: '#ff453a', level: '强' }
   return { color: '#bf5af2', level: '极强' }
 }
-function popLevel(p: number): Level {
-  if (p <= 20) return { color: NORMAL, level: '晴好' }
-  if (p <= 40) return { color: '#ffd60a', level: '小概率' }
-  if (p <= 70) return { color: '#ff9f0a', level: '中等' }
-  return { color: '#ff453a', level: '较大' }
-}
 function windLevel(v: number): Level {
   if (v < 20) return { color: NORMAL,     level: '微风' }
   if (v < 40) return { color: '#ffd60a',  level: '中风' }
@@ -1273,12 +1262,12 @@ function windLevel(v: number): Level {
   return       { color: '#ff453a',  level: '大风' }
 }
 
-// 关键指标条：降水概率 / 湿度 / 紫外线 / 风速
+// 关键指标条：体感 / 湿度 / 紫外线 / 风速
 const MetricTiles = memo(function MetricTiles({ stats }: { stats: Stats }) {
   const cols: { key: string; value: string; dim: string; level: string; color: string }[] = []
-  if (stats.pop != null) {
-    const a = popLevel(stats.pop)
-    cols.push({ key: 'pop', value: `${stats.pop}%`, dim: '降水', level: a.level, color: a.color })
+  if (stats.feelsLike != null) {
+    const a = feelsLevel(stats.feelsLike)
+    cols.push({ key: 'feels', value: `${Math.round(stats.feelsLike)}°`, dim: '体感', level: a.level, color: a.color })
   }
   if (stats.humidity != null) {
     const a = humidLevel(stats.humidity)
