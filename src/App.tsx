@@ -543,13 +543,6 @@ export default function App() {
       doUpdate()
     }
   }, [scores, cityKey])
-  const sourceSummary = useMemo(() => {
-    const temps = results.filter(r => !r.error && r.current != null).map(r => r.current!.temp)
-    if (temps.length < 2) return null
-    const avg = temps.reduce((a, b) => a + b, 0) / temps.length
-    const sd = Math.sqrt(temps.reduce((a, b) => a + (b - avg) ** 2, 0) / temps.length)
-    return { count: temps.length, sd: sd.toFixed(1) }
-  }, [results])
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
     return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
@@ -697,25 +690,14 @@ export default function App() {
           </div>
         ) : (
           <>
-            {/* 信源摘要：默认收起，点击展开全部信源卡 */}
-            {sourceSummary && (
-              <button
-                type="button"
-                className={'cards-summary' + (cardsOpen ? ' open' : '')}
+            {/* 信源温度刻度条：彩色信源刻度 + 发光均值圆点 */}
+            {stats && (
+              <SourceBar
+                results={results}
+                stats={stats}
+                open={cardsOpen}
                 onClick={() => setCardsOpen(o => !o)}
-                aria-expanded={cardsOpen}
-              >
-                <span className="cards-summary-label">
-                  <span className="cards-summary-count">{sourceSummary.count} 个信源</span>
-                  <span className="cards-summary-sep">·</span>
-                  <span>偏差 ±{sourceSummary.sd}°</span>
-                </span>
-                <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" strokeWidth="2.2"
-                  strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="6 9 12 15 18 9" />
-                </svg>
-              </button>
+              />
             )}
             {/* 展开区域：grid-template-rows 0fr→1fr 平滑撑开 */}
             <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
@@ -737,25 +719,12 @@ export default function App() {
 
         {air.length > 0 && avgAqi != null && (
           <>
-            <button
-              type="button"
-              className={'cards-summary' + (aqiOpen ? ' open' : '')}
+            {/* AQI 色阶条：渐变轨道 + 位置圆点 */}
+            <AqiBar
+              avgAqi={avgAqi}
+              open={aqiOpen}
               onClick={() => setAqiOpen(o => !o)}
-              aria-expanded={aqiOpen}
-            >
-              <span className="cards-summary-label">
-                <span className="cards-summary-count">空气质量</span>
-                <span className="cards-summary-sep">·</span>
-                <span style={{ color: aqiColor(avgAqi) }}>AQI {avgAqi}</span>
-                <span className="cards-summary-sep">·</span>
-                <span style={{ color: aqiColor(avgAqi) }}>{aqiCategory(avgAqi)}</span>
-              </span>
-              <svg className="cards-chevron" width="16" height="16" viewBox="0 0 24 24"
-                fill="none" stroke="currentColor" strokeWidth="2.2"
-                strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
+            />
             <div className={'cards-expand' + (aqiOpen ? ' open' : '')}>
               <div className="cards-expand-inner">
                 <AqiSection air={air} />
@@ -882,6 +851,82 @@ function MinutelyRainCard({ data }: { data: MinutelyRain }) {
         <span>现在</span><span>15分钟</span><span>30分钟</span><span>45分钟</span><span>1小时</span>
       </div>
     </div>
+  )
+}
+
+// 信源温度刻度条（折叠摘要头）
+function SourceBar({
+  results, stats, open, onClick,
+}: {
+  results: ProviderResult[]
+  stats: Stats
+  open: boolean
+  onClick: () => void
+}) {
+  const { min, max, avg } = stats
+  const range = max - min
+  const pct = (v: number) =>
+    range > 0.05 ? Math.max(3, Math.min(97, ((v - min) / range) * 100)) : 50
+  const ticks = results
+    .filter((r) => r.current != null)
+    .map((r) => {
+      const meta = PROVIDERS.find((p) => p.id === r.providerId)
+      return { id: r.providerId, pct: pct(r.current!.temp), color: meta?.color ?? 'rgba(255,255,255,0.55)' }
+    })
+  return (
+    <button
+      type="button"
+      className={'cards-summary' + (open ? ' open' : '')}
+      onClick={onClick}
+      aria-expanded={open}
+    >
+      <div className="bar-track-wrap" aria-hidden="true">
+        <div className="bar-track" />
+        {ticks.map((t) => (
+          <span key={t.id} className="bar-tick" style={{ left: `${t.pct}%`, background: t.color }} />
+        ))}
+        <span className="bar-avg" style={{ left: `${pct(avg)}%` }} />
+      </div>
+      <span className="bar-range">{Math.round(min)}° ～ {Math.round(max)}°</span>
+      <svg className="cards-chevron" width="13" height="13" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </button>
+  )
+}
+
+// AQI 色阶条（折叠摘要头）
+function AqiBar({
+  avgAqi, open, onClick,
+}: {
+  avgAqi: number
+  open: boolean
+  onClick: () => void
+}) {
+  const col = aqiColor(avgAqi)
+  const dotPct = Math.max(2, Math.min(98, (Math.min(avgAqi, 300) / 300) * 100))
+  return (
+    <button
+      type="button"
+      className={'cards-summary' + (open ? ' open' : '')}
+      onClick={onClick}
+      aria-expanded={open}
+    >
+      <div className="bar-track-wrap" aria-hidden="true">
+        <div className="aqi-track" />
+        <span className="aqi-dot" style={{ left: `${dotPct}%`, background: col, boxShadow: `0 0 8px 2px ${col}66` }} />
+      </div>
+      <span className="bar-range">
+        <span style={{ color: col, fontWeight: 500 }}>{avgAqi}</span>
+        {' AQI · '}
+        <span style={{ color: col, fontWeight: 500 }}>{aqiCategory(avgAqi)}</span>
+      </span>
+      <svg className="cards-chevron" width="13" height="13" viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </button>
   )
 }
 

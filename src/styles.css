@@ -1011,7 +1011,81 @@ a.card { text-decoration: none; color: inherit; display: block; }
 }
 
 /* ── 6. 信源卡折叠面板 ── */
-/* 摘要行：玻璃 pill 按钮，宽度铺满，左侧文字右侧箭头 */
+
+/* 横线图：信源温度刻度 + AQI 色阶（cards-summary 内部） */
+.bar-track-wrap {
+  position: relative;
+  flex: 1;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* 温度刻度轨道：中央横线，两端渐隐 */
+.bar-track {
+  position: absolute;
+  left: 2%; right: 2%;
+  height: 1px;
+  background: linear-gradient(
+    90deg, transparent, rgba(255,255,255,0.26) 8%, rgba(255,255,255,0.26) 92%, transparent
+  );
+}
+/* 各信源温度刻度 */
+.bar-tick {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 10px;
+  border-radius: 1px;
+  opacity: 0.82;
+}
+/* 加权均值发光圆点 */
+.bar-avg {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 10px 3px rgba(255, 255, 255, 0.70);
+  z-index: 2;
+}
+/* AQI 色阶轨道 */
+.aqi-track {
+  position: absolute;
+  left: 0; right: 0;
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg, #34c759 0%, #ffd60a 33%, #ff9f0a 55%, #ff453a 75%, #af52de 90%, #a1304e 100%
+  );
+  opacity: 0.46;
+}
+/* AQI 位置圆点 */
+.aqi-dot {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 0, 0, 0.32);
+  z-index: 2;
+  transition: left 0.5s var(--spring);
+}
+/* 温度区间 / AQI 数值文字（右侧固定宽，不换行） */
+.bar-range {
+  font-size: 12px;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+
+/* 摘要行：玻璃 pill 按钮，宽度铺满，左侧横线图右侧箭头 */
 .cards-summary {
   width: 100%;
   display: flex;
