@@ -35,15 +35,6 @@ func windLevel(_ v: Double) -> AlertStyle {
     return AlertStyle(color: Color(hex: "#ff453a"), level: "大风")
 }
 
-func aqiLevel(_ aqi: Int) -> AlertStyle {
-    if aqi <= 50  { return AlertStyle(color: metricNormal, level: "优") }
-    if aqi <= 100 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "良") }
-    if aqi <= 150 { return AlertStyle(color: Color(hex: "#ff9f0a"), level: "轻度污染") }
-    if aqi <= 200 { return AlertStyle(color: Color(hex: "#ff453a"), level: "中度污染") }
-    if aqi <= 300 { return AlertStyle(color: Color(hex: "#af52de"), level: "重度污染") }
-    return AlertStyle(color: Color(hex: "#a1304e"), level: "严重污染")
-}
-
 func uvLevel(_ uv: Double) -> AlertStyle {
     if uv <= 2 { return AlertStyle(color: metricNormal, level: "弱") }
     if uv <= 4 { return AlertStyle(color: Color(hex: "#ffd60a"), level: "中等") }
