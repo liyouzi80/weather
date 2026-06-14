@@ -45,15 +45,6 @@ class CityViewModel {
         return vals.reduce(0, +) / vals.count
     }
 
-    // 信源摘要：信源数 + 温度标准差（折叠摘要行用）。不足 2 源时为 nil。
-    var sourceSummary: (count: Int, sd: String)? {
-        let temps = results.filter { $0.hasData }.compactMap { $0.current?.temp }
-        guard temps.count >= 2 else { return nil }
-        let avg = temps.reduce(0, +) / Double(temps.count)
-        let variance = temps.reduce(0) { $0 + ($1 - avg) * ($1 - avg) } / Double(temps.count)
-        return (temps.count, String(format: "%.1f", variance.squareRoot()))
-    }
-
     var warnings: [WeatherWarning] {
         results.compactMap { $0.current?.warnings }.first(where: { !$0.isEmpty }) ?? []
     }

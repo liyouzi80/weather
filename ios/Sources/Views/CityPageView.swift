@@ -111,19 +111,10 @@ struct CityPageView: View {
                         .riseIn(0.12)
                 }
 
-                // 信源：默认折叠成摘要行（N 个信源 · 偏差 ±X°），点击展开全部信源卡
-                // iOS 27 GlassEffectContainer：相邻信源卡的 Liquid Glass 自动混合渲染，
-                // 展开/折叠时卡片间边缘平滑衔接，与 PWA 折叠动效对齐。
-                if let summary = vm.sourceSummary {
+                // 信源：温度刻度条折叠 → 展开全部信源卡
+                if let stats = vm.stats {
                     VStack(spacing: 0) {
-                        CollapsibleSummary(isOpen: $cardsOpen) {
-                            HStack(spacing: 6) {
-                                Text("\(summary.count) 个信源").foregroundStyle(.white)
-                                Text("·").foregroundStyle(.white.opacity(0.45))
-                                Text("偏差 ±\(summary.sd)°").foregroundStyle(.white.opacity(0.75))
-                            }
-                            .font(.system(size: 14, weight: .medium))
-                        }
+                        SourceBarSummary(results: vm.results, stats: stats, isOpen: $cardsOpen)
                         if cardsOpen {
                             GlassEffectContainer {
                                 LazyVGrid(columns: providerColumns, spacing: 10) {
@@ -161,19 +152,10 @@ struct CityPageView: View {
                     .padding(.bottom, 16)
                 }
 
-                // AQI：默认折叠成摘要行（空气质量 · AQI N · 等级），点击展开各信源 AQI 卡
+                // AQI：色阶条折叠 → 展开各信源 AQI 卡
                 if !vm.air.isEmpty, let avgAqi = vm.avgAqi {
                     VStack(spacing: 0) {
-                        CollapsibleSummary(isOpen: $aqiOpen) {
-                            HStack(spacing: 6) {
-                                Text("空气质量").foregroundStyle(.white)
-                                Text("·").foregroundStyle(.white.opacity(0.45))
-                                Text("AQI \(avgAqi)").foregroundStyle(aqiColor(avgAqi))
-                                Text("·").foregroundStyle(.white.opacity(0.45))
-                                Text(aqiCategory(avgAqi)).foregroundStyle(aqiColor(avgAqi))
-                            }
-                            .font(.system(size: 14, weight: .medium))
-                        }
+                        AqiBarSummary(avgAqi: avgAqi, isOpen: $aqiOpen)
                         if aqiOpen {
                             GlassEffectContainer {
                                 AQISectionView(air: vm.air)
@@ -256,6 +238,133 @@ struct CollapsibleSummary<Label: View>: View {
                 Spacer(minLength: 8)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .glassCard()
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// 信源温度刻度条（折叠摘要头）
+struct SourceBarSummary: View {
+    let results: [ProviderResult]
+    let stats: WeatherStats
+    @Binding var isOpen: Bool
+
+    private var range: Double { stats.max - stats.min }
+    private func pct(_ v: Double) -> Double {
+        guard range > 0.05 else { return 0.5 }
+        return max(0.03, min(0.97, (v - stats.min) / range))
+    }
+
+    var body: some View {
+        Button {
+            Haptics.soft()
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) { isOpen.toggle() }
+        } label: {
+            HStack(spacing: 10) {
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    ZStack(alignment: .leading) {
+                        // 轨道线
+                        LinearGradient(
+                            colors: [.clear, .white.opacity(0.28), .white.opacity(0.28), .clear],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                        .frame(height: 1)
+                        .padding(.horizontal, w * 0.02)
+                        // 各信源彩色刻度
+                        ForEach(results.filter { $0.current != nil }) { r in
+                            Capsule()
+                                .fill(Color(hex: r.color))
+                                .frame(width: 2, height: 10)
+                                .offset(x: pct(r.current!.temp) * w - 1)
+                        }
+                        // 加权均值发光圆点
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 9, height: 9)
+                            .shadow(color: .white.opacity(0.75), radius: 5)
+                            .offset(x: pct(stats.avg) * w - 4.5)
+                    }
+                }
+                .frame(height: 22)
+
+                Text("\(Int(stats.min.rounded()))° ～ \(Int(stats.max.rounded()))°")
+                    .font(.system(size: 12, weight: .light))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .fixedSize()
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .rotationEffect(.degrees(isOpen ? 180 : 0))
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+            .glassCard()
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// AQI 色阶条（折叠摘要头）
+struct AqiBarSummary: View {
+    let avgAqi: Int
+    @Binding var isOpen: Bool
+
+    private var dotPct: Double { max(0.02, min(0.98, Double(min(avgAqi, 300)) / 300.0)) }
+    private var col: Color { aqiColor(avgAqi) }
+
+    var body: some View {
+        Button {
+            Haptics.soft()
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) { isOpen.toggle() }
+        } label: {
+            HStack(spacing: 10) {
+                GeometryReader { geo in
+                    let w = geo.size.width
+                    ZStack(alignment: .leading) {
+                        // 渐变轨道
+                        LinearGradient(
+                            colors: [
+                                Color(hex: "#34c759"), Color(hex: "#ffd60a"),
+                                Color(hex: "#ff9f0a"), Color(hex: "#ff453a"),
+                                Color(hex: "#af52de"), Color(hex: "#a1304e"),
+                            ],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                        .opacity(0.46)
+                        .frame(height: 4)
+                        .clipShape(Capsule())
+                        // 位置圆点
+                        Circle()
+                            .fill(col)
+                            .frame(width: 11, height: 11)
+                            .shadow(color: col.opacity(0.6), radius: 4)
+                            .offset(x: dotPct * w - 5.5)
+                    }
+                }
+                .frame(height: 22)
+
+                HStack(spacing: 4) {
+                    Text("\(avgAqi)").foregroundStyle(col).fontWeight(.medium)
+                    Text("AQI ·").foregroundStyle(.white.opacity(0.5))
+                    Text(aqiCategory(avgAqi)).foregroundStyle(col).fontWeight(.medium)
+                }
+                .font(.system(size: 12, weight: .light))
+                .fixedSize()
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.5))
                     .rotationEffect(.degrees(isOpen ? 180 : 0))
             }
