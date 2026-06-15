@@ -997,6 +997,21 @@ const ProviderCard = memo(function ProviderCard({
   score: number
   onScoreChange: (delta: number) => void
 }) {
+  // Early-return must live here (outer) so the inner component only mounts when there IS data.
+  // If the check were inside ProviderCardBody, useEffect([], []) would run on first mount with
+  // cardRef=null (no DOM yet), then skip re-running when backfill later provides data — leaving
+  // the card with no touch listeners.
+  if (r.error || !r.current) return null
+  return <ProviderCardBody r={r} score={score} onScoreChange={onScoreChange} />
+})
+
+const ProviderCardBody = memo(function ProviderCardBody({
+  r, score, onScoreChange,
+}: {
+  r: Annotated
+  score: number
+  onScoreChange: (delta: number) => void
+}) {
   const cardRef = useRef<HTMLDivElement>(null)
   const swipeStartX = useRef<number | null>(null)
   const swipeStartY = useRef<number | null>(null)
@@ -1070,10 +1085,7 @@ const ProviderCard = memo(function ProviderCard({
 
   const meta = PROVIDERS.find((p) => p.id === r.providerId)
   const color = meta?.color ?? '#0a84ff'
-
-  if (r.error || !r.current) return null   // 失败/无数据信源静默隐藏
-
-  const c = r.current
+  const c = r.current!
   const muted = score === 0
   const cls = ['card', r.isMax ? 'is-max' : '', r.isMin ? 'is-min' : '', muted ? 'score-muted' : ''].filter(Boolean).join(' ')
   return (
