@@ -140,17 +140,24 @@ function initRain(canvas: HTMLCanvasElement, device: any, gpu: any): () => void 
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
     const data = makeDrops(W, H)
     count = data.length / 8
-    dropBuf?.destroy?.()
-    dropBuf = device.createBuffer({ size: Math.max(32, data.byteLength), usage: BU.STORAGE | BU.COPY_DST })
+    const byteLen = Math.max(32, data.byteLength)
+    // 复用已有 buffer（若容量够），避免 resize 时 GPU 重新分配
+    const needNewBuf = !dropBuf || byteLen > dropBuf.size
+    if (needNewBuf) {
+      dropBuf?.destroy?.()
+      dropBuf = device.createBuffer({ size: byteLen, usage: BU.STORAGE | BU.COPY_DST })
+    }
     device.queue.writeBuffer(dropBuf, 0, data)
-    computeBG = device.createBindGroup({
-      layout: computePipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: dropBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
-    })
-    renderBG = device.createBindGroup({
-      layout: renderPipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: dropBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
-    })
+    if (needNewBuf) {
+      computeBG = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: dropBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
+      })
+      renderBG = device.createBindGroup({
+        layout: renderPipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: dropBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
+      })
+    }
   }
   build()
   window.addEventListener('resize', build)

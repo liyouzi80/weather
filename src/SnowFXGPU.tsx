@@ -124,17 +124,23 @@ function initSnow(canvas: HTMLCanvasElement, device: any, gpu: any): () => void 
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px'
     const data = makeFlakes(W, H)
     count = data.length / 8
-    flakeBuf?.destroy?.()
-    flakeBuf = device.createBuffer({ size: Math.max(32, data.byteLength), usage: BU.STORAGE | BU.COPY_DST })
+    const byteLen = Math.max(32, data.byteLength)
+    const needNewBuf = !flakeBuf || byteLen > flakeBuf.size
+    if (needNewBuf) {
+      flakeBuf?.destroy?.()
+      flakeBuf = device.createBuffer({ size: byteLen, usage: BU.STORAGE | BU.COPY_DST })
+    }
     device.queue.writeBuffer(flakeBuf, 0, data)
-    computeBG = device.createBindGroup({
-      layout: computePipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: flakeBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
-    })
-    renderBG = device.createBindGroup({
-      layout: renderPipeline.getBindGroupLayout(0),
-      entries: [{ binding: 0, resource: { buffer: flakeBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
-    })
+    if (needNewBuf) {
+      computeBG = device.createBindGroup({
+        layout: computePipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: flakeBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
+      })
+      renderBG = device.createBindGroup({
+        layout: renderPipeline.getBindGroupLayout(0),
+        entries: [{ binding: 0, resource: { buffer: flakeBuf } }, { binding: 1, resource: { buffer: uniformBuf } }],
+      })
+    }
   }
   build()
   window.addEventListener('resize', build)

@@ -46,10 +46,34 @@ function useBoltCanvas(ref: React.RefObject<HTMLCanvasElement | null>) {
       return { pts, branches }
     }
 
+    // 描边路径辅助（不触发 stroke，让调用方控制样式后再 stroke）
+    const tracePath = (pts: [number, number][]) => {
+      ctx.beginPath()
+      ctx.moveTo(pts[0][0], pts[0][1])
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
+    }
+
     let flash = 0, nextBolt = rnd(1.2, 3.5), bolt: Bolt | null = null
-    let raf = 0, last = 0
+    let rafId = 0, timerId = 0, last = 0
+
+    // 没有活跃闪电时休眠，节省 CPU；快接近下次触发时才唤醒
+    const cancelAll = () => {
+      if (rafId) { cancelAnimationFrame(rafId); rafId = 0 }
+      if (timerId) { clearTimeout(timerId); timerId = 0 }
+    }
+    const scheduleNext = () => {
+      if (flash > 0 || nextBolt < 1.0) {
+        rafId = requestAnimationFrame(frame)
+      } else {
+        const ms = Math.max(0, (nextBolt - 0.9) * 1000)
+        timerId = window.setTimeout(() => {
+          timerId = 0; last = 0; rafId = requestAnimationFrame(frame)
+        }, ms)
+      }
+    }
 
     const frame = (now: number) => {
+      rafId = 0
       const dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016
       last = now
       ctx.clearRect(0, 0, W, H)
@@ -62,18 +86,22 @@ function useBoltCanvas(ref: React.RefObject<HTMLCanvasElement | null>) {
         ctx.fillRect(0, 0, W, H)
         if (bolt && flash > 0.2) {
           ctx.save()
-          ctx.shadowColor = 'rgba(160,190,255,1)'; ctx.shadowBlur = 20
-          ctx.strokeStyle = `rgba(255,255,255,${flash * 0.98})`; ctx.lineWidth = 2.4
-          ctx.beginPath()
-          ctx.moveTo(bolt.pts[0][0], bolt.pts[0][1])
-          for (let i = 1; i < bolt.pts.length; i++) ctx.lineTo(bolt.pts[i][0], bolt.pts[i][1])
-          ctx.stroke()
-          ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(210,230,255,${flash * 0.65})`
+          ctx.lineCap = 'round'
+          // 主干：宽→中→细三层叠加模拟发光（替代 shadowBlur，移动端 GPU 负担更低）
+          ctx.lineWidth = 12; ctx.strokeStyle = `rgba(140,175,255,${flash * 0.15})`
+          tracePath(bolt.pts); ctx.stroke()
+          ctx.lineWidth = 6;  ctx.strokeStyle = `rgba(185,210,255,${flash * 0.32})`
+          tracePath(bolt.pts); ctx.stroke()
+          ctx.lineWidth = 2.4; ctx.strokeStyle = `rgba(255,255,255,${flash * 0.98})`
+          tracePath(bolt.pts); ctx.stroke()
+          // 分支
           for (const br of bolt.branches) {
-            ctx.beginPath()
-            ctx.moveTo(br.pts[0][0], br.pts[0][1])
-            for (let i = 1; i < br.pts.length; i++) ctx.lineTo(br.pts[i][0], br.pts[i][1])
-            ctx.stroke()
+            ctx.lineWidth = 6;   ctx.strokeStyle = `rgba(140,175,255,${flash * 0.10})`
+            tracePath(br.pts); ctx.stroke()
+            ctx.lineWidth = 3;   ctx.strokeStyle = `rgba(185,210,255,${flash * 0.22})`
+            tracePath(br.pts); ctx.stroke()
+            ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(210,230,255,${flash * 0.65})`
+            tracePath(br.pts); ctx.stroke()
           }
           ctx.restore()
         }
@@ -81,18 +109,18 @@ function useBoltCanvas(ref: React.RefObject<HTMLCanvasElement | null>) {
         if (flash < 0) flash = 0
       }
 
-      raf = requestAnimationFrame(frame)
+      scheduleNext()
     }
-    raf = requestAnimationFrame(frame)
+    scheduleNext()
 
     const onVis = () => {
-      if (document.hidden) { cancelAnimationFrame(raf); raf = 0 }
-      else if (!raf) { last = 0; raf = requestAnimationFrame(frame) }
+      if (document.hidden) { cancelAll() }
+      else if (!rafId && !timerId) { last = 0; scheduleNext() }
     }
     document.addEventListener('visibilitychange', onVis)
 
     return () => {
-      cancelAnimationFrame(raf)
+      cancelAll()
       window.removeEventListener('resize', resize)
       document.removeEventListener('visibilitychange', onVis)
     }

@@ -220,7 +220,16 @@ function drawMoon(ctx: CanvasRenderingContext2D, mx: number, my: number, r: numb
   let sprite = moonSpriteCache.get(key)
   if (!sprite) {
     const built = buildMoonSprite(r, elongation)
-    if (!built) return                 // 贴图未就绪：下一帧再画
+    if (!built) {
+      // 贴图未就绪：画简单发光圆占位，下一帧升级为真实月面
+      const g = ctx.createRadialGradient(mx, my, 0, mx, my, r * 1.5)
+      g.addColorStop(0,    'rgba(240,245,255,0.90)')
+      g.addColorStop(0.65, 'rgba(235,242,255,0.60)')
+      g.addColorStop(1,    'rgba(210,225,255,0)')
+      ctx.fillStyle = g
+      ctx.beginPath(); ctx.arc(mx, my, r * 1.5, 0, TAU); ctx.fill()
+      return
+    }
     if (moonSpriteCache.size > 8) moonSpriteCache.clear()
     moonSpriteCache.set(key, built); sprite = built
   }
@@ -261,6 +270,7 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
 
     // Cloud scene: each cluster is a baked sprite + world position / drift.
     const clouds: Cloud[] = []
+    let fogStripe: HTMLCanvasElement | null = null  // 雾/霾条纹预烘焙，fog/haze init 时填充
     let cancelled = false   // guards async SVG image loads against unmount
 
     const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -539,6 +549,20 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       for (let i = 0; i < nb; i++)
         motes.push({ x: rnd(0, W), y: rnd(0.1, 0.9) * H, r: rnd(H * 0.10, H * 0.20), vx: rnd(5, 16) * (Math.random() < 0.5 ? -1 : 1), vy: rnd(-3, 3), o: rnd(0.05, 0.11) })
 
+      // 预烘焙横条纹（透明→不透明→透明），帧循环里用 drawImage 代替 createLinearGradient
+      const stripColor = haze ? '168,156,128' : '215,220,230'
+      const midLo = haze ? 0.40 : 0.38
+      const midHi = haze ? 0.60 : 0.62
+      fogStripe = document.createElement('canvas')
+      fogStripe.width = 4; fogStripe.height = 256
+      const sc = fogStripe.getContext('2d')!
+      const sg = sc.createLinearGradient(0, 0, 0, 256)
+      sg.addColorStop(0,     `rgba(${stripColor},0)`)
+      sg.addColorStop(midLo, `rgba(${stripColor},1)`)
+      sg.addColorStop(midHi, `rgba(${stripColor},1)`)
+      sg.addColorStop(1,     `rgba(${stripColor},0)`)
+      sc.fillStyle = sg; sc.fillRect(0, 0, 4, 256)
+
     } else {
       // clear-day: sun motes
       const n = Math.round(Math.min(80, area / 14000))
@@ -609,18 +633,27 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
               ctx.fillRect(0, 0, W, H)
               if (bolt && flash > 0.2) {
                 ctx.save()
-                ctx.shadowColor = 'rgba(160,190,255,1)'; ctx.shadowBlur = 20
-                ctx.strokeStyle = `rgba(255,255,255,${flash * 0.98})`; ctx.lineWidth = 2.4
-                ctx.beginPath()
-                ctx.moveTo(bolt.pts[0][0], bolt.pts[0][1])
-                for (let i = 1; i < bolt.pts.length; i++) ctx.lineTo(bolt.pts[i][0], bolt.pts[i][1])
-                ctx.stroke()
-                ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(210,230,255,${flash * 0.65})`
+                ctx.lineCap = 'round'
+                // 多层描边模拟发光（替代 shadowBlur，避免移动端全屏高斯模糊开销）
+                const traceBolt = (pts: [number, number][]) => {
+                  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1])
+                  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1])
+                }
+                // 主干：宽→中→细
+                ctx.lineWidth = 12; ctx.strokeStyle = `rgba(140,175,255,${flash * 0.15})`
+                traceBolt(bolt.pts); ctx.stroke()
+                ctx.lineWidth = 6;  ctx.strokeStyle = `rgba(185,210,255,${flash * 0.32})`
+                traceBolt(bolt.pts); ctx.stroke()
+                ctx.lineWidth = 2.4; ctx.strokeStyle = `rgba(255,255,255,${flash * 0.98})`
+                traceBolt(bolt.pts); ctx.stroke()
+                // 分支
                 for (const br of bolt.branches) {
-                  ctx.beginPath()
-                  ctx.moveTo(br.pts[0][0], br.pts[0][1])
-                  for (let i = 1; i < br.pts.length; i++) ctx.lineTo(br.pts[i][0], br.pts[i][1])
-                  ctx.stroke()
+                  ctx.lineWidth = 6;   ctx.strokeStyle = `rgba(140,175,255,${flash * 0.10})`
+                  traceBolt(br.pts); ctx.stroke()
+                  ctx.lineWidth = 3;   ctx.strokeStyle = `rgba(185,210,255,${flash * 0.22})`
+                  traceBolt(br.pts); ctx.stroke()
+                  ctx.lineWidth = 1.2; ctx.strokeStyle = `rgba(210,230,255,${flash * 0.65})`
+                  traceBolt(br.pts); ctx.stroke()
                 }
                 ctx.restore()
               }
@@ -716,16 +749,14 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
               if (m.x - m.r > W) m.x = -m.r; else if (m.x + m.r < 0) m.x = W + m.r
             }
           }
-          for (const band of fogBands) {
-            const cy = band.y + Math.sin(band.ph) * 16
-            const bG = ctx.createLinearGradient(0, cy - band.h, 0, cy + band.h)
-            bG.addColorStop(0,    'rgba(215,220,230,0)')
-            bG.addColorStop(0.38, `rgba(215,220,230,${band.o})`)
-            bG.addColorStop(0.62, `rgba(215,220,230,${band.o})`)
-            bG.addColorStop(1,    'rgba(215,220,230,0)')
-            ctx.fillStyle = bG
-            ctx.fillRect(0, cy - band.h, W, band.h * 2)
-            if (!reduced) band.ph += dt * band.spd * 0.6
+          if (fogStripe) {
+            for (const band of fogBands) {
+              const cy = band.y + Math.sin(band.ph) * 16
+              ctx.globalAlpha = band.o
+              ctx.drawImage(fogStripe, 0, cy - band.h, W, band.h * 2)
+              if (!reduced) band.ph += dt * band.spd * 0.6
+            }
+            ctx.globalAlpha = 1
           }
           break
         }
@@ -752,17 +783,15 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
               if (m.x - m.r > W) m.x = -m.r; else if (m.x + m.r < 0) m.x = W + m.r
             }
           }
-          // 横向霾层
-          for (const band of fogBands) {
-            const cy = band.y + Math.sin(band.ph) * 14
-            const bG = ctx.createLinearGradient(0, cy - band.h, 0, cy + band.h)
-            bG.addColorStop(0,   'rgba(168,156,128,0)')
-            bG.addColorStop(0.4, `rgba(168,156,128,${band.o})`)
-            bG.addColorStop(0.6, `rgba(168,156,128,${band.o})`)
-            bG.addColorStop(1,   'rgba(168,156,128,0)')
-            ctx.fillStyle = bG
-            ctx.fillRect(0, cy - band.h, W, band.h * 2)
-            if (!reduced) band.ph += dt * band.spd * 0.6
+          // 横向霾层（使用预烘焙条纹 + globalAlpha，替代每帧 createLinearGradient）
+          if (fogStripe) {
+            for (const band of fogBands) {
+              const cy = band.y + Math.sin(band.ph) * 14
+              ctx.globalAlpha = band.o
+              ctx.drawImage(fogStripe, 0, cy - band.h, W, band.h * 2)
+              if (!reduced) band.ph += dt * band.spd * 0.6
+            }
+            ctx.globalAlpha = 1
           }
           break
         }
