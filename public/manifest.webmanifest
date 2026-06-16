@@ -4,8 +4,9 @@
   "description": "并排对比中央气象台、广州市气象局、和风、彩云、OpenWeatherMap、WeatherAPI、Open-Meteo 等多个信源在番禺区 / 安福县的实时天气，高亮差异并给出温度排行",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#03050b",
-  "theme_color": "#03050b",
+  "orientation": "portrait",
+  "background_color": "#0b1426",
+  "theme_color": "#0b1426",
   "icons": [
     { "src": "/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
     { "src": "/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },

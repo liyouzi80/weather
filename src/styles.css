@@ -171,7 +171,7 @@ html[data-sky='haze'] body::before {
   /* 顶部安全区交由吸顶头部处理；底部留出空间给固定的页面圆点 + home 指示条；
      左右取安全区与 20px 的较大值，刘海机横屏时内容不被挖空区压住 */
   padding: 0 max(20px, env(safe-area-inset-right))
-             max(72px, calc(44px + env(safe-area-inset-bottom)))
+             max(56px, calc(36px + env(safe-area-inset-bottom)))
              max(20px, env(safe-area-inset-left));
   /* 全高 flex 列：首屏铺满视口，统计卡片可钉到底部，hero 区域吃掉余下空间 */
   min-height: 100dvh;
@@ -871,7 +871,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 
 /* ── Responsive ── */
 @media (max-width: 400px) {
-  .app { padding: 0 max(12px, env(safe-area-inset-right)) max(64px, calc(36px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
+  .app { padding: 0 max(12px, env(safe-area-inset-right)) max(52px, calc(34px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
   .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
   .hero-city { font-size: 24px; }
   .hero-temp { font-size: 92px; }
