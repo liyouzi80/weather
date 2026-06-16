@@ -174,7 +174,7 @@ html[data-sky='haze'] body::before {
   /* 顶部安全区交由吸顶头部处理；底部留出空间给固定的页面圆点 + home 指示条；
      左右取安全区与 20px 的较大值，刘海机横屏时内容不被挖空区压住 */
   padding: 0 max(20px, env(safe-area-inset-right))
-             max(56px, calc(36px + env(safe-area-inset-bottom)))
+             max(48px, calc(24px + env(safe-area-inset-bottom)))
              max(20px, env(safe-area-inset-left));
   /* 全高 flex 列：首屏铺满视口，统计卡片可钉到底部，hero 区域吃掉余下空间
      svh 兜底（iOS ≤15.3），dvh 随浏览器工具栏收缩动态适应（iOS 15.4+ 生效） */
@@ -210,8 +210,9 @@ html[data-sky='haze'] body::before {
 .page-dots {
   position: fixed;
   left: 50%;
-  /* 紧贴安全区上边缘（home 指示条顶部），减少与 home bar 的视觉间距 */
-  bottom: max(8px, env(safe-area-inset-bottom));
+  /* 贴近 home bar：safe-area-inset-bottom 是 home 指示条上方 34px 保护区，
+     减去 16px 使圆点降至距屏幕底边约 18px，视觉上紧贴 home 指示条 */
+  bottom: max(8px, calc(env(safe-area-inset-bottom) - 16px));
   transform: translateX(-50%);
   z-index: 20;
   display: flex;
@@ -890,7 +891,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
    375px = iPhone SE 3rd gen 宽度；≥376px（如 iPhone 16 Pro / 17 Pro 393pt）
    保留 20px padding 与 clamp() 字号，以充分利用大屏空间 */
 @media (max-width: 375px) {
-  .app { padding: 0 max(12px, env(safe-area-inset-right)) max(52px, calc(34px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
+  .app { padding: 0 max(12px, env(safe-area-inset-right)) max(44px, calc(20px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
   .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
   .hero-city { font-size: 24px; }
   .hero-temp { font-size: 92px; }
