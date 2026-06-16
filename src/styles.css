@@ -61,6 +61,9 @@ html {
   -ms-overflow-style: none;
   /* 禁止顶底橡皮筋回弹 & 浏览器原生下拉刷新 */
   overscroll-behavior: none;
+  /* 防止 iOS 横屏时自动放大字体（iPhone 17 Pro 横向亦通用） */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 html::-webkit-scrollbar { display: none; }
 
@@ -173,7 +176,9 @@ html[data-sky='haze'] body::before {
   padding: 0 max(20px, env(safe-area-inset-right))
              max(56px, calc(36px + env(safe-area-inset-bottom)))
              max(20px, env(safe-area-inset-left));
-  /* 全高 flex 列：首屏铺满视口，统计卡片可钉到底部，hero 区域吃掉余下空间 */
+  /* 全高 flex 列：首屏铺满视口，统计卡片可钉到底部，hero 区域吃掉余下空间
+     svh 兜底（iOS ≤15.3），dvh 随浏览器工具栏收缩动态适应（iOS 15.4+ 生效） */
+  min-height: 100svh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -869,8 +874,10 @@ a.card { text-decoration: none; color: inherit; display: block; }
   50% { opacity: 0.6; }
 }
 
-/* ── Responsive ── */
-@media (max-width: 400px) {
+/* ── Responsive ──
+   375px = iPhone SE 3rd gen 宽度；≥376px（如 iPhone 16 Pro / 17 Pro 393pt）
+   保留 20px padding 与 clamp() 字号，以充分利用大屏空间 */
+@media (max-width: 375px) {
   .app { padding: 0 max(12px, env(safe-area-inset-right)) max(52px, calc(34px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
   .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
   .hero-city { font-size: 24px; }
