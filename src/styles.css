@@ -210,7 +210,8 @@ html[data-sky='haze'] body::before {
 .page-dots {
   position: fixed;
   left: 50%;
-  bottom: max(16px, calc(10px + env(safe-area-inset-bottom)));
+  /* 紧贴安全区上边缘（home 指示条顶部），减少与 home bar 的视觉间距 */
+  bottom: max(8px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   z-index: 20;
   display: flex;
@@ -301,6 +302,17 @@ html[data-sky='haze'] body::before {
   /* 负边距 + 等量内边距让吸顶层满铺到 .app 两侧边缘 */
   margin: 0 -20px;
   padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
+}
+/* 灵动岛/状态栏常驻深色渐变：降低天气内容与 iOS 系统毛玻璃的视觉对比，
+   使其自然融入而非突兀。height 覆盖安全区 + 少量溢出以平滑过渡。 */
+.loc-header::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: calc(env(safe-area-inset-top, 54px) + 28px);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0) 100%);
+  z-index: -1;
+  pointer-events: none;
 }
 /* 吸顶遮罩：滚动后出现，覆盖其下方的内容（90% 实底 → 底边淡出）*/
 .loc-header::before {
