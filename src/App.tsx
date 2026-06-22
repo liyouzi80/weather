@@ -1092,7 +1092,7 @@ const ProviderCardBody = memo(function ProviderCardBody({
     <div
       ref={cardRef}
       className={cls}
-      style={{ viewTransitionName: `provider-card-${r.providerId}` } as React.CSSProperties}
+      style={{ viewTransitionName: `provider-card-${r.providerId}`, '--card-accent': color } as React.CSSProperties}
     >
       <div className="head">
         <span className="dot" style={{ background: color }} />
