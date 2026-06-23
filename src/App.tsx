@@ -196,7 +196,6 @@ export default function App() {
   const startY = useRef<number | null>(null)
   const gesture = useRef<'swipe' | 'ignore' | null>(null)
   const appRef = useRef<HTMLDivElement>(null)
-  const heroRef = useRef<HTMLDivElement>(null)
   const swipeWrapRef = useRef<HTMLElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
@@ -366,12 +365,9 @@ export default function App() {
 
   // 昼夜 + 暮光染色：统一按北京时（番禺/安福均在 UTC+8），不随设备时区
   const { night, tint } = useMemo(() => computeSky(Date.now()), [updatedAt])
-  // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky，
-  // 同时把状态栏配色（theme-color）调成对应天空色，PWA 更沉浸
+  // 动态天气背景：随「多数天气现象 + 昼夜」切换根节点 data-sky（驱动天空 CSS 主题）
   useEffect(() => {
-    const sky = skyKey(stats?.text, night)
-    document.documentElement.dataset.sky = sky
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', SKY_THEME[sky] ?? '#0b1426')
+    document.documentElement.dataset.sky = skyKey(stats?.text, night)
   }, [stats, night])
 
   // 实时天气动效类型（全屏背景层）
@@ -388,7 +384,7 @@ export default function App() {
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
-        <div ref={heroRef} className={'hero' + (!stats ? ' hero-skeleton' : '')}>
+        <div className={'hero' + (!stats ? ' hero-skeleton' : '')}>
           <h1 className="hero-city">{city.name}</h1>
           {stats ? (
             <>
@@ -963,18 +959,6 @@ function analyze(
       windSpeed: r1(avgOf(winds)),
     },
   }
-}
-
-// 各天空主题对应的状态栏配色（取该主题背景渐变顶端色，使状态栏与画面顶部融为一体）
-const SKY_THEME: Record<string, string> = {
-  'clear-day': '#163465',
-  'clear-night': '#0a1430',
-  cloudy: '#1d2842',
-  overcast: '#242b39',
-  rain: '#172a3e',
-  snow: '#293751',
-  fog: '#2b2e36',
-  haze: '#34302a',
 }
 
 // 太阳时相：按北京时（番禺/安福均在 UTC+8）算昼夜 + 日出/日落暖色染色。
