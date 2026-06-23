@@ -46,7 +46,7 @@ class ProviderAggregator {
     // MARK: Stats
 
     /// weights: providerId → score (0–5, default 3). Score 0 = excluded from aggregation.
-    func analyze(_ results: [ProviderResult], weights: (String) -> Int = { _ in 3 }) -> WeatherStats? {
+    func analyze(_ results: [ProviderResult], weights: @escaping (String) -> Int = { _ in 3 }) -> WeatherStats? {
         let w = { (r: ProviderResult) -> Double in Double(weights(r.providerId)) }
         let ok = results.filter { $0.hasData }
         guard !ok.isEmpty else { return nil }

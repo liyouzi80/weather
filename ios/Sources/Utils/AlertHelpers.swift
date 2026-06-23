@@ -43,6 +43,8 @@ func uvLevel(_ uv: Double) -> AlertStyle {
     return AlertStyle(color: Color(hex: "#bf5af2"), level: "极强")
 }
 
+func aqiLevel(_ aqi: Int) -> AlertStyle { AlertStyle(color: aqiColor(aqi), level: aqiCategory(aqi)) }
+
 // AQI full scale (for detail cards)
 func aqiColor(_ aqi: Int) -> Color {
     if aqi <= 50  { return Color(hex: "#34c759") }
