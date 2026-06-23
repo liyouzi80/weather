@@ -29,6 +29,9 @@
   /* Hero 温度默认渐变（无主题时） */
   --hero-top: #ffffff;
   --hero-btm: rgba(255, 255, 255, 0.72);
+
+  /* 天空底色：状态栏安全区遮罩取用，随主题切换 */
+  --sky-bg: #0b1426;
 }
 
 /* 连续圆角（squircle）：支持的浏览器用超椭圆，其余回退普通圆角 */
@@ -119,35 +122,35 @@ body::after {
    切换城市/天气时产生"换了个世界"的视觉差异 */
 
 html[data-sky='clear-day'] {
-  background-color: #0e1b38;
+  background-color: #0e1b38; --sky-bg: #0e1b38;
   --hero-top: #ffffff; --hero-btm: #ffd6a0;
 }
 html[data-sky='clear-night'] {
-  background-color: #060e20;
+  background-color: #060e20; --sky-bg: #060e20;
   --hero-top: #e0e8ff; --hero-btm: #8aa0e0;
 }
 html[data-sky='cloudy'] {
-  background-color: #131c30;
+  background-color: #131c30; --sky-bg: #131c30;
   --hero-top: #f0f0f5; --hero-btm: #a0a4ba;
 }
 html[data-sky='overcast'] {
-  background-color: #171b26;
+  background-color: #171b26; --sky-bg: #171b26;
   --hero-top: #e0e0e8; --hero-btm: #82828e;
 }
 html[data-sky='rain'] {
-  background-color: #0c1924;
+  background-color: #0c1924; --sky-bg: #0c1924;
   --hero-top: #d8e4f0; --hero-btm: #7a98b8;
 }
 html[data-sky='snow'] {
-  background-color: #1a2038;
+  background-color: #1a2038; --sky-bg: #1a2038;
   --hero-top: #f0eeff; --hero-btm: #b0a8d8;
 }
 html[data-sky='fog'] {
-  background-color: #1a1c22;
+  background-color: #1a1c22; --sky-bg: #1a1c22;
   --hero-top: #e8e5e0; --hero-btm: #9a9890;
 }
 html[data-sky='haze'] {
-  background-color: #221e16;
+  background-color: #221e16; --sky-bg: #221e16;
   --hero-top: #f0e6d0; --hero-btm: #c0a060;
 }
 
@@ -211,6 +214,24 @@ html[data-sky='haze'] body::before {
     linear-gradient(180deg, #221e16 0%, #221e16 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 90% 52% at 50% -6%, #4e4630 0%, transparent 56%),
     linear-gradient(180deg, #38322a 0%, #28221a 46%, #221e16 100%);
+}
+
+/* 状态栏安全区实色遮罩：位于所有 GPU 合成层（canvas / hero parallax / swipe-wrap）之上，
+   用 html background-color 铺满安全区，消除渐变色差和合成层边界带来的「毛玻璃」感。
+   下边缘 40px 淡出过渡，让天空渐变 / 雨滴自然接续。 */
+.app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(env(safe-area-inset-top, 0px) + 40px);
+  background: linear-gradient(180deg,
+    var(--sky-bg, #0b1426) 0%,
+    var(--sky-bg, #0b1426) calc(env(safe-area-inset-top, 0px) - 4px),
+    transparent 100%);
+  z-index: 3;
+  pointer-events: none;
 }
 
 .app {
@@ -956,7 +977,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
   to { opacity: 1; }
 }
 
-.loc-header { animation: fadeIn 0.45s ease backwards; }
 .hero-city { animation: riseIn 0.5s var(--spring) both; }
 
 /* 触摸反馈仅给真正可点的卡（AQI 外链卡 .card-link，见上方 :active 规则）；
