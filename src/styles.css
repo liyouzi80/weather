@@ -308,7 +308,6 @@ html[data-sky='haze'] body::before {
 .loc-header {
   position: sticky;
   top: 0;
-  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -316,9 +315,11 @@ html[data-sky='haze'] body::before {
   /* 负边距 + 等量内边距让吸顶层满铺到 .app 两侧边缘 */
   margin: 0 -20px;
   padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
-/* 吸顶遮罩：滚动后出现，覆盖其下方的内容（90% 实底 → 底边淡出）*/
-.loc-header::before {
+/* 吸顶遮罩：仅在 scrolled 时创建（避免透明伪元素产生 iOS 合成层瑕疵）*/
+.loc-header.scrolled::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -328,11 +329,9 @@ html[data-sky='haze'] body::before {
     rgba(8, 12, 24, 0.94) 0%,
     rgba(8, 12, 24, 0.88) 65%,
     rgba(8, 12, 24, 0) 100%);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  animation: fadeIn 0.22s ease both;
 }
-.loc-header.scrolled::before { opacity: 1; }
-.loc-header.scrolled { pointer-events: auto; cursor: pointer; }
+.loc-header.scrolled { z-index: 10; pointer-events: auto; cursor: pointer; }
 
 /* 吸顶栏：城市名 + 温度（城市名 scrolled 后淡入，温度由 JS 控制交叉淡变） */
 .loc-sticky-name {
@@ -945,7 +944,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   to { opacity: 1; }
 }
 
-.loc-header { animation: fadeIn 0.45s ease both; }
+.loc-header { animation: fadeIn 0.45s ease backwards; }
 .hero-city { animation: riseIn 0.5s var(--spring) both; }
 
 /* 触摸反馈仅给真正可点的卡（AQI 外链卡 .card-link，见上方 :active 规则）；
