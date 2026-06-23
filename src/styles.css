@@ -29,9 +29,6 @@
   /* Hero 温度默认渐变（无主题时） */
   --hero-top: #ffffff;
   --hero-btm: rgba(255, 255, 255, 0.72);
-
-  /* 天空底色：状态栏安全区遮罩取用，随主题切换 */
-  --sky-bg: #0b1426;
 }
 
 /* 连续圆角（squircle）：支持的浏览器用超椭圆，其余回退普通圆角 */
@@ -99,7 +96,6 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    linear-gradient(180deg, #0b1426 0%, #0b1426 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 80% 50% at 50% -10%, #1c2541 0%, transparent 55%),
     linear-gradient(180deg, #0a0f1a 0%, #05080f 36%, #0b1426 100%);
   z-index: -1;
@@ -122,36 +118,28 @@ body::after {
    切换城市/天气时产生"换了个世界"的视觉差异 */
 
 html[data-sky='clear-day'] {
-  background-color: #0e1b38; --sky-bg: #0e1b38;
-  --hero-top: #ffffff; --hero-btm: #ffd6a0;
+  background-color: #0e1b38;  --hero-top: #ffffff; --hero-btm: #ffd6a0;
 }
 html[data-sky='clear-night'] {
-  background-color: #060e20; --sky-bg: #060e20;
-  --hero-top: #e0e8ff; --hero-btm: #8aa0e0;
+  background-color: #060e20;  --hero-top: #e0e8ff; --hero-btm: #8aa0e0;
 }
 html[data-sky='cloudy'] {
-  background-color: #131c30; --sky-bg: #131c30;
-  --hero-top: #f0f0f5; --hero-btm: #a0a4ba;
+  background-color: #131c30;  --hero-top: #f0f0f5; --hero-btm: #a0a4ba;
 }
 html[data-sky='overcast'] {
-  background-color: #171b26; --sky-bg: #171b26;
-  --hero-top: #e0e0e8; --hero-btm: #82828e;
+  background-color: #171b26;  --hero-top: #e0e0e8; --hero-btm: #82828e;
 }
 html[data-sky='rain'] {
-  background-color: #0c1924; --sky-bg: #0c1924;
-  --hero-top: #d8e4f0; --hero-btm: #7a98b8;
+  background-color: #0c1924;  --hero-top: #d8e4f0; --hero-btm: #7a98b8;
 }
 html[data-sky='snow'] {
-  background-color: #1a2038; --sky-bg: #1a2038;
-  --hero-top: #f0eeff; --hero-btm: #b0a8d8;
+  background-color: #1a2038;  --hero-top: #f0eeff; --hero-btm: #b0a8d8;
 }
 html[data-sky='fog'] {
-  background-color: #1a1c22; --sky-bg: #1a1c22;
-  --hero-top: #e8e5e0; --hero-btm: #9a9890;
+  background-color: #1a1c22;  --hero-top: #e8e5e0; --hero-btm: #9a9890;
 }
 html[data-sky='haze'] {
-  background-color: #221e16; --sky-bg: #221e16;
-  --hero-top: #f0e6d0; --hero-btm: #c0a060;
+  background-color: #221e16;  --hero-top: #f0e6d0; --hero-btm: #c0a060;
 }
 
 /* 偏亮的天空主题：上调次要文字色，保证 ≥AA 对比度 */
@@ -163,7 +151,6 @@ html[data-sky='snow'], html[data-sky='overcast'] {
 /* 晴天：右上角大面积暖金光晕，饱和度显著高于旧版 */
 html[data-sky='clear-day'] body::before {
   background:
-    linear-gradient(180deg, #0e1b38 0%, #0e1b38 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 55% 40% at 82% -4%, rgba(255, 175, 70, 0.44) 0%, transparent 50%),
     radial-gradient(ellipse 80% 50% at 50% -10%, #285098 0%, transparent 56%),
     linear-gradient(180deg, #1a3c72 0%, #0c1a38 44%, #0e1b38 100%);
@@ -171,67 +158,42 @@ html[data-sky='clear-day'] body::before {
 /* 晴夜：深靛蓝 + 右上角淡紫月光 */
 html[data-sky='clear-night'] body::before {
   background:
-    linear-gradient(180deg, #060e20 0%, #060e20 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 50% 36% at 80% 2%, rgba(130, 160, 255, 0.22) 0%, transparent 48%),
     radial-gradient(ellipse 80% 50% at 50% -10%, #14204a 0%, transparent 56%),
     linear-gradient(180deg, #08143a 0%, #060e22 46%, #060e20 100%);
 }
 html[data-sky='cloudy'] body::before {
   background:
-    linear-gradient(180deg, #131c30 0%, #131c30 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 90% 52% at 50% -10%, #2b3852 0%, transparent 60%),
     linear-gradient(180deg, #1d2842 0%, #11192a 44%, #131c30 100%);
 }
 html[data-sky='overcast'] body::before {
   background:
-    linear-gradient(180deg, #171b26 0%, #171b26 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 92% 55% at 50% -12%, #323847 0%, transparent 60%),
     linear-gradient(180deg, #242b39 0%, #151a24 44%, #171b26 100%);
 }
 /* 雨：冷钢蓝调，更深沉 */
 html[data-sky='rain'] body::before {
   background:
-    linear-gradient(180deg, #0c1924 0%, #0c1924 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 88% 48% at 50% -8%, #1c3a58 0%, transparent 58%),
     linear-gradient(180deg, #142c44 0%, #0c1820 46%, #0c1924 100%);
 }
 /* 雪：偏亮薰衣紫银调 */
 html[data-sky='snow'] body::before {
   background:
-    linear-gradient(180deg, #1a2038 0%, #1a2038 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 90% 52% at 50% -10%, #404868 0%, transparent 58%),
     linear-gradient(180deg, #2e3858 0%, #1a2038 46%, #1a2038 100%);
 }
 html[data-sky='fog'] body::before {
   background:
-    linear-gradient(180deg, #1a1c22 0%, #1a1c22 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 92% 55% at 50% -10%, #363941 0%, transparent 60%),
     linear-gradient(180deg, #2b2e36 0%, #1a1c20 44%, #1a1c22 100%);
 }
 /* 霾：灰黄脏空气，更明显的暖棕 */
 html[data-sky='haze'] body::before {
   background:
-    linear-gradient(180deg, #221e16 0%, #221e16 env(safe-area-inset-top, 0px), transparent calc(env(safe-area-inset-top, 0px) + 60px)),
     radial-gradient(ellipse 90% 52% at 50% -6%, #4e4630 0%, transparent 56%),
     linear-gradient(180deg, #38322a 0%, #28221a 46%, #221e16 100%);
-}
-
-/* 状态栏安全区实色遮罩：位于所有 GPU 合成层（canvas / hero parallax / swipe-wrap）之上，
-   用 html background-color 铺满安全区，消除渐变色差和合成层边界带来的「毛玻璃」感。
-   下边缘 40px 淡出过渡，让天空渐变 / 雨滴自然接续。 */
-.app::before {
-  content: '';
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: calc(env(safe-area-inset-top, 0px) + 40px);
-  background: linear-gradient(180deg,
-    var(--sky-bg, #0b1426) 0%,
-    var(--sky-bg, #0b1426) calc(env(safe-area-inset-top, 0px) - 4px),
-    transparent 100%);
-  z-index: 3;
-  pointer-events: none;
 }
 
 .app {
@@ -334,60 +296,8 @@ html[data-sky='haze'] body::before {
   z-index: 0;
   pointer-events: none;
 }
-/* 内容浮在动效层之上（吸顶头部/固定圆点各自管理定位，排除在外） */
-.app > *:not(.weather-fx):not(.loc-header):not(.page-dots) { position: relative; z-index: 1; }
-
-/* ── 顶部吸顶栏：无按钮，仅在滚过 hero 城市名后显示城市名 ── */
-.loc-header {
-  position: sticky;
-  top: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: none;
-  /* 负边距 + 等量内边距让吸顶层满铺到 .app 两侧边缘 */
-  margin: 0 -20px;
-  padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-}
-/* 吸顶遮罩：仅在 scrolled 时创建（避免透明伪元素产生 iOS 合成层瑕疵）*/
-.loc-header.scrolled::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(180deg,
-    rgba(8, 12, 24, 0.94) 0%,
-    rgba(8, 12, 24, 0.88) 65%,
-    rgba(8, 12, 24, 0) 100%);
-  animation: fadeIn 0.22s ease both;
-}
-.loc-header.scrolled { z-index: 10; pointer-events: auto; cursor: pointer; }
-
-/* 吸顶栏：城市名 + 温度（城市名 scrolled 后淡入，温度由 JS 控制交叉淡变） */
-.loc-sticky-name {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  color: #fff;
-  opacity: 0;
-  transform: translateY(-5px);
-  transition: opacity var(--transition-fast), transform var(--transition-fast);
-}
-.loc-header.scrolled .loc-sticky-name {
-  opacity: 1;
-  transform: none;
-}
-/* 吸顶温度：由滚动 handler 管理 opacity，CSS 仅定义初始状态与样式 */
-.loc-sticky-temp {
-  font-size: 17px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  color: rgba(255, 255, 255, 0.72);
-  opacity: 0;
-}
+/* 内容浮在动效层之上（固定圆点各自管理定位，排除在外） */
+.app > *:not(.weather-fx):not(.page-dots) { position: relative; z-index: 1; }
 .wx { display: inline-flex; align-items: center; gap: 5px; }
 .wx-icon { flex: none; }
 
@@ -599,7 +509,7 @@ html[data-sky='haze'] body::before {
   align-items: center;
   justify-content: center;
   flex: 1 0 auto;
-  padding: 24px 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 0 24px;
   animation: riseIn 0.55s var(--spring) both;
   /* will-change 由滚动逻辑按需挂载/撤除（见 App.tsx onScroll），不常驻以释放 GPU 层 */
 }
@@ -958,7 +868,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
    保留 20px padding 与 clamp() 字号，以充分利用大屏空间 */
 @media (max-width: 375px) {
   .app { padding: 0 max(12px, env(safe-area-inset-right)) max(44px, calc(20px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
-  .loc-header { margin: 0 -12px; padding-left: 12px; padding-right: 12px; }
   .hero-city { font-size: 24px; }
   .hero-temp { font-size: 92px; }
   .hero-cond, .hero-comfort { font-size: 19px; }
@@ -1065,21 +974,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
 /* WeatherFX canvas 在转场期间保持不动（天空渐变跨城市不抖动） */
 ::view-transition-group(.weather-fx) { animation-duration: 0s; }
 
-/* ── 5. Hero scroll-driven 视差（CSS 接管 translateY + opacity，主线程零参与）── */
-@supports (animation-timeline: scroll()) {
-  @keyframes heroParallax {
-    from { opacity: 1; transform: translateY(0); }
-    to   { opacity: 0; transform: translateY(-36px); }
-  }
-  .hero {
-    animation: heroParallax linear both;
-    animation-duration: auto;
-    animation-timeline: scroll(root);
-    animation-range: 0px 200px;
-  }
-}
-
-/* ── 6. 信源卡折叠面板 ── */
+/* ── 5. 信源卡折叠面板 ── */
 
 /* 横线图：信源温度刻度 + AQI 色阶（cards-summary 内部） */
 .bar-track-wrap {

@@ -6,12 +6,6 @@ import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
 import { loadScores, saveScore, getScore, type Scores } from './credibility'
 
-// CSS Scroll-driven Animations (Chrome 115+, Firefox 110+, Safari 18+):
-// hero parallax / phase-1 fade / temp-fly / sticky-temp cross-fade are handled by CSS.
-// When supported, the JS scroll handler skips all inline-style visual updates.
-const CSS_SCROLL_DRIVEN =
-  typeof CSS !== 'undefined' && CSS.supports('animation-timeline: scroll()')
-
 const CITIES: GeoLocation[] = [
   {
     name: '番禺区', cityName: '番禺', lat: 22.9468, lon: 113.3622,
@@ -178,12 +172,10 @@ export default function App() {
         setUpdatedAt(null)
         setInitialLoad(true)
         setCityIdx(i)
-        setScrolled(false)
         setCardsOpen(false)
         setAqiOpen(false)
       })
       window.scrollTo(0, 0)
-      if (stickyTempRef.current && !CSS_SCROLL_DRIVEN) stickyTempRef.current.style.opacity = '0'
     }
 
     // View Transitions：根据城市索引方向设置滑动方向（forward/back），让转场带有方向感。
@@ -198,7 +190,6 @@ export default function App() {
 
   // 手势（移动端）：左右滑动切城市。
   const [dragging, setDragging] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
   const swipeXRef = useRef(0)
   const swipeRawRef = useRef(0)
   const startX = useRef<number | null>(null)
@@ -206,7 +197,6 @@ export default function App() {
   const gesture = useRef<'swipe' | 'ignore' | null>(null)
   const appRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
-  const stickyTempRef = useRef<HTMLSpanElement>(null)
   const swipeWrapRef = useRef<HTMLElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
@@ -303,81 +293,6 @@ export default function App() {
     }
   }, [])
 
-  // Hero 多阶段滚动动效 + 吸顶栏驱动（合并为一个 scroll listener，减少事件监听开销）
-  //   Phase 1 (0–80px)  : 天气现象+高低温淡出；吸顶栏 scrolled 在此触发
-  //   Phase 2 (80–180px): 温度数字缩小+上移，吸顶栏温度交叉淡入
-  //   全程               : hero 视差上移 + 整体淡出
-  // 纯 DOM 直操作 + rAF 节流，不走 React state（仅 scrolled 在阈值切换时触发一次）
-  useEffect(() => {
-    const hero = heroRef.current
-    if (!hero) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    let raf = 0
-    let wasScrolled = false
-    let wasAtTop = true  // 追踪是否刚从滚动态返回顶部，用于城市名平滑淡入
-    const onScroll = () => {
-      if (raf) return
-      raf = requestAnimationFrame(() => {
-        raf = 0
-        const y = window.scrollY
-        const tempEl = hero.querySelector<HTMLElement>('.hero-temp')
-        const condEl = hero.querySelector<HTMLElement>('.hero-cond')
-        const hiloEl = hero.querySelector<HTMLElement>('.hero-hilo')
-        const comfortEl = hero.querySelector<HTMLElement>('.hero-comfort')
-        const cityEl = hero.querySelector<HTMLElement>('.hero-city')
-
-        // 吸顶 scrolled：显示阈值 80px，隐藏阈值 60px（滞后区间防止边界反复闪烁）
-        const isScrolled = wasScrolled ? y > 60 : y > 80
-        if (isScrolled !== wasScrolled) { wasScrolled = isScrolled; setScrolled(isScrolled) }
-
-        // CSS scroll-driven animations handle all visual effects — JS only tracks state
-        if (CSS_SCROLL_DRIVEN) return
-
-        if (y <= 0) {
-          const justArrived = !wasAtTop
-          wasAtTop = true
-          if (tempEl) { tempEl.style.transform = ''; tempEl.style.opacity = '' }
-          if (condEl) condEl.style.opacity = ''
-          if (hiloEl) hiloEl.style.opacity = ''
-          if (comfortEl) comfortEl.style.opacity = ''
-          if (stickyTempRef.current) stickyTempRef.current.style.opacity = '0'
-          if (cityEl) {
-            // 从滚动态回到顶部时：平滑淡入城市名，避免硬跳
-            if (justArrived && cityEl.style.opacity) {
-              cityEl.style.transition = 'opacity 0.22s ease-out'
-              cityEl.style.opacity = ''
-              setTimeout(() => { if (cityEl) cityEl.style.transition = '' }, 240)
-            } else {
-              cityEl.style.opacity = ''
-            }
-          }
-          return
-        }
-        wasAtTop = false
-        // Phase 1 (0–80px): 城市名 + 天气状况 + 高低温淡出
-        // hero translateY + opacity 由 CSS scroll-driven 接管（@supports animation-timeline）
-        const t1 = Math.min(y / 80, 1)
-        // Phase 2 (80–180px): 温度数字缩小 + 向上飞出；吸顶温度交叉淡入
-        const t2 = Math.max(0, Math.min((y - 80) / 100, 1))
-        if (cityEl) cityEl.style.opacity = `${(1 - t1).toFixed(3)}`
-        if (condEl) condEl.style.opacity = `${(1 - t1).toFixed(3)}`
-        if (hiloEl) hiloEl.style.opacity = `${(1 - t1).toFixed(3)}`
-        if (comfortEl) comfortEl.style.opacity = `${(1 - t1).toFixed(3)}`
-        if (tempEl) {
-          // transform-origin: 50% 20% 令缩放从顶部折叠，translateY 让数字向上飞向吸顶栏
-          const scale = (1 - 0.28 * t2).toFixed(3)
-          const dy = (-88 * t2).toFixed(1)
-          tempEl.style.transform = `scale(${scale}) translateY(${dy}px)`
-          tempEl.style.opacity = (1 - t2).toFixed(3)
-        }
-        // 吸顶栏温度与 hero 温度镜像淡变，形成「数字飞过去」的视觉
-        if (stickyTempRef.current) stickyTempRef.current.style.opacity = t2.toFixed(3)
-      })
-    }
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => { window.removeEventListener('scroll', onScroll); cancelAnimationFrame(raf) }
-  }, [])
-
   // 头部刷新时间：相对格式，每 30 秒重算一次
   useEffect(() => {
     const calc = () => {
@@ -465,19 +380,6 @@ export default function App() {
   return (
     <div className="app" ref={appRef}>
       <WeatherFX kind={fx} tint={tint} lat={CITIES[cityIdx].lat} lon={CITIES[cityIdx].lon} />
-      <header
-        className={'loc-header' + (scrolled ? ' scrolled' : '')}
-        onClick={scrolled ? () => window.scrollTo({ top: 0, behavior: 'smooth' }) : undefined}
-        aria-label={scrolled ? '回到顶部' : undefined}
-        role={scrolled ? 'button' : undefined}
-      >
-        <span className="loc-sticky-name">{city.name}</span>
-        {stats && (
-          <span ref={stickyTempRef} className="loc-sticky-temp">
-            {' · '}{Math.round(stats.avg)}°
-          </span>
-        )}
-      </header>
 
       {/* 左右滑动切城市：整块内容随手指平移，松手回弹 */}
       <main
