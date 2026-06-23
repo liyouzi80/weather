@@ -86,9 +86,6 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [updatedAgo, setUpdatedAgo] = useState('')
   const [initialLoad, setInitialLoad] = useState(true)
-  const [showPullHint, setShowPullHint] = useState(() => {
-    try { return !localStorage.getItem('pwr_hint_seen') } catch { return true }
-  })
   const [cardsOpen, setCardsOpen] = useState(false)
   const [aqiOpen, setAqiOpen] = useState(false)
   const [scores, setScores] = useState<Scores>(() => loadScores())
@@ -199,36 +196,17 @@ export default function App() {
     }
   }, [cityIdx])
 
-  // 首次加载完成后显示下拉提示 4 秒，之后自动隐藏
-  useEffect(() => {
-    if (initialLoad || !showPullHint) return
-    const t = setTimeout(() => {
-      setShowPullHint(false)
-      try { localStorage.setItem('pwr_hint_seen', '1') } catch {}
-    }, 4000)
-    return () => clearTimeout(t)
-  }, [initialLoad, showPullHint])
-
-  // 手势（移动端）：下拉刷新 + 左右滑动切城市。
-  // 用非被动原生监听，统一在一处判定主轴，避免纵向下拉与横向翻页冲突。
-  // pull/swipeX 用 DOM ref 直接操作，避免每帧 setState → React 重渲染导致卡顿。
-  const [pullReady, setPullReady] = useState(false)
+  // 手势（移动端）：左右滑动切城市。
   const [dragging, setDragging] = useState(false)
   const [scrolled, setScrolled] = useState(false)
-  const pullRef = useRef(0)
-  const pullReadyRef = useRef(false)
   const swipeXRef = useRef(0)
   const swipeRawRef = useRef(0)
   const startX = useRef<number | null>(null)
   const startY = useRef<number | null>(null)
-  const gesture = useRef<'pull' | 'swipe' | 'ignore' | null>(null)
-  const atTop = useRef(false)
+  const gesture = useRef<'swipe' | 'ignore' | null>(null)
   const appRef = useRef<HTMLDivElement>(null)
   const heroRef = useRef<HTMLDivElement>(null)
   const stickyTempRef = useRef<HTMLSpanElement>(null)
-  const pullIndicatorRef = useRef<HTMLDivElement>(null)
-  const pullSvgRef = useRef<SVGSVGElement>(null)
-  const pullCircleRef = useRef<SVGCircleElement>(null)
   const swipeWrapRef = useRef<HTMLElement>(null)
   const loadingRef = useRef(loading)
   const refreshRef = useRef(refresh)
@@ -236,8 +214,6 @@ export default function App() {
   const cityIdxRef = useRef(cityIdx)
   const resultsRef = useRef(results)
   const airRef = useRef(air)
-  const PULL_MAX = 64
-  const PULL_TRIGGER = 46
   const SWIPE_TRIGGER = 45
   useEffect(() => {
     loadingRef.current = loading
@@ -254,62 +230,31 @@ export default function App() {
       const t = e.touches[0]
       startX.current = t.clientX
       startY.current = t.clientY
-      // Touch started inside a provider card — let card handle it, never city-switch
       const insideCard = !!(e.target as Element | null)?.closest('.card')
       gesture.current = insideCard ? 'ignore' : null
-      atTop.current = window.scrollY <= 0 && !loadingRef.current
     }
     const onMove = (e: TouchEvent) => {
       if (startX.current == null || startY.current == null) return
       const t = e.touches[0]
       const dx = t.clientX - startX.current
       const dy = t.clientY - startY.current
-      // 首次超过阈值时判定主轴：横向→翻页，顶部下拉→刷新，其余→交给原生滚动
       if (gesture.current == null) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
-        if (Math.abs(dx) > Math.abs(dy)) gesture.current = 'swipe'
-        else if (dy > 0 && atTop.current) gesture.current = 'pull'
-        else gesture.current = 'ignore'
+        gesture.current = Math.abs(dx) > Math.abs(dy) ? 'swipe' : 'ignore'
       }
       if (gesture.current === 'swipe') {
         e.preventDefault()
         const clamped = Math.max(-70, Math.min(70, dx * 0.4))
         swipeXRef.current = clamped
-        swipeRawRef.current = dx   // 原始位移用于触发判断，不受阻尼影响
+        swipeRawRef.current = dx
         const wrap = swipeWrapRef.current
         if (wrap) wrap.style.transform = `translateX(${clamped}px)`
         setDragging(true)
-      } else if (gesture.current === 'pull') {
-        e.preventDefault()
-        const p = dy > 0 ? Math.min(dy * 0.62, PULL_MAX) : 0
-        pullRef.current = p
-        const ind = pullIndicatorRef.current
-        const circle = pullCircleRef.current
-        if (ind) {
-          if (ind.style.transition) ind.style.transition = ''
-          ind.style.height = `${p}px`
-          // Continuous opacity: 0 → full over the first 40% of pull distance
-          ind.style.opacity = `${Math.min(p / (PULL_TRIGGER * 0.4), 1) * 0.92}`
-          ind.classList.toggle('active', p > 8)
-        }
-        if (circle) {
-          if (circle.style.transition) circle.style.transition = ''
-          const CIRC = 62.83
-          circle.style.strokeDashoffset = `${CIRC * (1 - Math.min(p / PULL_TRIGGER, 1))}`
-        }
-        if (p >= PULL_TRIGGER && !pullReadyRef.current) {
-          pullReadyRef.current = true
-          setPullReady(true)
-          haptic(8)
-        } else if (p < PULL_TRIGGER && pullReadyRef.current) {
-          pullReadyRef.current = false
-          setPullReady(false)
-        }
       }
     }
     const onEnd = () => {
       if (gesture.current === 'swipe') {
-        const rawDx = swipeRawRef.current  // 原始位移判断触发（约 45px 真实手势距离）
+        const rawDx = swipeRawRef.current
         setDragging(false)
         if (Math.abs(rawDx) >= SWIPE_TRIGGER) {
           const len = CITIES.length
@@ -320,33 +265,6 @@ export default function App() {
         swipeRawRef.current = 0
         const wrap = swipeWrapRef.current
         if (wrap) wrap.style.transform = ''
-      } else if (gesture.current === 'pull') {
-        const triggered = pullRef.current >= PULL_TRIGGER
-        pullRef.current = 0
-        pullReadyRef.current = false
-        setPullReady(false)
-        if (triggered) {
-          // Leave height/opacity as-is; loading useEffect will spring it back
-          try { localStorage.setItem('pwr_hint_seen', '1') } catch {}
-          setShowPullHint(false)
-          refreshRef.current()
-        } else {
-          // Not triggered: spring-back the indicator
-          const ind = pullIndicatorRef.current
-          const circle = pullCircleRef.current
-          if (ind) {
-            ind.style.transition = 'height 0.38s var(--spring), opacity 0.26s ease'
-            ind.style.height = '0px'
-            ind.style.opacity = '0'
-            ind.classList.remove('active')
-            setTimeout(() => { if (pullIndicatorRef.current) pullIndicatorRef.current.style.transition = '' }, 400)
-          }
-          if (circle) {
-            circle.style.transition = 'stroke-dashoffset 0.26s ease'
-            circle.style.strokeDashoffset = '62.83'
-            setTimeout(() => { if (pullCircleRef.current) pullCircleRef.current.style.transition = '' }, 280)
-          }
-        }
       }
       startX.current = null
       startY.current = null
@@ -363,44 +281,6 @@ export default function App() {
       el.removeEventListener('touchcancel', onEnd)
     }
   }, [])
-
-  // 下拉刷新指示器与 loading 状态同步：
-  // loading=true 时过渡为旋转菊花，loading=false 时弹簧回收；
-  // 若 height=0 说明是自动刷新（非手势触发），直接跳过。
-  useEffect(() => {
-    const ind = pullIndicatorRef.current
-    const circle = pullCircleRef.current
-    const currentHeight = ind ? (parseFloat(ind.style.height) || 0) : 0
-    if (currentHeight <= 0) return
-    const CIRC = 62.83
-    if (loading) {
-      // 进入菊花模式：缩短 dashoffset 使圆弧约占 80%，配合 spin 形成加载环
-      if (circle) {
-        circle.style.transition = 'stroke-dashoffset 0.22s ease'
-        circle.style.strokeDashoffset = `${CIRC * 0.2}`
-        setTimeout(() => { if (pullCircleRef.current) pullCircleRef.current.style.transition = '' }, 240)
-      }
-      if (ind) ind.style.opacity = '1'
-    } else {
-      // 加载完成：清空圆弧，弹簧收起指示器，内容随之平滑上移
-      if (circle) {
-        circle.style.transition = 'stroke-dashoffset 0.2s ease'
-        circle.style.strokeDashoffset = `${CIRC}`
-        setTimeout(() => { if (pullCircleRef.current) pullCircleRef.current.style.transition = '' }, 220)
-      }
-      if (ind) {
-        ind.style.transition = 'height 0.42s var(--spring), opacity 0.3s ease'
-        ind.style.height = '0px'
-        ind.style.opacity = '0'
-        setTimeout(() => {
-          if (pullIndicatorRef.current) {
-            pullIndicatorRef.current.style.transition = ''
-            pullIndicatorRef.current.classList.remove('active')
-          }
-        }, 450)
-      }
-    }
-  }, [loading])
 
   // 自动刷新：切回前台且数据已超过 5 分钟时刷新；另每 10 分钟（仅前台）刷新一次
   const lastUpdateRef = useRef(0)
@@ -585,27 +465,6 @@ export default function App() {
   return (
     <div className="app" ref={appRef}>
       <WeatherFX kind={fx} tint={tint} lat={CITIES[cityIdx].lat} lon={CITIES[cityIdx].lon} />
-      <div ref={pullIndicatorRef} className={'pull-indicator' + (pullReady ? ' ready' : '')}>
-        <svg
-          ref={pullSvgRef}
-          width="26" height="26" viewBox="0 0 26 26" fill="none"
-          className={loading ? 'spin' : ''}
-        >
-          {/* Track ring */}
-          <circle cx="13" cy="13" r="10" stroke="rgba(255,255,255,0.18)" strokeWidth="2" />
-          {/* Progress arc: fills as you pull, transitions to spinner arc during loading */}
-          <circle
-            ref={pullCircleRef}
-            cx="13" cy="13" r="10"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeDasharray="62.83"
-            strokeDashoffset="62.83"
-            transform="rotate(-90 13 13)"
-          />
-        </svg>
-      </div>
       <header
         className={'loc-header' + (scrolled ? ' scrolled' : '')}
         onClick={scrolled ? () => window.scrollTo({ top: 0, behavior: 'smooth' }) : undefined}
@@ -639,8 +498,16 @@ export default function App() {
               </div>
               <div className="hero-cond" aria-hidden="true">{stats.text}</div>
               {loading && results.length > 0
-                ? <span className="hero-updated refreshing">数据更新中…</span>
-                : updatedAgo && <span className="hero-updated">{updatedAgo}</span>
+                ? <span className="hero-updated refreshing">
+                    <svg className="refresh-icon spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                    更新中…
+                  </span>
+                : updatedAgo && (
+                  <button className="hero-updated" onClick={refresh} aria-label="刷新天气数据">
+                    <svg className="refresh-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 2v6h-6" /><path d="M3 12a9 9 0 0 1 15-6.7L21 8" /><path d="M3 22v-6h6" /><path d="M21 12a9 9 0 0 1-15 6.7L3 16" /></svg>
+                    {updatedAgo}
+                  </button>
+                )
               }
             </>
           ) : (
@@ -659,9 +526,6 @@ export default function App() {
 
         {minutelyRain && <MinutelyRainCard data={minutelyRain} />}
 
-        {showPullHint && !initialLoad && (
-          <div className="pull-hint" aria-hidden="true">↓ 下拉更新</div>
-        )}
 
       </div>
 

@@ -292,26 +292,6 @@ html[data-sky='haze'] body::before {
   box-shadow: 0 0 8px rgba(255, 255, 255, 0.55);
 }
 
-/* 下拉刷新指示器：随下拉距离展开高度（height/opacity 完全由 JS 管理） */
-.pull-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  height: 0;
-  opacity: 0;
-  /* 圆弧用 currentColor，ready 状态时提亮（color transition 由 CSS 处理） */
-  color: rgba(255, 255, 255, 0.65);
-  transition: color 0.2s ease;
-}
-/* 下拉/刷新中让出顶部安全区，避免被灵动岛/刘海遮挡 */
-.pull-indicator.active {
-  box-sizing: content-box;
-  padding-top: env(safe-area-inset-top, 0px);
-}
-/* 超过触发阈值时提亮圆弧，提示"松手即刷新" */
-.pull-indicator.ready { color: rgba(255, 255, 255, 0.95); }
-
 /* 实时天气动效：全屏背景层，浮在天空渐变之上、内容之下 */
 .weather-fx {
   position: fixed;
@@ -336,17 +316,6 @@ html[data-sky='haze'] body::before {
   /* 负边距 + 等量内边距让吸顶层满铺到 .app 两侧边缘 */
   margin: 0 -20px;
   padding: calc(env(safe-area-inset-top) + 14px) 20px 10px;
-}
-/* 灵动岛/状态栏常驻深色渐变：降低天气内容与 iOS 系统毛玻璃的视觉对比，
-   使其自然融入而非突兀。height 覆盖安全区 + 少量溢出以平滑过渡。 */
-.loc-header::after {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  height: calc(env(safe-area-inset-top, 54px) + 28px);
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.28) 0%, rgba(0, 0, 0, 0) 100%);
-  z-index: -1;
-  pointer-events: none;
 }
 /* 吸顶遮罩：滚动后出现，覆盖其下方的内容（90% 实底 → 底边淡出）*/
 .loc-header::before {
@@ -522,19 +491,6 @@ html[data-sky='haze'] body::before {
   color: rgba(255, 175, 50, 0.95);
 }
 
-/* 下拉刷新引导提示 */
-.pull-hint {
-  text-align: center;
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.35);
-  letter-spacing: 0.03em;
-  padding: 6px 0 2px;
-  animation: fadeIn 0.6s ease both;
-  pointer-events: none;
-  user-select: none;
-}
-
 /* 概览次要指标小卡：等宽三列，列数由组件内联样式动态设置 */
 /* 关键指标条：hero 正下方一排，去卡片框，「图标 + 数值 + 标签」竖排，
    直接浮于天气动效之上（方案 B：通透融入，呼应苹果天气）。 */
@@ -626,15 +582,36 @@ html[data-sky='haze'] body::before {
   background-clip: text;
   margin: 0 0 1px;
 }
-/* 更新时间：弱色辅助文字；后台刷新中时轻微脉动 */
+/* 更新时间：可点击刷新按钮（替代下拉刷新） */
 .hero-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 12px;
   font-weight: 400;
   color: rgba(255, 255, 255, 0.45);
   margin-top: 12px;
+  background: none;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+button.hero-updated:active {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+}
+.refresh-icon {
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 .hero-updated.refreshing {
   animation: heroUpdPulse 1.1s ease-in-out infinite;
+}
+.hero-updated.refreshing .refresh-icon {
+  opacity: 1;
 }
 @keyframes heroUpdPulse {
   0%, 100% { opacity: 0.45; }
