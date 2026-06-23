@@ -60,6 +60,9 @@ html, body, #root { height: 100%; margin: 0; }
 /* 根节点铺满整个滚动画布（含 iOS 安全区/回弹区） */
 html {
   background-color: #0b1426;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 50% -10%, #1c2541 0%, transparent 55%),
+    linear-gradient(180deg, #0a0f1a 0%, #05080f 36%, #0b1426 100%);
   /* 隐藏滚动条（Chrome/Safari 的滚动条实际挂在 html 上） */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -87,59 +90,67 @@ body {
   -webkit-touch-callout: none;
 }
 
-/* Atmospheric background layers
-   每层 body::before 最顶部加一条「安全区遮罩」渐变：
-   从 html background-color 全不透明持续到 env(safe-area-inset-top)，
-   再用 60px 过渡到透明，保证 iOS 状态栏区域色调与主背景一致、无色差。 */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, #1c2541 0%, transparent 55%),
-    linear-gradient(180deg, #0a0f1a 0%, #05080f 36%, #0b1426 100%);
-  z-index: -1;
-}
-
-/* Subtle grain overlay */
-body::after {
-  content: '';
-  position: fixed;
-  inset: 0;
-  opacity: 0.025;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-repeat: repeat;
-  background-size: 200px 200px;
-  z-index: -1;
-  pointer-events: none;
-}
 
 /* 动态天气背景 + hero 温度渐变变量：每个主题定义独立色调，
    切换城市/天气时产生"换了个世界"的视觉差异 */
 
 html[data-sky='clear-day'] {
-  background-color: #0e1b38;  --hero-top: #ffffff; --hero-btm: #ffd6a0;
+  background-color: #0e1b38;
+  background-image:
+    radial-gradient(ellipse 55% 40% at 82% -4%, rgba(255, 175, 70, 0.44) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 50% -10%, #285098 0%, transparent 56%),
+    linear-gradient(180deg, #1a3c72 0%, #0c1a38 44%, #0e1b38 100%);
+  --hero-top: #ffffff; --hero-btm: #ffd6a0;
 }
 html[data-sky='clear-night'] {
-  background-color: #060e20;  --hero-top: #e0e8ff; --hero-btm: #8aa0e0;
+  background-color: #060e20;
+  background-image:
+    radial-gradient(ellipse 50% 36% at 80% 2%, rgba(130, 160, 255, 0.22) 0%, transparent 48%),
+    radial-gradient(ellipse 80% 50% at 50% -10%, #14204a 0%, transparent 56%),
+    linear-gradient(180deg, #08143a 0%, #060e22 46%, #060e20 100%);
+  --hero-top: #e0e8ff; --hero-btm: #8aa0e0;
 }
 html[data-sky='cloudy'] {
-  background-color: #131c30;  --hero-top: #f0f0f5; --hero-btm: #a0a4ba;
+  background-color: #131c30;
+  background-image:
+    radial-gradient(ellipse 90% 52% at 50% -10%, #2b3852 0%, transparent 60%),
+    linear-gradient(180deg, #1d2842 0%, #11192a 44%, #131c30 100%);
+  --hero-top: #f0f0f5; --hero-btm: #a0a4ba;
 }
 html[data-sky='overcast'] {
-  background-color: #171b26;  --hero-top: #e0e0e8; --hero-btm: #82828e;
+  background-color: #171b26;
+  background-image:
+    radial-gradient(ellipse 92% 55% at 50% -12%, #323847 0%, transparent 60%),
+    linear-gradient(180deg, #242b39 0%, #151a24 44%, #171b26 100%);
+  --hero-top: #e0e0e8; --hero-btm: #82828e;
 }
 html[data-sky='rain'] {
-  background-color: #0c1924;  --hero-top: #d8e4f0; --hero-btm: #7a98b8;
+  background-color: #0c1924;
+  background-image:
+    radial-gradient(ellipse 88% 48% at 50% -8%, #1c3a58 0%, transparent 58%),
+    linear-gradient(180deg, #142c44 0%, #0c1820 46%, #0c1924 100%);
+  --hero-top: #d8e4f0; --hero-btm: #7a98b8;
 }
 html[data-sky='snow'] {
-  background-color: #1a2038;  --hero-top: #f0eeff; --hero-btm: #b0a8d8;
+  background-color: #1a2038;
+  background-image:
+    radial-gradient(ellipse 90% 52% at 50% -10%, #404868 0%, transparent 58%),
+    linear-gradient(180deg, #2e3858 0%, #1a2038 46%, #1a2038 100%);
+  --hero-top: #f0eeff; --hero-btm: #b0a8d8;
 }
 html[data-sky='fog'] {
-  background-color: #1a1c22;  --hero-top: #e8e5e0; --hero-btm: #9a9890;
+  background-color: #1a1c22;
+  background-image:
+    radial-gradient(ellipse 92% 55% at 50% -10%, #363941 0%, transparent 60%),
+    linear-gradient(180deg, #2b2e36 0%, #1a1c20 44%, #1a1c22 100%);
+  --hero-top: #e8e5e0; --hero-btm: #9a9890;
 }
 html[data-sky='haze'] {
-  background-color: #221e16;  --hero-top: #f0e6d0; --hero-btm: #c0a060;
+  background-color: #221e16;
+  background-image:
+    radial-gradient(ellipse 90% 52% at 50% -6%, #4e4630 0%, transparent 56%),
+    linear-gradient(180deg, #38322a 0%, #28221a 46%, #221e16 100%);
+  --hero-top: #f0e6d0; --hero-btm: #c0a060;
 }
 
 /* 偏亮的天空主题：上调次要文字色，保证 ≥AA 对比度 */
@@ -148,53 +159,7 @@ html[data-sky='snow'], html[data-sky='overcast'] {
   --text-dim: #b0b0b6;
 }
 
-/* 晴天：右上角大面积暖金光晕，饱和度显著高于旧版 */
-html[data-sky='clear-day'] body::before {
-  background:
-    radial-gradient(ellipse 55% 40% at 82% -4%, rgba(255, 175, 70, 0.44) 0%, transparent 50%),
-    radial-gradient(ellipse 80% 50% at 50% -10%, #285098 0%, transparent 56%),
-    linear-gradient(180deg, #1a3c72 0%, #0c1a38 44%, #0e1b38 100%);
-}
-/* 晴夜：深靛蓝 + 右上角淡紫月光 */
-html[data-sky='clear-night'] body::before {
-  background:
-    radial-gradient(ellipse 50% 36% at 80% 2%, rgba(130, 160, 255, 0.22) 0%, transparent 48%),
-    radial-gradient(ellipse 80% 50% at 50% -10%, #14204a 0%, transparent 56%),
-    linear-gradient(180deg, #08143a 0%, #060e22 46%, #060e20 100%);
-}
-html[data-sky='cloudy'] body::before {
-  background:
-    radial-gradient(ellipse 90% 52% at 50% -10%, #2b3852 0%, transparent 60%),
-    linear-gradient(180deg, #1d2842 0%, #11192a 44%, #131c30 100%);
-}
-html[data-sky='overcast'] body::before {
-  background:
-    radial-gradient(ellipse 92% 55% at 50% -12%, #323847 0%, transparent 60%),
-    linear-gradient(180deg, #242b39 0%, #151a24 44%, #171b26 100%);
-}
-/* 雨：冷钢蓝调，更深沉 */
-html[data-sky='rain'] body::before {
-  background:
-    radial-gradient(ellipse 88% 48% at 50% -8%, #1c3a58 0%, transparent 58%),
-    linear-gradient(180deg, #142c44 0%, #0c1820 46%, #0c1924 100%);
-}
-/* 雪：偏亮薰衣紫银调 */
-html[data-sky='snow'] body::before {
-  background:
-    radial-gradient(ellipse 90% 52% at 50% -10%, #404868 0%, transparent 58%),
-    linear-gradient(180deg, #2e3858 0%, #1a2038 46%, #1a2038 100%);
-}
-html[data-sky='fog'] body::before {
-  background:
-    radial-gradient(ellipse 92% 55% at 50% -10%, #363941 0%, transparent 60%),
-    linear-gradient(180deg, #2b2e36 0%, #1a1c20 44%, #1a1c22 100%);
-}
-/* 霾：灰黄脏空气，更明显的暖棕 */
-html[data-sky='haze'] body::before {
-  background:
-    radial-gradient(ellipse 90% 52% at 50% -6%, #4e4630 0%, transparent 56%),
-    linear-gradient(180deg, #38322a 0%, #28221a 46%, #221e16 100%);
-}
+
 
 .app {
   max-width: 560px;
