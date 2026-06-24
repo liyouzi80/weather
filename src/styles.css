@@ -74,7 +74,7 @@ html {
 html::-webkit-scrollbar { display: none; }
 
 body {
-  background-color: inherit;
+  background: transparent;
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
     'Helvetica Neue', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
@@ -447,7 +447,7 @@ html[data-sky='snow'], html[data-sky='overcast'] {
   align-items: center;
   justify-content: center;
   flex: 1 0 auto;
-  padding: 24px 0;
+  padding: calc(env(safe-area-inset-top, 0px) + 24px) 0 24px;
   animation: riseIn 0.55s var(--spring) both;
 }
 /* 城市名：hero 顶部居中；轻字重让大温度数字成为视觉主角 */
