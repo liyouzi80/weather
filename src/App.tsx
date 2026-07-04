@@ -47,6 +47,7 @@ function readCache(idx: number): { results: ProviderResult[]; air: AqiResult[]; 
 }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+const isWideLayout = () => typeof matchMedia !== 'undefined' && matchMedia('(min-width: 900px)').matches
 
 // 按 providerId 合并 AQI：保留原顺序，每个源优先取「有数据」的版本（新>旧），用于后台补齐。
 function mergeAqi(prev: AqiResult[], next: AqiResult[]): AqiResult[] {
@@ -80,8 +81,9 @@ export default function App() {
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null)
   const [updatedAgo, setUpdatedAgo] = useState('')
   const [initialLoad, setInitialLoad] = useState(true)
-  const [cardsOpen, setCardsOpen] = useState(false)
-  const [aqiOpen, setAqiOpen] = useState(false)
+  const [cardsOpen, setCardsOpen] = useState(isWideLayout)
+  const [aqiOpen, setAqiOpen] = useState(isWideLayout)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
   const [scores, setScores] = useState<Scores>(() => loadScores())
   // Tracks the latest refresh call; stale responses (from city switches or rapid re-taps) are discarded
   const refreshIdRef = useRef(0)
@@ -123,6 +125,12 @@ export default function App() {
       if (weatherHealthy(merged) > weatherHealthy(cur)) {
         cur = merged
         setResults(merged)
+        setUpdatedAt(new Date())
+        setRefreshError(
+          weatherHealthy(merged) < expected
+            ? `${expected - weatherHealthy(merged)} 个天气信源暂时不可用`
+            : null,
+        )
         writeCache(idx, merged, airRef.current)
       }
     }
@@ -135,10 +143,20 @@ export default function App() {
     try {
       const [weather, aqi] = await Promise.all([fetchAll(loc), fetchAllAqi(loc)])
       if (id !== refreshIdRef.current) return
-      setResults(weather)
+      const healthy = weatherHealthy(weather)
+      setResults((previous) => healthy > 0 || weatherHealthy(previous) === 0 ? weather : previous)
       setAir(aqi.sources)
-      setUpdatedAt(new Date())
-      writeCache(cityIdx, weather, aqi.sources)
+      setRefreshError(
+        healthy === 0
+          ? '天气信源暂时不可用，当前显示最近一次数据'
+          : healthy < weather.length
+            ? `${weather.length - healthy} 个天气信源暂时不可用`
+            : null,
+      )
+      if (healthy > 0) {
+        setUpdatedAt(new Date())
+        writeCache(cityIdx, weather, aqi.sources)
+      }
       if (aqiHealthy(aqi.sources) < 2) void backfill(id, cityIdx, loc, aqi.sources)
       if (weatherHealthy(weather) < weather.length) void backfillWeather(id, cityIdx, loc, weather)
     } finally {
@@ -160,6 +178,18 @@ export default function App() {
     refresh()
   }, [refresh])
 
+  useEffect(() => {
+    const media = matchMedia('(min-width: 900px)')
+    const handleChange = () => {
+      if (media.matches) {
+        setCardsOpen(true)
+        setAqiOpen(true)
+      }
+    }
+    media.addEventListener('change', handleChange)
+    return () => media.removeEventListener('change', handleChange)
+  }, [])
+
   const selectCity = useCallback((i: number) => {
     if (i === cityIdx) return
     haptic(8)
@@ -171,9 +201,10 @@ export default function App() {
         setAir([])
         setUpdatedAt(null)
         setInitialLoad(true)
+        setRefreshError(null)
         setCityIdx(i)
-        setCardsOpen(false)
-        setAqiOpen(false)
+        setCardsOpen(isWideLayout())
+        setAqiOpen(isWideLayout())
       })
       window.scrollTo(0, 0)
     }
@@ -323,9 +354,9 @@ export default function App() {
     ),
   [annotated, scores, cityKey])
 
-  const updateScore = useCallback((providerId: string, delta: number) => {
+  const setProviderScore = useCallback((providerId: string, value: number) => {
     const current = getScore(scores, cityKey, providerId)
-    const next = Math.max(0, Math.min(5, current + delta))
+    const next = Math.max(0, Math.min(5, value))
     if (next === current) return
     haptic([8, 30, 8])
     const doUpdate = () => {
@@ -337,6 +368,9 @@ export default function App() {
       doUpdate()
     }
   }, [scores, cityKey])
+  const updateScore = useCallback((providerId: string, delta: number) => {
+    setProviderScore(providerId, getScore(scores, cityKey, providerId) + delta)
+  }, [scores, cityKey, setProviderScore])
   const avgAqi = useMemo(() => {
     const vals = air.filter((a) => a.air).map((a) => a.air!.aqi)
     return vals.length ? Math.round(vals.reduce((x, y) => x + y, 0) / vals.length) : null
@@ -357,7 +391,7 @@ export default function App() {
     () => results.find((r) => r.current?.minutelyRain)?.current?.minutelyRain ?? null,
     [results],
   )
-  const isEmpty = !loading && results.length === 0 && !initialLoad
+  const isEmpty = !loading && !initialLoad && stats == null
   const activeCount = useMemo(
     () => PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(city) ?? true)).length,
     [city],
@@ -384,7 +418,7 @@ export default function App() {
       >
       {/* 城市切换时 key 变化，触发 pageIn 淡入动画 */}
       <div className="app-content" key={cityIdx}>
-        <div className={'hero' + (!stats ? ' hero-skeleton' : '')}>
+        <div className={'hero' + (!stats && (loading || initialLoad) ? ' hero-skeleton' : '')}>
           <h1 className="hero-city">{city.name}</h1>
           {stats ? (
             <>
@@ -408,11 +442,13 @@ export default function App() {
                 )
               }
             </>
-          ) : (
+          ) : loading || initialLoad ? (
             <>
               <div className="hskel hskel-temp" />
               <div className="hskel hskel-cond" />
             </>
+          ) : (
+            <div className="hero-unavailable" role="status">暂无天气数据</div>
           )}
         </div>
 
@@ -428,7 +464,11 @@ export default function App() {
       </div>
 
       <div className="app-content" key={`cards-${cityIdx}`}>
-        {loading && results.length === 0 ? (
+        {refreshError && !isEmpty && (
+          <div className="data-status" role="status" aria-live="polite">{refreshError}</div>
+        )}
+
+        {loading && stats == null ? (
           <div className="cards">
             {Array.from({ length: activeCount }, (_, i) => (
               <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 0.08}s` }} />
@@ -446,8 +486,12 @@ export default function App() {
               />
             )}
             {/* 展开区域：grid-template-rows 0fr→1fr 平滑撑开 */}
-            <div className={'cards-expand' + (cardsOpen ? ' open' : '')}>
-              <div className="cards-expand-inner">
+            <div id="weather-sources" className={'cards-expand' + (cardsOpen ? ' open' : '')}>
+              <div
+                className="cards-expand-inner"
+                aria-hidden={!cardsOpen}
+                {...(!cardsOpen ? { inert: '' } : {})}
+              >
                 <div className="cards">
                   {sortedAnnotated.map((r) => (
                     <ProviderCard
@@ -455,6 +499,7 @@ export default function App() {
                       r={r}
                       score={getScore(scores, cityKey, r.providerId)}
                       onScoreChange={(delta) => updateScore(r.providerId, delta)}
+                      onScoreSelect={(value) => setProviderScore(r.providerId, value)}
                     />
                   ))}
                 </div>
@@ -471,8 +516,12 @@ export default function App() {
               open={aqiOpen}
               onClick={() => setAqiOpen(o => !o)}
             />
-            <div className={'cards-expand' + (aqiOpen ? ' open' : '')}>
-              <div className="cards-expand-inner">
+            <div id="air-quality-sources" className={'cards-expand' + (aqiOpen ? ' open' : '')}>
+              <div
+                className="cards-expand-inner"
+                aria-hidden={!aqiOpen}
+                {...(!aqiOpen ? { inert: '' } : {})}
+              >
                 <AqiSection air={air} />
               </div>
             </div>
@@ -480,8 +529,9 @@ export default function App() {
         )}
 
         {isEmpty && (
-          <div className="hint">
-            <p>所有信源获取失败</p>
+          <div className="hint" role="alert">
+            <p>天气数据暂时不可用</p>
+            <span>请检查网络连接，稍后再试。</span>
             <button type="button" className="retry-btn" onClick={refresh}>重新加载</button>
           </div>
         )}
@@ -625,6 +675,8 @@ function SourceBar({
       className={'cards-summary' + (open ? ' open' : '')}
       onClick={onClick}
       aria-expanded={open}
+      aria-controls="weather-sources"
+      aria-label={`${open ? '收起' : '展开'}天气信源，温度范围 ${Math.round(min)} 至 ${Math.round(max)} 度`}
     >
       <div className="bar-track-wrap" aria-hidden="true">
         <div className="bar-track" />
@@ -658,6 +710,8 @@ function AqiBar({
       className={'cards-summary' + (open ? ' open' : '')}
       onClick={onClick}
       aria-expanded={open}
+      aria-controls="air-quality-sources"
+      aria-label={`${open ? '收起' : '展开'}空气质量信源，当前 ${avgAqi} AQI，${aqiCategory(avgAqi)}`}
     >
       <div className="bar-track-wrap" aria-hidden="true">
         <div className="aqi-track" />
@@ -742,37 +796,65 @@ const AqiSection = memo(function AqiSection({ air }: { air: AqiResult[] }) {
   )
 })
 
-function ScoreDots({ score }: { score: number }) {
+function ScoreDots({
+  providerName, score, onSelect,
+}: {
+  providerName: string
+  score: number
+  onSelect: (value: number) => void
+}) {
   return (
-    <span className="score-dots" aria-label={`可信度 ${score}/5`}>
+    <span className="score-dots" role="group" aria-label={`${providerName}可信度评分，当前 ${score} 分`}>
       {Array.from({ length: 5 }, (_, i) => (
-        <span key={i} className={'score-dot' + (i < score ? ' on' : '')} />
+        <button
+          key={i}
+          type="button"
+          className="score-dot-button"
+          aria-label={score === i + 1 ? `${i + 1} 分，点击清除` : `${i + 1} 分`}
+          aria-pressed={score === i + 1}
+          title={`${i + 1} 分`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onSelect(score === i + 1 ? 0 : i + 1)
+          }}
+        >
+          <span className={'score-dot' + (i < score ? ' on' : '')} aria-hidden="true" />
+        </button>
       ))}
     </span>
   )
 }
 
 const ProviderCard = memo(function ProviderCard({
-  r, score, onScoreChange,
+  r, score, onScoreChange, onScoreSelect,
 }: {
   r: Annotated
   score: number
   onScoreChange: (delta: number) => void
+  onScoreSelect: (value: number) => void
 }) {
   // Early-return must live here (outer) so the inner component only mounts when there IS data.
   // If the check were inside ProviderCardBody, useEffect([], []) would run on first mount with
   // cardRef=null (no DOM yet), then skip re-running when backfill later provides data — leaving
   // the card with no touch listeners.
   if (r.error || !r.current) return null
-  return <ProviderCardBody r={r} score={score} onScoreChange={onScoreChange} />
+  return (
+    <ProviderCardBody
+      r={r}
+      score={score}
+      onScoreChange={onScoreChange}
+      onScoreSelect={onScoreSelect}
+    />
+  )
 })
 
 const ProviderCardBody = memo(function ProviderCardBody({
-  r, score, onScoreChange,
+  r, score, onScoreChange, onScoreSelect,
 }: {
   r: Annotated
   score: number
   onScoreChange: (delta: number) => void
+  onScoreSelect: (value: number) => void
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const swipeStartX = useRef<number | null>(null)
@@ -791,7 +873,7 @@ const ProviderCardBody = memo(function ProviderCardBody({
       const t = e.touches[0]
       swipeStartX.current = t.clientX
       swipeStartY.current = t.clientY
-      swipeGesture.current = null
+      swipeGesture.current = (e.target as Element | null)?.closest('.score-dot-button') ? 'scroll' : null
       swipeRaw.current = 0
     }
     const onMove = (e: TouchEvent) => {
@@ -861,7 +943,7 @@ const ProviderCardBody = memo(function ProviderCardBody({
         <span className="name">{r.providerName}</span>
         {r.isMax && <span className="tag tag-hot">最高</span>}
         {r.isMin && <span className="tag tag-cold">最低</span>}
-        <ScoreDots score={score} />
+        <ScoreDots providerName={r.providerName} score={score} onSelect={onScoreSelect} />
         <span className="temp">{Math.round(c.temp)}°</span>
       </div>
       <div className="row">

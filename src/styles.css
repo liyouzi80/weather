@@ -82,13 +82,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
   letter-spacing: -0.01em;
   overflow-x: hidden;
-  /* 禁止文字选中（app 行为，防止拖动文字） */
-  user-select: none;
-  -webkit-user-select: none;
-  /* 禁止长按弹出系统菜单（图片另存为、复制链接等） */
-  -webkit-touch-callout: none;
 }
 
+button,
+.page-dots,
+.score-dots {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+:where(button, a):focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.95);
+  outline-offset: 3px;
+}
 
 /* 动态天气背景：每个主题一个「统一纯色」底色，无渐变、无光晕。
    全屏从状态栏到底部同一个颜色，配合 .weather-fx 的云/雨/雾形成氛围。 */
@@ -571,6 +577,12 @@ button.hero-updated:active {
 .hskel-temp  { width: clamp(160px, 46vw, 220px); height: clamp(76px, 23vw, 108px); border-radius: var(--radius); }
 .hskel-cond  { width: 80px;  height: 18px; margin-top: 14px; }
 .hskel-hilo  { width: 148px; height: 17px; margin-top: 7px; }
+.hero-unavailable {
+  margin-top: 22px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 17px;
+  font-weight: 500;
+}
 
 /* ── Provider Cards ── */
 .cards {
@@ -684,27 +696,52 @@ a.card { text-decoration: none; color: inherit; display: block; }
 /* 可信度评分：5 个小圆点 */
 .score-dots {
   display: flex;
-  gap: 3px;
+  gap: 1px;
   align-items: center;
   margin-left: auto;
-  margin-right: 2px;
+  margin-right: 1px;
   flex: none;
 }
+.score-dot-button {
+  display: grid;
+  place-items: center;
+  width: 13px;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  cursor: pointer;
+}
 .score-dot {
-  width: 5px;
-  height: 5px;
+  display: block;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: rgba(255, 255, 255, 0.18);
-  transition: background 0.25s ease;
+  transition: background 0.25s ease, transform 0.2s var(--spring);
 }
 .score-dot.on {
   background: rgba(255, 255, 255, 0.72);
+}
+.score-dot-button:hover .score-dot,
+.score-dot-button:focus-visible .score-dot {
+  background: rgba(255, 255, 255, 0.95);
+  transform: scale(1.35);
+}
+.score-dot-button:focus-visible {
+  outline-width: 1.5px;
+  outline-offset: 0;
 }
 
 /* 评分为 0 的信源：降低透明度 + 饱和度，明确表示已排除 */
 .card.score-muted {
   opacity: 0.38;
   filter: saturate(0.4);
+}
+.card.score-muted:focus-within {
+  opacity: 0.72;
 }
 
 /* 滑动打分视觉反馈：右滑→绿边，左滑→红边（强度跟随滑动进度） */
@@ -763,6 +800,19 @@ a.card { text-decoration: none; color: inherit; display: block; }
   align-items: center;
   gap: 16px;
 }
+.hint p { margin: 0; color: var(--text); }
+.hint span { margin-top: -8px; font-size: 13px; font-weight: 400; }
+.data-status {
+  margin-top: 12px;
+  padding: 10px 14px;
+  border: 0.5px solid rgba(255, 214, 10, 0.24);
+  border-radius: var(--radius-sm);
+  background: rgba(44, 36, 12, 0.34);
+  color: rgba(255, 226, 128, 0.9);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
 .retry-btn {
   padding: 9px 24px;
   border-radius: 999px;
@@ -810,6 +860,35 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .hero-hilo { font-size: 16px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }
+  .score-dot-button { width: 12px; }
+}
+
+/* 宽屏将概览与数据拆成双栏；移动端继续保持单列与完整天气动效。 */
+@media (min-width: 900px) {
+  .app {
+    max-width: 1180px;
+    padding: 0 clamp(28px, 4vw, 56px) 64px;
+  }
+  .swipe-wrap {
+    display: grid;
+    grid-template-columns: minmax(360px, 0.88fr) minmax(480px, 1.12fr);
+    gap: clamp(44px, 7vw, 96px);
+    align-items: start;
+  }
+  .swipe-wrap > .app-content:first-child {
+    position: sticky;
+    top: 0;
+    min-height: 100dvh;
+  }
+  .swipe-wrap > .app-content:last-child {
+    min-width: 0;
+    padding-top: clamp(48px, 8vh, 88px);
+    padding-bottom: 48px;
+  }
+  .weather-fx { opacity: 0.72; }
+  .hero { padding-top: 56px; }
+  .hero-temp { font-size: clamp(112px, 11vw, 156px); }
+  .page-dots { bottom: 18px; }
 }
 
 /* ── Motion / 动效 ── */
