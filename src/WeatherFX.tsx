@@ -271,6 +271,9 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
     // Cloud scene: each cluster is a baked sprite + world position / drift.
     const clouds: Cloud[] = []
     let fogStripe: HTMLCanvasElement | null = null  // 雾/霾条纹预烘焙，fog/haze init 时填充
+    // High cirrus veil (clear-day enhancement): one wide baked sprite that drifts.
+    let cirrus: HTMLImageElement | null = null
+    let cirrusW = 0, cirrusH = 0, cirrusX = 0
     let cancelled = false   // guards async SVG image loads against unmount
 
     const rnd = (a: number, b: number) => a + Math.random() * (b - a)
@@ -480,6 +483,51 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       }
     }
 
+    // Bake a wide high-cirrus veil: horizontally-stretched fractal noise turned
+    // into white wisps (R channel → alpha), faded toward the horizon so the
+    // lower content area stays clean. Warm-tinted at sunrise/sunset.
+    const buildCirrus = () => {
+      const sw = Math.ceil(W * 1.8), sh = Math.ceil(H)
+      cirrusW = sw; cirrusH = sh
+      // Wisp color: white by day, mixed toward the twilight tint at golden hour.
+      const wa = tint ? tint.warmth : 0
+      const wr = wa > 0 ? Math.round(255 + (tint!.r - 255) * 0.45 * wa) : 255
+      const wg = wa > 0 ? Math.round(255 + (tint!.g - 255) * 0.45 * wa) : 255
+      const wb = wa > 0 ? Math.round(255 + (tint!.b - 255) * 0.45 * wa) : 255
+      const seedA = Math.floor(Math.random() * 900)
+      const seedB = Math.floor(Math.random() * 900)
+      const svg =
+        `<svg xmlns="http://www.w3.org/2000/svg" width="${(sw * dpr).toFixed(0)}" height="${(sh * dpr).toFixed(0)}" viewBox="0 0 ${sw} ${sh}">` +
+        `<defs>` +
+          `<filter id="c" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">` +
+            // main streaky cirrus band
+            `<feTurbulence type="fractalNoise" baseFrequency="0.004 0.023" numOctaves="7" seed="${seedA}" result="n"/>` +
+            `<feColorMatrix in="n" type="matrix" values="0 0 0 0 ${(wr/255).toFixed(3)} 0 0 0 0 ${(wg/255).toFixed(3)} 0 0 0 0 ${(wb/255).toFixed(3)} 1.05 0 0 0 -0.2" result="w"/>` +
+            `<feComponentTransfer in="w" result="wc"><feFuncA type="gamma" amplitude="1.7" exponent="2.2" offset="0"/></feComponentTransfer>` +
+            `<feGaussianBlur in="wc" stdDeviation="0.5"/>` +
+          `</filter>` +
+          `<filter id="c2" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">` +
+            // finer, fainter second layer for depth
+            `<feTurbulence type="fractalNoise" baseFrequency="0.007 0.034" numOctaves="6" seed="${seedB}" result="n"/>` +
+            `<feColorMatrix in="n" type="matrix" values="0 0 0 0 ${(wr/255).toFixed(3)} 0 0 0 0 ${(wg/255).toFixed(3)} 0 0 0 0 ${(wb/255).toFixed(3)} 0.8 0 0 0 -0.34"/>` +
+          `</filter>` +
+          `<linearGradient id="fade" x1="0" y1="0" x2="0" y2="1">` +
+            `<stop offset="0" stop-color="#fff" stop-opacity="0.82"/>` +
+            `<stop offset="0.5" stop-color="#fff" stop-opacity="0.5"/>` +
+            `<stop offset="0.84" stop-color="#fff" stop-opacity="0"/>` +
+          `</linearGradient>` +
+          `<mask id="m"><rect width="${sw}" height="${sh}" fill="url(#fade)"/></mask>` +
+        `</defs>` +
+        `<g mask="url(#m)">` +
+          `<rect width="${sw}" height="${sh}" filter="url(#c)" opacity="0.78"/>` +
+          `<rect width="${sw}" height="${sh}" filter="url(#c2)" opacity="0.5"/>` +
+        `</g>` +
+      `</svg>`
+      const img = new Image()
+      img.onload = () => { if (cancelled) return; cirrus = img; if (reduced) requestAnimationFrame(frame) }
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+    }
+
     const resize = () => {
       const Wn = window.innerWidth, Hn = window.innerHeight
       const widthChanged = Wn !== W_prev
@@ -615,10 +663,11 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       sc.fillStyle = sg; sc.fillRect(0, 0, 4, 256)
 
     } else {
-      // clear-day: sun motes
+      // clear-day: sun motes + high cirrus veil
       const n = Math.round(Math.min(80, area / 14000))
       for (let i = 0; i < n; i++)
         motes.push({ x: rnd(0, W), y: rnd(0, H), r: rnd(0.8, 2.8), vx: rnd(-5, 5), vy: rnd(-18, -5), o: rnd(0.12, 0.35) })
+      buildCirrus()
     }
 
     let flash = 0, nextBolt = rnd(1.2, 3.5), bolt: Bolt | null = null
@@ -890,6 +939,16 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
 
         // ── Clear Day ─────────────────────────────────────────────────────────
         default: {
+          // High cirrus veil, drawn over the blue sky but under sun glow/rays.
+          if (cirrus) {
+            ctx.globalAlpha = 0.55
+            const sw = cirrusW
+            let x0 = -(cirrusX % sw)
+            if (x0 > 0) x0 -= sw
+            for (let x = x0; x < W; x += sw) ctx.drawImage(cirrus, x, 0, cirrusW, cirrusH)
+            ctx.globalAlpha = 1
+            if (!reduced) { cirrusX += 4 * dt; if (cirrusX >= sw) cirrusX -= sw }
+          }
           if (sunGrad) { ctx.fillStyle = sunGrad; ctx.fillRect(0, 0, W, H) }
           if (!reduced) {
             dayT += dt * 0.4
