@@ -80,8 +80,8 @@ const CLOUD_PAL: Record<CloudPalette, {
     fb: '92,112,148', fbAlpha: [0.44, 0.58, 0.72], fbTop: 'rgba(178,200,238,0.34)', fbBot: 'rgba(18,26,42,0.52)',
   },
   'overcast': {
-    top: '#9aa4b6', mid: '#707a8e', bot: '#484f60', op: 0.88,
-    fb: '114,124,140', fbAlpha: [0.68, 0.80, 0.92], fbTop: 'rgba(160,172,192,0.26)', fbBot: 'rgba(52,60,78,0.44)',
+    top: '#c2cad6', mid: '#6c7688', bot: '#333a48', op: 0.9,
+    fb: '114,124,140', fbAlpha: [0.68, 0.80, 0.92], fbTop: 'rgba(196,206,224,0.32)', fbBot: 'rgba(30,36,50,0.56)',
   },
   'overcast-night': {
     top: '#5c6678', mid: '#3e4658', bot: '#1c2230', op: 0.90,
@@ -360,9 +360,9 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       // overcast = more clusters, wider spans, lower & overlapping → fills the sky.
       const layerCfg = overcast
         ? [
-            { count: 6, yLo: 0.00, yHi: 0.38, sLo: 0.80, sHi: 1.25, vLo: 2, vHi:  6 },
-            { count: 6, yLo: 0.04, yHi: 0.46, sLo: 1.10, sHi: 1.70, vLo: 4, vHi: 10 },
-            { count: 5, yLo: 0.08, yHi: 0.48, sLo: 1.45, sHi: 2.15, vLo: 8, vHi: 16 },
+            { count: 11, yLo: 0.00, yHi: 0.52, sLo: 0.80, sHi: 1.25, vLo: 2, vHi:  6 },
+            { count: 11, yLo: 0.05, yHi: 0.60, sLo: 1.10, sHi: 1.70, vLo: 4, vHi: 10 },
+            { count: 10, yLo: 0.10, yHi: 0.66, sLo: 1.45, sHi: 2.15, vLo: 8, vHi: 16 },
           ]
         : [
             { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
