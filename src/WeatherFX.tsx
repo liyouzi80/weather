@@ -316,7 +316,7 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
     const buildCloudSVG = (
       blobs: CloudBlob[], layer: number, palette: CloudPalette,
       minX: number, minY: number, pad: number, w: number, h: number,
-      scale: number, seed: number,
+      scale: number, seed: number, stormy: boolean,
     ): string => {
       const P = CLOUD_PAL[palette]
       const blur = [3, 2, 1.4][Math.min(layer, 2)]
@@ -333,18 +333,58 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
         const rx = (b.r * 1.18).toFixed(1), ry = b.r.toFixed(1)
         shapes += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>`
       }
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="${(w * dpr).toFixed(0)}" height="${(h * dpr).toFixed(0)}" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}">` +
+      const svgOpen = `<svg xmlns="http://www.w3.org/2000/svg" width="${(w * dpr).toFixed(0)}" height="${(h * dpr).toFixed(0)}" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}">`
+      const grad =
+        `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
+          `<stop offset="0" stop-color="${top}"/>` +
+          `<stop offset="0.5" stop-color="${mid}"/>` +
+          `<stop offset="1" stop-color="${bot}"/>` +
+        `</linearGradient>`
+
+      if (!stormy) {
+        // Clean cumulus filter: displaced ellipses + feather.
+        return svgOpen +
+          `<defs>` +
+            `<filter id="f" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">` +
+              `<feTurbulence type="fractalNoise" baseFrequency="${baseFreq}" numOctaves="4" seed="${seed}" result="n"/>` +
+              `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale.toFixed(0)}" xChannelSelector="R" yChannelSelector="G"/>` +
+              `<feGaussianBlur stdDeviation="${blur}"/>` +
+            `</filter>` + grad +
+          `</defs>` +
+          `<g filter="url(#f)" fill="url(#g)" fill-opacity="${P.op}">${shapes}</g>` +
+        `</svg>`
+      }
+
+      // Stormy overcast filter: torn wispy silhouette + internal turbulent
+      // self-shadow texture (feDiffuseLighting on a fractal-noise field) so the
+      // body reads as churning volume with lit crowns and dark crevices — like
+      // real storm clouds, not smooth cotton. Light comes from upper-left.
+      const shapeFreq = (0.011 + Math.random() * 0.006).toFixed(4)
+      const texFreq = (0.010 + Math.random() * 0.005).toFixed(4)
+      const dispScale = Math.min(96, scale * 1.5).toFixed(0)
+      const surf = (9 + layer * 3).toFixed(0)
+      return svgOpen +
         `<defs>` +
-          `<filter id="f" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">` +
-            `<feTurbulence type="fractalNoise" baseFrequency="${baseFreq}" numOctaves="4" seed="${seed}" result="n"/>` +
-            `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale.toFixed(0)}" xChannelSelector="R" yChannelSelector="G"/>` +
-            `<feGaussianBlur stdDeviation="${blur}"/>` +
-          `</filter>` +
-          `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
-            `<stop offset="0" stop-color="${top}"/>` +
-            `<stop offset="0.5" stop-color="${mid}"/>` +
-            `<stop offset="1" stop-color="${bot}"/>` +
-          `</linearGradient>` +
+          `<filter id="f" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">` +
+            // 1. tear the ellipse silhouette into wispy lobes
+            `<feTurbulence type="fractalNoise" baseFrequency="${shapeFreq}" numOctaves="5" seed="${seed}" result="warp"/>` +
+            `<feDisplacementMap in="SourceGraphic" in2="warp" scale="${dispScale}" xChannelSelector="R" yChannelSelector="G" result="shape"/>` +
+            `<feGaussianBlur in="shape" stdDeviation="${blur}" result="silh"/>` +
+            // 2. light a noise field → soft cloud self-shadow texture
+            `<feTurbulence type="fractalNoise" baseFrequency="${texFreq}" numOctaves="5" seed="${(seed * 3) % 900}" result="noise"/>` +
+            `<feDiffuseLighting in="noise" surfaceScale="${surf}" diffuseConstant="1.1" lighting-color="#ffffff" result="lit">` +
+              `<feDistantLight azimuth="235" elevation="58"/>` +
+            `</feDiffuseLighting>` +
+            // 3. compress texture range so crevices darken but body keeps color
+            `<feComponentTransfer in="lit" result="litSoft">` +
+              `<feFuncR type="linear" slope="0.5" intercept="0.5"/>` +
+              `<feFuncG type="linear" slope="0.5" intercept="0.5"/>` +
+              `<feFuncB type="linear" slope="0.5" intercept="0.5"/>` +
+            `</feComponentTransfer>` +
+            // 4. multiply texture into the colored silhouette, clip to its alpha
+            `<feBlend mode="multiply" in="silh" in2="litSoft" result="tex"/>` +
+            `<feComposite in="tex" in2="silh" operator="in"/>` +
+          `</filter>` + grad +
         `</defs>` +
         `<g filter="url(#f)" fill="url(#g)" fill-opacity="${P.op}">${shapes}</g>` +
       `</svg>`
@@ -426,7 +466,7 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
           clouds.push(cloud)
 
           // Async-load the higher-quality SVG sprite; swaps in over the fallback.
-          const svg = buildCloudSVG(blobs, li, palette, minX, minY, pad, w, h, scale, Math.floor(Math.random() * 1000))
+          const svg = buildCloudSVG(blobs, li, palette, minX, minY, pad, w, h, scale, Math.floor(Math.random() * 1000), overcast)
           const img = new Image()
           img.onload = () => {
             if (cancelled) return
