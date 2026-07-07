@@ -391,6 +391,17 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
             // flat-ish bottom: each blob's bottom sits near baseY
             const by = baseY - br * rnd(0, 0.30)
             blobs.push({ x: bx, y: by, r: br })
+            // Cumulus billowing crown: pile a smaller rounded puff atop the
+            // taller central blobs so the top reads as stacked cauliflower
+            // lobes (like real 多云 cumulus), not a single smooth arc.
+            if (!overcast && env > 0.66 && Math.random() < 0.78) {
+              const cr = br * rnd(0.44, 0.66)
+              blobs.push({
+                x: bx + rnd(-0.32, 0.32) * br,
+                y: by - br * rnd(0.5, 0.85),
+                r: cr,
+              })
+            }
           }
 
           let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxR = 0
@@ -401,7 +412,7 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
             if (b.y + b.r > maxY) maxY = b.y + b.r
             if (b.r > maxR) maxR = b.r
           }
-          const scale = Math.min(72, maxR * 1.35)   // displacement amplitude (fluffiness)
+          const scale = Math.min(60, maxR * 1.12)   // displacement amplitude (fluffiness)
           const pad = Math.ceil(scale + 22)
           const w = (maxX - minX) + pad * 2
           const h = (maxY - minY) + pad * 2
