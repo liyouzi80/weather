@@ -319,7 +319,7 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       scale: number, seed: number,
     ): string => {
       const P = CLOUD_PAL[palette]
-      const blur = [6, 4, 3][Math.min(layer, 2)]
+      const blur = [3, 2, 1.4][Math.min(layer, 2)]
       const baseFreq = (0.009 + Math.random() * 0.006).toFixed(4)
       // Twilight: blend the warm sun color into the lit faces (top strongest,
       // bottom barely) so clouds glow with sunrise/sunset like Apple Weather.
