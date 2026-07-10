@@ -357,13 +357,16 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
       const texes = [0, 1, 2].map(k => buildNoiseCloudTex(palette, (kind.charCodeAt(0) * 7 + k * 101 + 1) | 0))
       const sc = W / 393   // scale iOS point sizes/speeds to the actual width
 
-      // [count, wLo, wHi, alphaLo, alphaHi, yLo, yHi, vLo, vHi] — iOS values.
+      // [count, wLo, wHi, alphaLo, alphaHi, yLo, yHi, vLo, vHi].
       // y is a fraction measured from the BOTTOM (SpriteKit y-up); converted below.
+      // cloudy（多云）= iOS 原值：稀疏、靠上、点缀式。
+      // overcast（阴天）= 加密加满：云更多、更大、更实、覆盖下探至 ~6 成屏高，
+      //   连成一片压顶的阴云层，和多云明显区分。
       const layers = overcast
         ? [
-            [3, 280, 380, 0.72, 0.90, 0.74, 0.99, 10, 18],
-            [3, 340, 460, 0.80, 0.95, 0.64, 0.96, 16, 26],
-            [2, 400, 540, 0.74, 0.92, 0.54, 0.88, 24, 38],
+            [6, 300, 400, 0.82, 0.95, 0.66, 0.99,  8, 15],
+            [6, 360, 480, 0.86, 0.97, 0.52, 0.92, 13, 22],
+            [5, 420, 580, 0.82, 0.95, 0.38, 0.80, 20, 32],
           ]
         : [
             [2, 240, 340, 0.60, 0.78, 0.78, 0.99,  9, 16],
@@ -373,16 +376,27 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
 
       for (let li = 0; li < 3; li++) {
         const [count, wLo, wHi, aLo, aHi, yLo, yHi, vLo, vHi] = layers[li]
+        // 阴天：整层同向飘移（像一整片阴云缓移），多云：各自随机方向。
+        const layerDir = Math.random() < 0.5 ? 1 : -1
         for (let i = 0; i < count; i++) {
           const w = rnd(wLo, wHi) * sc
           const h = w * 0.52
           const yFrac = rnd(yLo, yHi)              // fraction from bottom
           const cy = (1 - yFrac) * H               // → top-anchored canvas y (center)
-          const vx = (Math.random() < 0.5 ? 1 : -1) * rnd(vLo, vHi) * sc
+          let x: number, vx: number
+          if (overcast) {
+            // 沿宽度均匀铺开（带抖动），消除大块空洞 → 连成压顶阴云层
+            const span = W + w * 0.6
+            x = -w * 0.3 + ((i + 0.5 + rnd(-0.38, 0.38)) / count) * span
+            vx = layerDir * rnd(vLo, vHi) * sc
+          } else {
+            x = rnd(-w * 0.3, W + w * 0.3)
+            vx = (Math.random() < 0.5 ? 1 : -1) * rnd(vLo, vHi) * sc
+          }
           clouds.push({
             tex: texes[Math.floor(Math.random() * texes.length)],
             w, h,
-            x: rnd(-w * 0.3, W + w * 0.3),
+            x,
             y: cy - h / 2,
             vx, layer: li, ph: rnd(0, TAU),
             alpha: rnd(aLo, aHi),
