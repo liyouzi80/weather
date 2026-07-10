@@ -36,18 +36,15 @@ interface Drop  { x: number; y: number; len: number; vy: number; vx: number }
 interface Flake { x: number; y: number; r: number; vy: number; vx: number; sway: number; ph: number; layer: number }
 interface Star  { x: number; y: number; r: number; ph: number; sp: number; bright: boolean }
 interface Shoot { x: number; y: number; vx: number; vy: number; life: number }
-interface CloudBlob { x: number; y: number; r: number }
 interface FogBand   { y: number; ph: number; spd: number; o: number; h: number }
 interface Mote      { x: number; y: number; r: number; vx: number; vy: number; o: number }
 interface Bolt      { pts: [number, number][]; branches: { pts: [number, number][] }[] }
-// A cloud cluster: a baked sprite (SVG turbulence preferred, canvas-blur fallback)
-// plus its world position / drift. `img` swaps in once the SVG decodes.
+// A drifting cloud sprite: a baked Perlin-noise texture + world position/drift.
 interface Cloud {
-  fallback: HTMLCanvasElement
-  img: HTMLImageElement | null
+  tex: HTMLCanvasElement
   w: number; h: number
   x: number; y: number          // world top-left
-  vx: number; layer: number; ph: number
+  vx: number; layer: number; ph: number; alpha: number
 }
 
 type CloudPalette = 'cloudy' | 'cloudy-night' | 'overcast' | 'overcast-night'
@@ -55,38 +52,52 @@ type CloudPalette = 'cloudy' | 'cloudy-night' | 'overcast' | 'overcast-night'
 // Sunrise/sunset warm tint. warmth 0 = no tint (day/night), 1 = peak twilight.
 export interface CloudTint { r: number; g: number; b: number; warmth: number }
 
-// Blend a #rrggbb hex toward an rgb triplet by amount (0..1) → #rrggbb.
-function mixHex(hex: string, r: number, g: number, b: number, amt: number): string {
-  const hr = parseInt(hex.slice(1, 3), 16)
-  const hg = parseInt(hex.slice(3, 5), 16)
-  const hb = parseInt(hex.slice(5, 7), 16)
-  const to = (a: number, c: number) => Math.round(a + (c - a) * amt)
-  const hx = (n: number) => n.toString(16).padStart(2, '0')
-  return `#${hx(to(hr, r))}${hx(to(hg, g))}${hx(to(hb, b))}`
+type RGB = [number, number, number]
+
+// Per-palette cloud volume colors: lit top → mid → shadowed bottom.
+// Ported 1:1 from the native iOS scene (WeatherScene.swift CloudPalette) so the
+// PWA clouds match the iOS look the user prefers.
+const CLOUD_PAL: Record<CloudPalette, { top: RGB; mid: RGB; bot: RGB }> = {
+  'cloudy':         { top: [180, 194, 212], mid: [128, 148, 176], bot: [78, 94, 122] },
+  'cloudy-night':   { top: [129, 150, 186], mid: [84, 104, 140],  bot: [38, 52, 78] },
+  'overcast':       { top: [154, 164, 182], mid: [112, 122, 142], bot: [72, 79, 96] },
+  'overcast-night': { top: [92, 102, 120],  mid: [62, 70, 88],    bot: [28, 34, 48] },
 }
 
-// Per-palette volume colors: lit top → mid → shadowed bottom, plus overall opacity.
-// `fb` is the flat fill used by the canvas fallback (per depth layer).
-const CLOUD_PAL: Record<CloudPalette, {
-  top: string; mid: string; bot: string; op: number
-  fb: string; fbAlpha: [number, number, number]; fbTop: string; fbBot: string
-}> = {
-  'cloudy': {
-    top: '#b4c2d4', mid: '#8094b0', bot: '#4e5e7a', op: 0.78,
-    fb: '152,170,194', fbAlpha: [0.40, 0.56, 0.72], fbTop: 'rgba(190,210,235,0.28)', fbBot: 'rgba(45,58,82,0.42)',
-  },
-  'cloudy-night': {
-    top: '#8196ba', mid: '#54688c', bot: '#26344e', op: 0.88,
-    fb: '92,112,148', fbAlpha: [0.44, 0.58, 0.72], fbTop: 'rgba(178,200,238,0.34)', fbBot: 'rgba(18,26,42,0.52)',
-  },
-  'overcast': {
-    top: '#c2cad6', mid: '#6c7688', bot: '#333a48', op: 0.9,
-    fb: '114,124,140', fbAlpha: [0.68, 0.80, 0.92], fbTop: 'rgba(196,206,224,0.32)', fbBot: 'rgba(30,36,50,0.56)',
-  },
-  'overcast-night': {
-    top: '#5c6678', mid: '#3e4658', bot: '#1c2230', op: 0.90,
-    fb: '64,72,88', fbAlpha: [0.58, 0.70, 0.82], fbTop: 'rgba(108,120,142,0.30)', fbBot: 'rgba(10,14,24,0.56)',
-  },
+// ── Seeded 2D Perlin noise + fBm ──────────────────────────────────────────────
+// Stand-in for iOS GKPerlinNoiseSource: a seeded gradient-noise field summed over
+// octaves, used to bake fluffy volumetric cloud textures matching the native app.
+function makePerlin(seed: number): (x: number, y: number) => number {
+  const perm = new Uint8Array(256)
+  for (let i = 0; i < 256; i++) perm[i] = i
+  let s = (seed | 0) || 1
+  const rand = () => { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return ((s >>> 0) % 100000) / 100000 }
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1))
+    const t = perm[i]; perm[i] = perm[j]; perm[j] = t
+  }
+  const p = new Uint8Array(512)
+  for (let i = 0; i < 512; i++) p[i] = perm[i & 255]
+  const fade = (t: number) => t * t * t * (t * (t * 6 - 15) + 10)
+  const lerp = (a: number, b: number, t: number) => a + t * (b - a)
+  const grad = (h: number, x: number, y: number) => {
+    switch (h & 3) {
+      case 0:  return  x + y
+      case 1:  return -x + y
+      case 2:  return  x - y
+      default: return -x - y
+    }
+  }
+  return (x, y) => {
+    const X = Math.floor(x) & 255, Y = Math.floor(y) & 255
+    const xf = x - Math.floor(x), yf = y - Math.floor(y)
+    const u = fade(xf), v = fade(yf)
+    const aa = p[p[X] + Y], ab = p[p[X] + Y + 1]
+    const ba = p[p[X + 1] + Y], bb = p[p[X + 1] + Y + 1]
+    const x1 = lerp(grad(aa, xf, yf), grad(ba, xf - 1, yf), u)
+    const x2 = lerp(grad(ab, xf, yf - 1), grad(bb, xf - 1, yf - 1), u)
+    return lerp(x1, x2, v)   // roughly [-1, 1]
+  }
 }
 
 // ── Astronomical helpers ──────────────────────────────────────────────────────
@@ -278,207 +289,104 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
 
     const rnd = (a: number, b: number) => a + Math.random() * (b - a)
 
-    // Canvas fallback sprite: blurred merged-arc silhouette + clipped vertical
-    // volume gradient. Shown instantly while the SVG decodes (and if SVG fails).
-    const makeFallbackCanvas = (
-      blobs: CloudBlob[], layer: number, palette: CloudPalette,
-      minX: number, minY: number, pad: number, w: number, h: number,
-    ): HTMLCanvasElement => {
-      const off = document.createElement('canvas')
-      off.width = Math.max(1, Math.ceil(w * dpr)); off.height = Math.max(1, Math.ceil(h * dpr))
-      const o = off.getContext('2d')!
-      o.setTransform(dpr, 0, 0, dpr, 0, 0)
-      o.translate(pad - minX, pad - minY)
+    // Bake a fluffy volumetric cloud sprite from a seeded Perlin noise field,
+    // ported from the native iOS scene (WeatherScene.buildNoiseCloudTex):
+    //  · multi-octave noise → wispy density
+    //  · elliptical envelope (wide, short) carves the cloud shape + feathers edges
+    //  · vertical lit-top→shadowed-bottom volume color + noise brightness lift
+    // `tint` (sunrise/sunset warmth) is blended into the volume colors so the
+    // clouds glow warm at golden hour; the effect re-bakes when the tint changes.
+    const buildNoiseCloudTex = (palette: CloudPalette, seed: number): HTMLCanvasElement => {
+      const W0 = 256, H0 = 140
       const P = CLOUD_PAL[palette]
-      const a = P.fbAlpha[Math.min(layer, 2)]
-      const blur = [12, 9, 6][Math.min(layer, 2)]
-      o.filter = `blur(${blur}px)`
-      o.beginPath()
-      for (const b of blobs) { o.moveTo(b.x + b.r, b.y); o.arc(b.x, b.y, b.r, 0, TAU) }
-      o.fillStyle = `rgba(${P.fb},${a})`
-      o.fill()
-      o.filter = 'none'
-      o.globalCompositeOperation = 'source-atop'
-      const g = o.createLinearGradient(0, minY, 0, maxYOf(blobs))
-      g.addColorStop(0, P.fbTop); g.addColorStop(0.55, 'rgba(0,0,0,0)'); g.addColorStop(1, P.fbBot)
-      o.fillStyle = g
-      o.fillRect(minX - pad, minY - pad, w, h)
-      o.globalCompositeOperation = 'source-over'
+      const wa = tint ? tint.warmth : 0
+      const warm = (c: RGB, amt: number): RGB => wa > 0
+        ? [c[0] + (tint!.r - c[0]) * amt * wa, c[1] + (tint!.g - c[1]) * amt * wa, c[2] + (tint!.b - c[2]) * amt * wa]
+        : c
+      const top = warm(P.top, 0.55), mid = warm(P.mid, 0.34), bot = warm(P.bot, 0.12)
+
+      const noise = makePerlin(seed)
+      const fbm = (x: number, y: number): number => {
+        let amp = 1, freq = 2.2, sum = 0, norm = 0
+        for (let o = 0; o < 6; o++) { sum += amp * noise(x * freq, y * freq); norm += amp; amp *= 0.58; freq *= 2.2 }
+        return sum / norm
+      }
+      const clamp01 = (v: number) => v < 0 ? 0 : v > 1 ? 1 : v
+      const smooth = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t) }
+      const vol = (t: number): RGB => {
+        if (t < 0.5) { const k = t * 2; return [top[0] + (mid[0] - top[0]) * k, top[1] + (mid[1] - top[1]) * k, top[2] + (mid[2] - top[2]) * k] }
+        const k = (t - 0.5) * 2; return [mid[0] + (bot[0] - mid[0]) * k, mid[1] + (bot[1] - mid[1]) * k, mid[2] + (bot[2] - mid[2]) * k]
+      }
+
+      const off = document.createElement('canvas')
+      off.width = W0; off.height = H0
+      const o = off.getContext('2d')!
+      const img = o.createImageData(W0, H0)
+      const d = img.data
+      for (let y = 0; y < H0; y++) {
+        const ny = y / (H0 - 1)
+        const ey = (ny - 0.42) * 2.3               // cloud body centered slightly high, vertically tight
+        const [cr, cg, cb] = vol(clamp01(ny))
+        for (let x = 0; x < W0; x++) {
+          const nx = x / (W0 - 1)
+          const ex = (nx - 0.5) * 2.0
+          const env = Math.max(0, 1 - (ex * ex + ey * ey))          // elliptical envelope 0..1
+          const n = clamp01(0.5 + 0.75 * fbm(nx * 2.4, ny * 1.3))   // noise → 0..1 (widened)
+          const nnC = smooth(0.34, 0.80, n)                          // boost contrast: clumps sharpen, thin haze drops
+          const density = env * (0.34 + 0.66 * nnC)
+          const a = smooth(0.36, 0.66, density)                      // alpha: solid core, no hazy rim
+          const lift = (nnC - 0.5) * 0.18 * 255                      // lit clumps brighter → depth, less grey
+          const i = (y * W0 + x) * 4
+          d[i]     = clamp01((cr + lift) / 255) * 255
+          d[i + 1] = clamp01((cg + lift) / 255) * 255
+          d[i + 2] = clamp01((cb + lift) / 255) * 255
+          d[i + 3] = a * 255
+        }
+      }
+      o.putImageData(img, 0, 0)
       return off
     }
 
-    const maxYOf = (blobs: CloudBlob[]) => {
-      let m = -Infinity
-      for (const b of blobs) if (b.y + b.r > m) m = b.y + b.r
-      return m
-    }
-
-    // SVG sprite: fractal-noise displacement warps the merged ellipses into wispy,
-    // irregular cloud lobes (feTurbulence + feDisplacementMap), a vertical gradient
-    // gives volume (lit top → shadowed bottom), feGaussianBlur feathers the edges.
-    const buildCloudSVG = (
-      blobs: CloudBlob[], layer: number, palette: CloudPalette,
-      minX: number, minY: number, pad: number, w: number, h: number,
-      scale: number, seed: number, stormy: boolean,
-    ): string => {
-      const P = CLOUD_PAL[palette]
-      const blur = [3, 2, 1.4][Math.min(layer, 2)]
-      const baseFreq = (0.009 + Math.random() * 0.006).toFixed(4)
-      // Twilight: blend the warm sun color into the lit faces (top strongest,
-      // bottom barely) so clouds glow with sunrise/sunset like Apple Weather.
-      const wa = tint ? tint.warmth : 0
-      const top = wa > 0 ? mixHex(P.top, tint!.r, tint!.g, tint!.b, 0.60 * wa) : P.top
-      const mid = wa > 0 ? mixHex(P.mid, tint!.r, tint!.g, tint!.b, 0.34 * wa) : P.mid
-      const bot = wa > 0 ? mixHex(P.bot, tint!.r, tint!.g, tint!.b, 0.12 * wa) : P.bot
-      let shapes = ''
-      for (const b of blobs) {
-        const cx = (b.x - minX + pad).toFixed(1), cy = (b.y - minY + pad).toFixed(1)
-        const rx = (b.r * 1.18).toFixed(1), ry = b.r.toFixed(1)
-        shapes += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}"/>`
-      }
-      const svgOpen = `<svg xmlns="http://www.w3.org/2000/svg" width="${(w * dpr).toFixed(0)}" height="${(h * dpr).toFixed(0)}" viewBox="0 0 ${w.toFixed(0)} ${h.toFixed(0)}">`
-      const grad =
-        `<linearGradient id="g" x1="0" y1="0" x2="0" y2="1">` +
-          `<stop offset="0" stop-color="${top}"/>` +
-          `<stop offset="0.5" stop-color="${mid}"/>` +
-          `<stop offset="1" stop-color="${bot}"/>` +
-        `</linearGradient>`
-
-      if (!stormy) {
-        // Clean cumulus filter: displaced ellipses + feather.
-        return svgOpen +
-          `<defs>` +
-            `<filter id="f" x="-40%" y="-40%" width="180%" height="180%" color-interpolation-filters="sRGB">` +
-              `<feTurbulence type="fractalNoise" baseFrequency="${baseFreq}" numOctaves="4" seed="${seed}" result="n"/>` +
-              `<feDisplacementMap in="SourceGraphic" in2="n" scale="${scale.toFixed(0)}" xChannelSelector="R" yChannelSelector="G"/>` +
-              `<feGaussianBlur stdDeviation="${blur}"/>` +
-            `</filter>` + grad +
-          `</defs>` +
-          `<g filter="url(#f)" fill="url(#g)" fill-opacity="${P.op}">${shapes}</g>` +
-        `</svg>`
-      }
-
-      // Stormy overcast filter: torn wispy silhouette + internal turbulent
-      // self-shadow texture (feDiffuseLighting on a fractal-noise field) so the
-      // body reads as churning volume with lit crowns and dark crevices — like
-      // real storm clouds, not smooth cotton. Light comes from upper-left.
-      const shapeFreq = (0.011 + Math.random() * 0.006).toFixed(4)
-      const texFreq = (0.010 + Math.random() * 0.005).toFixed(4)
-      const dispScale = Math.min(96, scale * 1.5).toFixed(0)
-      const surf = (9 + layer * 3).toFixed(0)
-      return svgOpen +
-        `<defs>` +
-          `<filter id="f" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB">` +
-            // 1. tear the ellipse silhouette into wispy lobes
-            `<feTurbulence type="fractalNoise" baseFrequency="${shapeFreq}" numOctaves="5" seed="${seed}" result="warp"/>` +
-            `<feDisplacementMap in="SourceGraphic" in2="warp" scale="${dispScale}" xChannelSelector="R" yChannelSelector="G" result="shape"/>` +
-            `<feGaussianBlur in="shape" stdDeviation="${blur}" result="silh"/>` +
-            // 2. light a noise field → soft cloud self-shadow texture
-            `<feTurbulence type="fractalNoise" baseFrequency="${texFreq}" numOctaves="5" seed="${(seed * 3) % 900}" result="noise"/>` +
-            `<feDiffuseLighting in="noise" surfaceScale="${surf}" diffuseConstant="1.1" lighting-color="#ffffff" result="lit">` +
-              `<feDistantLight azimuth="235" elevation="58"/>` +
-            `</feDiffuseLighting>` +
-            // 3. compress texture range so crevices darken but body keeps color
-            `<feComponentTransfer in="lit" result="litSoft">` +
-              `<feFuncR type="linear" slope="0.5" intercept="0.5"/>` +
-              `<feFuncG type="linear" slope="0.5" intercept="0.5"/>` +
-              `<feFuncB type="linear" slope="0.5" intercept="0.5"/>` +
-            `</feComponentTransfer>` +
-            // 4. multiply texture into the colored silhouette, clip to its alpha
-            `<feBlend mode="multiply" in="silh" in2="litSoft" result="tex"/>` +
-            `<feComposite in="tex" in2="silh" operator="in"/>` +
-          `</filter>` + grad +
-        `</defs>` +
-        `<g filter="url(#f)" fill="url(#g)" fill-opacity="${P.op}">${shapes}</g>` +
-      `</svg>`
-    }
-
-    // (Re)build the whole cloud scene for current W/H/dpr.
+    // Build the drifting cloud scene from baked noise textures — layout ported
+    // from the iOS setupClouds (3 depth layers, sprite h = w*0.52, ± drift).
     const buildCloudScene = () => {
       clouds.length = 0
       const overcast = kind === 'overcast' || kind === 'overcast-night'
       const palette = kind as CloudPalette
+      // 3 seeds per weather so drifting sprites don't visibly repeat.
+      const texes = [0, 1, 2].map(k => buildNoiseCloudTex(palette, (kind.charCodeAt(0) * 7 + k * 101 + 1) | 0))
+      const sc = W / 393   // scale iOS point sizes/speeds to the actual width
 
-      // layer 0 = far (high, slow, smaller), 1 = mid, 2 = near (lower, fast, larger).
-      // overcast = more clusters, wider spans, lower & overlapping → fills the sky.
-      const layerCfg = overcast
+      // [count, wLo, wHi, alphaLo, alphaHi, yLo, yHi, vLo, vHi] — iOS values.
+      // y is a fraction measured from the BOTTOM (SpriteKit y-up); converted below.
+      const layers = overcast
         ? [
-            { count: 11, yLo: 0.00, yHi: 0.52, sLo: 0.80, sHi: 1.25, vLo: 2, vHi:  6 },
-            { count: 11, yLo: 0.05, yHi: 0.60, sLo: 1.10, sHi: 1.70, vLo: 4, vHi: 10 },
-            { count: 10, yLo: 0.10, yHi: 0.66, sLo: 1.45, sHi: 2.15, vLo: 8, vHi: 16 },
+            [3, 280, 380, 0.72, 0.90, 0.74, 0.99, 10, 18],
+            [3, 340, 460, 0.80, 0.95, 0.64, 0.96, 16, 26],
+            [2, 400, 540, 0.74, 0.92, 0.54, 0.88, 24, 38],
           ]
         : [
-            { count: 4, yLo: 0.02, yHi: 0.32, sLo: 0.55, sHi: 0.95, vLo:  3, vHi:  8 },
-            { count: 4, yLo: 0.06, yHi: 0.40, sLo: 0.80, sHi: 1.30, vLo:  7, vHi: 14 },
-            { count: 3, yLo: 0.08, yHi: 0.38, sLo: 1.10, sHi: 1.85, vLo: 13, vHi: 24 },
+            [2, 240, 340, 0.60, 0.78, 0.78, 0.99,  9, 16],
+            [2, 300, 420, 0.66, 0.84, 0.70, 0.96, 14, 24],
+            [2, 360, 500, 0.60, 0.80, 0.60, 0.90, 22, 36],
           ]
-      const spanLo = overcast ? 180 : 130, spanHi = overcast ? 320 : 250
 
       for (let li = 0; li < 3; li++) {
-        const cfg = layerCfg[li]
-        for (let i = 0; i < cfg.count; i++) {
-          const s  = rnd(cfg.sLo, cfg.sHi)
-          const cx = rnd(-0.15, 1.20) * W
-          const cy = rnd(cfg.yLo, cfg.yHi) * H
-          const cw = rnd(spanLo, spanHi) * s
-          const ch = rnd(42, 80) * s
-          const nb = 5 + Math.floor(Math.random() * 4)   // 5–8 blobs
-          const baseY = cy
-          const blobs: CloudBlob[] = []
-          for (let b = 0; b < nb; b++) {
-            const t = b / Math.max(nb - 1, 1)
-            // cumulus dome: bigger blobs in the middle, smaller at the edges
-            const env = 0.42 + 0.58 * Math.sin(t * Math.PI)
-            const br = Math.max(16, 0.58 * ch * env * rnd(0.85, 1.15))
-            const bx = cx - cw / 2 + t * cw + rnd(-12, 12) * s
-            // flat-ish bottom: each blob's bottom sits near baseY
-            const by = baseY - br * rnd(0, 0.30)
-            blobs.push({ x: bx, y: by, r: br })
-            // Cumulus billowing crown: pile a smaller rounded puff atop the
-            // taller central blobs so the top reads as stacked cauliflower
-            // lobes (like real 多云 cumulus), not a single smooth arc.
-            if (!overcast && env > 0.66 && Math.random() < 0.78) {
-              const cr = br * rnd(0.44, 0.66)
-              blobs.push({
-                x: bx + rnd(-0.32, 0.32) * br,
-                y: by - br * rnd(0.5, 0.85),
-                r: cr,
-              })
-            }
-          }
-
-          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, maxR = 0
-          for (const b of blobs) {
-            if (b.x - b.r < minX) minX = b.x - b.r
-            if (b.y - b.r < minY) minY = b.y - b.r
-            if (b.x + b.r > maxX) maxX = b.x + b.r
-            if (b.y + b.r > maxY) maxY = b.y + b.r
-            if (b.r > maxR) maxR = b.r
-          }
-          const scale = Math.min(60, maxR * 1.12)   // displacement amplitude (fluffiness)
-          const pad = Math.ceil(scale + 22)
-          const w = (maxX - minX) + pad * 2
-          const h = (maxY - minY) + pad * 2
-
-          const fallback = makeFallbackCanvas(blobs, li, palette, minX, minY, pad, w, h)
-          const cloud: Cloud = {
-            fallback, img: null, w, h,
-            x: minX - pad, y: minY - pad,
-            vx: rnd(cfg.vLo, cfg.vHi), layer: li, ph: rnd(0, TAU),
-          }
-          clouds.push(cloud)
-
-          // Async-load the higher-quality SVG sprite; swaps in over the fallback.
-          const svg = buildCloudSVG(blobs, li, palette, minX, minY, pad, w, h, scale, Math.floor(Math.random() * 1000), overcast)
-          const img = new Image()
-          img.onload = () => {
-            if (cancelled) return
-            cloud.img = img
-            // 减弱动效时整段动画只画一帧；SVG 异步载入后需补画一次，
-            // 否则云会永远停在模糊的回退贴图上。
-            if (reduced) requestAnimationFrame(frame)
-          }
-          img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg)
+        const [count, wLo, wHi, aLo, aHi, yLo, yHi, vLo, vHi] = layers[li]
+        for (let i = 0; i < count; i++) {
+          const w = rnd(wLo, wHi) * sc
+          const h = w * 0.52
+          const yFrac = rnd(yLo, yHi)              // fraction from bottom
+          const cy = (1 - yFrac) * H               // → top-anchored canvas y (center)
+          const vx = (Math.random() < 0.5 ? 1 : -1) * rnd(vLo, vHi) * sc
+          clouds.push({
+            tex: texes[Math.floor(Math.random() * texes.length)],
+            w, h,
+            x: rnd(-w * 0.3, W + w * 0.3),
+            y: cy - h / 2,
+            vx, layer: li, ph: rnd(0, TAU),
+            alpha: rnd(aLo, aHi),
+          })
         }
       }
     }
@@ -903,7 +811,9 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
         case 'overcast-night': {
           const drawCloud = (c: Cloud) => {
             const yo = Math.sin(c.ph) * (c.layer === 2 ? 5 : 3)
-            ctx.drawImage(c.img ?? c.fallback, c.x, c.y + yo, c.w, c.h)
+            ctx.globalAlpha = c.alpha
+            ctx.drawImage(c.tex, c.x, c.y + yo, c.w, c.h)
+            ctx.globalAlpha = 1
           }
 
           // 1. Stars (dim, behind all clouds — cloudy night only)
@@ -926,12 +836,13 @@ export function WeatherFX({ kind, tint, lat, lon }: { kind: FxKind; tint?: Cloud
           // 4. Mid + near clouds (in front of moon)
           for (const c of clouds) if (c.layer !== 0) drawCloud(c)
 
-          // Drift
+          // Drift (wraps both directions since vx may be negative)
           if (!reduced) {
             for (const c of clouds) {
               c.x += c.vx * dt
               c.ph += dt * 0.12
-              if (c.x > W) c.x = -c.w
+              if (c.x > W + c.w * 0.3) c.x = -c.w
+              else if (c.x < -c.w) c.x = W + c.w * 0.3
             }
           }
           break
