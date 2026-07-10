@@ -166,9 +166,26 @@ function mapAreaData(d: any): GzRealtime {
 
   const temp = mean('t')
   if (temp == null) throw new Error(`未解析到温度 GDPY.t`)
+  // 合理性护栏：番禺（亚热带）实况温度超出 [-10, 45]℃ 视为上游异常
+  // ——区域均值由 925 站累加求平均，单个自动站传感器故障（卡在极高/极低值）
+  // 即可把均值拉偏。此时宁可让本信源显示「暂无数据」，也不展示错得离谱的温度，
+  // 同时避免污染温度排行榜。
+  if (temp < -10 || temp > 45)
+    throw new Error(`温度超出合理范围（${temp}℃），疑似上游站点异常`)
 
   const speedMs = mean('wdidf') // m/s
   const deg = mean('wdidd')    // 度
+
+  // 二级字段各自做范围校验：越界则丢弃（设为 undefined），不影响主信源可用性。
+  const rhRaw = mean('rh')
+  const humidity = rhRaw != null && rhRaw >= 0 && rhRaw <= 100 ? rhRaw : undefined
+  const pRaw = mean('p')
+  const pressure = pRaw != null && pRaw >= 900 && pRaw <= 1080 ? pRaw : undefined
+  const rainRaw = mean('hourrf')
+  const rain1h = rainRaw != null && rainRaw >= 0 && rainRaw <= 500 ? rainRaw : undefined
+  const windSpeed = speedMs != null && speedMs >= 0 && speedMs <= 100
+    ? Math.round(speedMs * 3.6) // m/s -> km/h
+    : undefined
 
   // ddatetime 为北京时间字符串（如「2026-06-05 15:00」）；
   // 按惯例存为"北京时写入 UTC 字段"，前端按 UTC 渲染即显示正确的北京时间。
@@ -182,11 +199,11 @@ function mapAreaData(d: any): GzRealtime {
 
   return {
     temp,
-    humidity: mean('rh'),
-    windSpeed: speedMs != null ? Math.round(speedMs * 3.6) : undefined, // m/s -> km/h
+    humidity,
+    windSpeed,
     windDir: deg != null ? degToDir(deg) : undefined,
-    pressure: mean('p'),
-    rain1h: mean('hourrf'),
+    pressure,
+    rain1h,
     text: undefined, // 区均值实况无天气现象描述
     observedAt,
   }
