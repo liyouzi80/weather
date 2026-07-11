@@ -45,9 +45,14 @@ export const caiyunProvider: WeatherProvider = {
       fetch(`${base}/realtime`),
       fetch(`${base}/daily?dailysteps=1`).catch(() => null),
     ])
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const data = await res.json()
-    if (data.status !== 'ok') throw new Error(`接口返回 status=${data.status}`)
+    // 彩云在令牌无效/超配额时返回 HTTP 4xx，且 body 里带真实原因
+    // （如 {"status":"failed","error":"token is invalid"}）。先解析 body，
+    // 优先把彩云的 error 文案透出来，避免只看到笼统的「HTTP 400」。
+    const data = await res.json().catch(() => null)
+    if (!res.ok || !data || data.status !== 'ok') {
+      const reason = data?.error || data?.status || `HTTP ${res.status}`
+      throw new Error(`彩云接口错误：${reason}`)
+    }
     const r = data.result.realtime
 
     // 今日降水概率：daily.precipitation[0].probability 文档为 0–1，但实测有时返回 0–100
