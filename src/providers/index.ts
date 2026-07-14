@@ -33,21 +33,36 @@ function localizeError(msg: string): string {
   return msg
 }
 
-/** 并发拉取所有「已配置」信源，逐个返回结果（失败也返回，便于 UI 展示错误） */
-export async function fetchAll(loc: GeoLocation): Promise<ProviderResult[]> {
-  const active = PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(loc) ?? true))
+/** 给定地点当前生效的信源（已配置 + 适用于该地点） */
+export function activeProviders(loc: GeoLocation): WeatherProvider[] {
+  return PROVIDERS.filter((p) => p.isConfigured() && (p.appliesTo?.(loc) ?? true))
+}
+
+/**
+ * 并发拉取所有「已配置」信源。
+ * `onResult` 在**每个**信源各自结束（成功或失败）时立即回调，便于 UI 流式渲染——
+ * 快源先出，不必等最慢的那个（如番禺气象台抓取 tqyb 常拖到 8s 超时）拖住整批。
+ * 返回值仍是全部结果的数组（供缓存/补齐使用）。
+ */
+export async function fetchAll(
+  loc: GeoLocation,
+  onResult?: (r: ProviderResult) => void,
+): Promise<ProviderResult[]> {
   return Promise.all(
-    active.map(async (p): Promise<ProviderResult> => {
+    activeProviders(loc).map(async (p): Promise<ProviderResult> => {
+      let result: ProviderResult
       try {
         const current = await Promise.race([p.fetchCurrent(loc), timeout(FETCH_TIMEOUT)])
-        return { providerId: p.id, providerName: p.name, current }
+        result = { providerId: p.id, providerName: p.name, current }
       } catch (e) {
-        return {
+        result = {
           providerId: p.id,
           providerName: p.name,
           error: localizeError(e instanceof Error ? e.message : String(e)),
         }
       }
+      onResult?.(result)
+      return result
     }),
   )
 }

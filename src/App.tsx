@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import { fetchAll, fetchAllAqi, PROVIDERS } from './providers'
+import { activeProviders, fetchAll, fetchAllAqi, PROVIDERS } from './providers'
 import type { AqiResult, GeoLocation, MinutelyRain, ProviderResult, WeatherWarning } from './providers/types'
 import { WeatherIcon } from './WeatherIcon'
 import { WeatherFX, fxKind, type FxKind, type CloudTint } from './WeatherFX'
@@ -140,25 +140,45 @@ export default function App() {
     const id = ++refreshIdRef.current
     setLoading(true)
     const loc = CITIES[cityIdx]
+
+    // 流式加载：按当前生效信源建立累加表（以上次好值为底），每个源各自返回就
+    // 立即刷新 UI —— 快源（如彩云）先出，不再被最慢的源（如番禺气象台抓 tqyb
+    // 常拖到 8s 超时）拖住整批。
+    const active = activeProviders(loc)
+    const prior = new Map(resultsRef.current.map((r) => [r.providerId, r]))
+    const acc = new Map<string, ProviderResult>(
+      active.map((p) => [p.id, prior.get(p.id) ?? { providerId: p.id, providerName: p.name }]),
+    )
+    const snapshot = () => active.map((p) => acc.get(p.id)!)
+    const flush = () => { if (id === refreshIdRef.current) setResults(snapshot()) }
+    const patch = (r: ProviderResult) => {
+      const existing = acc.get(r.providerId)
+      // 成功→用新值；失败→保留已有好值（不用瞬时错误覆盖上次的数据）
+      acc.set(r.providerId, r.current ? r : (existing?.current ? existing : r))
+      flush()
+    }
+    flush()   // 先按 active 裁剪并渲染（切城市后剔除不适用的旧信源，如安福不显示番禺气象台）
+
     try {
-      const [weather, aqi] = await Promise.all([fetchAll(loc), fetchAllAqi(loc)])
+      const [, aqi] = await Promise.all([fetchAll(loc, patch), fetchAllAqi(loc)])
       if (id !== refreshIdRef.current) return
-      const healthy = weatherHealthy(weather)
-      setResults((previous) => healthy > 0 || weatherHealthy(previous) === 0 ? weather : previous)
+      const finalResults = snapshot()
+      const healthy = weatherHealthy(finalResults)
+      setResults(finalResults)
       setAir(aqi.sources)
       setRefreshError(
         healthy === 0
           ? '天气信源暂时不可用，当前显示最近一次数据'
-          : healthy < weather.length
-            ? `${weather.length - healthy} 个天气信源暂时不可用`
+          : healthy < finalResults.length
+            ? `${finalResults.length - healthy} 个天气信源暂时不可用`
             : null,
       )
       if (healthy > 0) {
         setUpdatedAt(new Date())
-        writeCache(cityIdx, weather, aqi.sources)
+        writeCache(cityIdx, finalResults, aqi.sources)
       }
       if (aqiHealthy(aqi.sources) < 2) void backfill(id, cityIdx, loc, aqi.sources)
-      if (weatherHealthy(weather) < weather.length) void backfillWeather(id, cityIdx, loc, weather)
+      if (healthy < finalResults.length) void backfillWeather(id, cityIdx, loc, finalResults)
     } finally {
       if (id === refreshIdRef.current) {
         setLoading(false)
