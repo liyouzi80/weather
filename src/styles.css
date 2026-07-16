@@ -41,8 +41,7 @@
 /* Vibrancy（振动）：玻璃卡上的次要文字用 plus-lighter 与底色叠加，
    透出背景亮度，避免在不同天空配色下灰字「消失」。深色界面下只提亮不压暗。 */
 @supports (mix-blend-mode: plus-lighter) {
-  .mc-label, .notice-issued,
-  .notice-detail, .notice-note {
+  .mc-label, .notice-issued, .notice-note {
     mix-blend-mode: plus-lighter;
   }
 }
@@ -525,38 +524,15 @@ button.hero-updated:active {
 @supports not (-webkit-touch-callout: none) {
   .hero-temp, .hero-deg { font-weight: 300; }
 }
-/* 天气状况 + 体感/湿度：同一视觉层级（统一字号/字重/颜色），紧贴排列在温度下方 */
+/* 天气状况：紧贴排列在温度下方 */
 .hero-cond {
   font-size: 17px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.90);
   margin-top: 12px;
 }
-.hero-comfort {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 7px;
-  font-size: 17px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.90);
-  margin-top: 4px;
-}
-.hero-comfort-sep { opacity: 0.4; font-weight: 400; }
-.hero-hilo {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  font-size: 14px;
-  font-weight: 400;
-  color: rgba(255, 255, 255, 0.58);
-  margin-top: 10px;
-  letter-spacing: 0.01em;
-}
 /* Hero 文字暗影：保证在浅色天空 + 飘动粒子下清晰可读 */
 .hero-cond,
-.hero-hilo,
-.hero-comfort,
 .hero-updated {
   text-shadow: 0 1px 12px rgba(0, 0, 0, 0.25);
 }
@@ -576,7 +552,6 @@ button.hero-updated:active {
 }
 .hskel-temp  { width: clamp(160px, 46vw, 220px); height: clamp(76px, 23vw, 108px); border-radius: var(--radius); }
 .hskel-cond  { width: 80px;  height: 18px; margin-top: 14px; }
-.hskel-hilo  { width: 148px; height: 17px; margin-top: 7px; }
 .hero-unavailable {
   margin-top: 22px;
   color: rgba(255, 255, 255, 0.72);
@@ -689,9 +664,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
   padding-top: 10px;
   font-weight: 500;
 }
-
-.card.err { opacity: 0.7; }
-.card .err-msg { color: #ff6961; font-size: 13px; font-weight: 500; }
 
 /* 可信度评分：5 个小圆点 */
 .score-dots {
@@ -856,8 +828,7 @@ a.card { text-decoration: none; color: inherit; display: block; }
   .app { padding: 0 max(12px, env(safe-area-inset-right)) max(44px, calc(20px + env(safe-area-inset-bottom))) max(12px, env(safe-area-inset-left)); }
   .hero-city { font-size: 24px; }
   .hero-temp { font-size: 92px; }
-  .hero-cond, .hero-comfort { font-size: 19px; }
-  .hero-hilo { font-size: 16px; }
+  .hero-cond { font-size: 19px; }
   .card { padding: 14px 14px; }
   .card .temp { font-size: 22px; }
   .score-dot-button { width: 12px; }
@@ -1087,16 +1058,6 @@ a.card { text-decoration: none; color: inherit; display: block; }
   -webkit-tap-highlight-color: transparent;
   margin-bottom: 0;
 }
-.cards-summary-label {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  font-size: 14px;
-  font-weight: 500;
-}
-.cards-summary-count { font-weight: 600; color: var(--text); }
-.cards-summary-sep   { color: var(--text-dim); opacity: 0.5; }
 /* 箭头：展开时旋转 180° */
 .cards-chevron {
   flex-shrink: 0;
