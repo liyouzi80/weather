@@ -142,7 +142,7 @@ html[data-sky='snow'], html[data-sky='overcast'] {
 .app {
   max-width: 560px;
   margin: 0 auto;
-  /* 顶部安全区交由吸顶头部处理；底部留出空间给固定的页面圆点 + home 指示条；
+  /* 顶部安全区由 .hero 的 padding 处理；底部留出空间给固定的页面圆点 + home 指示条；
      左右取安全区与 20px 的较大值，刘海机横屏时内容不被挖空区压住 */
   padding: 0 max(20px, env(safe-area-inset-right))
              max(48px, calc(24px + env(safe-area-inset-bottom)))
