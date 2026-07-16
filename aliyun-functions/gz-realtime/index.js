@@ -95,9 +95,25 @@ function mapAreaData(d) {
 
   const temp = mean('t')
   if (temp == null) throw new Error('未解析到温度 GDPY.t')
+  // 合理性护栏：番禺（亚热带）实况温度超出 [-10, 45]℃ 视为上游异常
+  // （区域均值由 925 站累加求平均，单个自动站故障即可拉偏）。宁可让本信源
+  // 显示暂无数据，也不返回错得离谱的温度。
+  if (temp < -10 || temp > 45)
+    throw new Error('温度超出合理范围（' + temp + '℃），疑似上游站点异常')
 
   const speedMs = mean('wdidf')
   const deg     = mean('wdidd')
+
+  // 二级字段各自范围校验：越界则丢弃（不影响主信源可用性）
+  const rhRaw = mean('rh')
+  const humidity = rhRaw != null && rhRaw >= 0 && rhRaw <= 100 ? rhRaw : undefined
+  const pRaw = mean('p')
+  const pressure = pRaw != null && pRaw >= 900 && pRaw <= 1080 ? pRaw : undefined
+  const rainRaw = mean('hourrf')
+  const rain1h = rainRaw != null && rainRaw >= 0 && rainRaw <= 500 ? rainRaw : undefined
+  const windSpeed = speedMs != null && speedMs >= 0 && speedMs <= 100
+    ? Math.round(speedMs * 3.6 * 10) / 10
+    : undefined
 
   let observedAt
   const ts = typeof gdpy.ddatetime === 'string' ? gdpy.ddatetime : undefined
@@ -109,11 +125,11 @@ function mapAreaData(d) {
 
   return {
     temp,
-    humidity:  mean('rh'),
-    windSpeed: speedMs != null ? Math.round(speedMs * 3.6 * 10) / 10 : undefined,
+    humidity,
+    windSpeed,
     windDir:   deg != null ? degToDir(deg) : undefined,
-    pressure:  mean('p'),
-    rain1h:    mean('hourrf'),
+    pressure,
+    rain1h,
     text:      undefined,
     observedAt,
   }
